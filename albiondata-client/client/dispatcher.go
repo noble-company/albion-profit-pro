@@ -1,16 +1,21 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
-
 	"strings"
+	"sync"
 
 	"github.com/ao-data/albiondata-client/lib"
 	"github.com/ao-data/albiondata-client/log"
 )
 
-type dispatcher struct{}
+type dispatcher struct {
+	mu        sync.Mutex
+	uploaders map[string]*queuedUploader
+	closed    bool
+}
 
 var (
 	wsHub *WSHub
@@ -18,13 +23,81 @@ var (
 )
 
 func createDispatcher() {
-	dis = &dispatcher{}
+	dis = &dispatcher{uploaders: make(map[string]*queuedUploader)}
 
 	if ConfigGlobal.EnableWebsockets {
 		wsHub = newHub()
 		go wsHub.run()
 		go runHTTPServer()
 	}
+}
+
+func (d *dispatcher) uploaderFor(target string) *queuedUploader {
+	target = strings.TrimSpace(target)
+	if target == "" || target == "noop" {
+		return nil
+	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.closed {
+		return nil
+	}
+	if existing := d.uploaders[target]; existing != nil {
+		return existing
+	}
+
+	created := createUploaders([]string{target})
+	if len(created) == 0 {
+		return nil
+	}
+	queued := newQueuedUploader(target, created[0], defaultUploadQueueCapacity, defaultUploadWorkerCount)
+	d.uploaders[target] = queued
+	return queued
+}
+
+func (d *dispatcher) shutdown(ctx context.Context) bool {
+	d.mu.Lock()
+	if d.closed {
+		d.mu.Unlock()
+		return true
+	}
+	d.closed = true
+	uploaders := make([]*queuedUploader, 0, len(d.uploaders))
+	for _, queued := range d.uploaders {
+		uploaders = append(uploaders, queued)
+	}
+	d.mu.Unlock()
+
+	allDrained := true
+	for _, queued := range uploaders {
+		if !queued.shutdown(ctx) {
+			allDrained = false
+		}
+	}
+	return allDrained
+}
+
+func (d *dispatcher) resetUploaders(ctx context.Context) bool {
+	d.mu.Lock()
+	if d.closed {
+		d.mu.Unlock()
+		return false
+	}
+	uploaders := make([]*queuedUploader, 0, len(d.uploaders))
+	for _, queued := range d.uploaders {
+		uploaders = append(uploaders, queued)
+	}
+	d.uploaders = make(map[string]*queuedUploader)
+	d.mu.Unlock()
+
+	allDrained := true
+	for _, queued := range uploaders {
+		if !queued.shutdown(ctx) {
+			allDrained = false
+		}
+	}
+	return allDrained
 }
 
 func createUploaders(targets []string) []uploader {
@@ -55,7 +128,8 @@ func createUploaders(targets []string) []uploader {
 		case target == "noop":
 			// anunciado como valido no help do -i; descarta de proposito, sem uploader
 		default:
-			log.Infof("An invalid ingest target was specified: %v", target)
+			// Nao ecoar o valor: configuracoes invalidas podem conter credenciais/query.
+			log.Info("An invalid ingest target scheme was specified.")
 		}
 	}
 
@@ -69,18 +143,16 @@ func sendMsgToPublicUploaders(upload interface{}, topic string, state *albionSta
 		return
 	}
 
-	var PublicIngestBaseUrls = ConfigGlobal.PublicIngestBaseUrls
+	configuredTargets, _, _ := configuredConnection()
+	var PublicIngestBaseUrls = configuredTargets
 	// http+pow://albion-online-data.com is used as a magic placeholder for every realm there is
-	if strings.Contains(ConfigGlobal.PublicIngestBaseUrls, "https+pow://albion-online-data.com") {
+	if strings.Contains(configuredTargets, "https+pow://albion-online-data.com") {
 		// we replace the placeholder with the correct one based on the serverID from albionState
 		PublicIngestBaseUrls = strings.Replace(PublicIngestBaseUrls, "https+pow://albion-online-data.com", state.AODataIngestBaseURL, -1)
 	}
 
-	var publicUploaders = createUploaders(strings.Split(PublicIngestBaseUrls, ","))
-	var privateUploaders = createUploaders(strings.Split(ConfigGlobal.PrivateIngestBaseUrls, ","))
-
-	sendMsgToUploaders(data, topic, publicUploaders, state, identifier)
-	sendMsgToUploaders(data, topic, privateUploaders, state, identifier)
+	sendMsgToTargets(data, topic, strings.Split(PublicIngestBaseUrls, ","), state, identifier)
+	sendMsgToTargets(data, topic, strings.Split(ConfigGlobal.PrivateIngestBaseUrls, ","), state, identifier)
 
 	// If websockets are enabled, send the data there too
 	if ConfigGlobal.EnableWebsockets {
@@ -89,7 +161,8 @@ func sendMsgToPublicUploaders(upload interface{}, topic string, state *albionSta
 }
 
 func sendMsgToPrivateUploaders(upload lib.PersonalizedUpload, topic string, state *albionState, identifier string) {
-	if ConfigGlobal.DisableUpload {
+	_, _, uploadsDisabled := configuredConnection()
+	if uploadsDisabled {
 		log.Info("Upload is disabled.")
 		return
 	}
@@ -110,10 +183,7 @@ func sendMsgToPrivateUploaders(upload lib.PersonalizedUpload, topic string, stat
 		return
 	}
 
-	var privateUploaders = createUploaders(strings.Split(ConfigGlobal.PrivateIngestBaseUrls, ","))
-	if len(privateUploaders) > 0 {
-		sendMsgToUploaders(data, topic, privateUploaders, state, identifier)
-	}
+	sendMsgToTargets(data, topic, strings.Split(ConfigGlobal.PrivateIngestBaseUrls, ","), state, identifier)
 
 	// If websockets are enabled, send the data there too
 	if ConfigGlobal.EnableWebsockets {
@@ -121,15 +191,40 @@ func sendMsgToPrivateUploaders(upload lib.PersonalizedUpload, topic string, stat
 	}
 }
 
-func sendMsgToUploaders(msg []byte, topic string, uploaders []uploader, state *albionState, identifier string) {
-	if ConfigGlobal.DisableUpload {
-		log.Info("Upload is disabled.")
+// PATCH LOCAL (Albion Profit Pro): resolve e armazena um uploader por destino durante
+// todo o ciclo do client. O caminho de captura apenas tenta enfileirar; rede lenta nunca
+// cria uma goroutine por pacote nem bloqueia o router.
+func sendMsgToTargets(msg []byte, topic string, targets []string, state *albionState, identifier string) {
+	_, _, uploadsDisabled := configuredConnection()
+	if uploadsDisabled {
 		return
 	}
-
-	for _, u := range uploaders {
-		u.sendToIngest(msg, topic, state, identifier)
+	if dis == nil {
+		createDispatcher()
 	}
+
+	for _, target := range targets {
+		target = strings.TrimSpace(target)
+		if target == "" || target == "noop" {
+			continue
+		}
+		if isAuthenticatedTarget(target) {
+			if !authenticatedUploadsAllowed() {
+				continue
+			}
+			if _, ok := state.serverForAuthenticatedUpload(); !ok {
+				continue
+			}
+		}
+		queued := dis.uploaderFor(target)
+		if queued != nil {
+			queued.enqueue(msg, topic, state, identifier)
+		}
+	}
+}
+
+func isAuthenticatedTarget(target string) bool {
+	return strings.HasPrefix(target, "http+token://") || strings.HasPrefix(target, "https+token://")
 }
 
 func runHTTPServer() {

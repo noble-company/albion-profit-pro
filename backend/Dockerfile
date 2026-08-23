@@ -22,9 +22,12 @@ USER app
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"
 
-# Entrypoint default é a API; o serviço "worker" no stack.yml sobrescreve o CMD.
-# Migration NÃO roda aqui de propósito (task 34) — um serviço "migrate" dedicado no
+# Entrypoint default é a API; o stack de produção sobrescreve o CMD para os jobs,
+# workers dedicados e beat. Cada papel também substitui este healthcheck da imagem.
+# Migration NÃO roda aqui de propósito — um serviço "migrate" dedicado no
 # stack.yml (command: alembic upgrade head, restart_policy condition: none) roda uma vez
 # antes de API/worker subirem, em vez de N réplicas da API disputando a migration ao
 # mesmo tempo no entrypoint.
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# A aplicação valida a cadeia X-Forwarded-For contra TRUSTED_PROXY_CIDRS. Desabilitar a
+# reescrita prévia do peer pelo Uvicorn preserva o endereço imediato do Traefik.
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

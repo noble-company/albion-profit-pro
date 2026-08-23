@@ -63,21 +63,25 @@ async def test_process_market_orders_inserts_batch_and_updates_cache(db_session)
         ]
     }
 
-    await save_market_orders(async_session_maker, get_redis(), payload)
+    await save_market_orders(async_session_maker, get_redis(), payload, "west")
 
     result = await db_session.execute(select(MarketOrder).where(MarketOrder.item_id == item_id))
     rows = result.scalars().all()
     assert len(rows) == 2
 
-    cached = (await mget_book_depths(get_redis(), item_id, [("1002", 1, 0)]))[("1002", 1, 0)]
+    cached = (await mget_book_depths(get_redis(), "west", item_id, [("1002", 1, 0)]))[
+        ("1002", 1, 0)
+    ]
     assert cached is not None
-    # profundidade recalculada do Postgres (task 29, achado C4): venda.preco é o MENOR
+    # profundidade recalculada do Postgres (task 29, achado C4): melhor_preco é o MENOR
     # preço de venda do livro inteiro pra essa combinação (100), não o primeiro/último
     # do lote (120) — e soma as duas ordens na quantidade total.
-    assert Decimal(cached["venda"]["preco"]) == Decimal("100")
-    assert cached["venda"]["total_unidades"] == 60
-    assert cached["venda"]["qtd_ordens"] == 2
+    assert Decimal(cached["venda"]["melhor_preco"]) == Decimal("100")
+    assert cached["venda"]["unidades_observadas"] == 60
+    assert cached["venda"]["ordens_observadas"] == 2
 
 
 async def test_process_market_orders_with_empty_list_does_nothing():
-    await save_market_orders(async_session_maker, get_redis(), {"orders": []})  # não levanta
+    await save_market_orders(
+        async_session_maker, get_redis(), {"orders": []}, "west"
+    )  # não levanta

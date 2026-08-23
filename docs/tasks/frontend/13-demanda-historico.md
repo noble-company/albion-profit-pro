@@ -8,8 +8,8 @@ O endpoint conhece unidades/ordens e histórico agregado; “quantas pessoas com
 interpretação falsa.
 
 ## O que implementar
-- `DemandaItem` e `GraficoSerie6h` sobre `/items/{unique_name}/demand` somente após local e qualidade
-  estarem definidos; incluir encantamento.
+- `DemandaItem` e `GraficoSerie6h` sobre `/items/{unique_name}/demand` somente após `server` (estado
+  global da task 09), local e qualidade estarem definidos; incluir encantamento.
 - Cards separados: livro atual, vendido 24 h, 7 d e 30 d. Rótulos deixam claro unidade/volume.
 - Gráfico Recharts da série de 6 h, com tooltip acessível, timezone local e tabela textual
   alternativa. Não unir visualmente buckets de 1 h e 6 h como uma série contínua.
@@ -25,5 +25,5 @@ Task 12.
 Trocar cidade/qualidade e comparar tendência com o histórico disponível no jogo.
 
 ## Testes automatizados
-Query condicional, janelas separadas, série vazia, troca de filtros, tabela alternativa e labels sem
-“pessoas”.
+Query condicional (inclui `server` nas dependências do hook), janelas separadas, série vazia, troca
+de filtros, tabela alternativa e labels sem “pessoas”.

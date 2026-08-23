@@ -2,10 +2,12 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,14 +15,30 @@ import (
 )
 
 // PATCH LOCAL (Albion Profit Pro): teto por requisicao. Sem isso o http.Client nao tem
-// timeout nenhum e o http.Transport tambem e pelado -- combinado com router.go, que dispara
-// uma goroutine por operacao sem limite, um backend travado faz o client vazar goroutine e
-// socket ate morrer de exaustao de memoria.
+// timeout nenhum e o http.Transport tambem e pelado. O uploader agora e reutilizado e a fila
+// e limitada, mas cada tentativa ainda precisa de teto para permitir shutdown previsivel.
 const ingestRequestTimeout = 30 * time.Second
 
+const (
+	defaultIngestMaxAttempts = 4
+	defaultRetryBaseDelay    = 250 * time.Millisecond
+	defaultRetryMaxDelay     = 5 * time.Second
+)
+
+type httpRetryPolicy struct {
+	maxAttempts int
+	baseDelay   time.Duration
+	maxDelay    time.Duration
+}
+
 type httpUploader struct {
-	baseURL   string
-	transport *http.Transport
+	baseURL       string
+	transport     *http.Transport
+	client        *http.Client
+	ctx           context.Context
+	cancel        context.CancelFunc
+	retry         httpRetryPolicy
+	authenticated bool
 	// PATCH LOCAL (Albion Profit Pro): vazio = nao envia Authorization. So destinos
 	// marcados com o esquema "+token" preenchem isso -- ver newHTTPUploaderAuth.
 	apiToken string
@@ -28,10 +46,7 @@ type httpUploader struct {
 
 // newHTTPUploader creates a new HTTP uploader
 func newHTTPUploader(url string) uploader {
-	return &httpUploader{
-		baseURL:   url,
-		transport: &http.Transport{},
-	}
+	return buildHTTPUploader(url, false, "")
 }
 
 // newHTTPUploaderAuth cria um uploader autenticado para o ingest do Albion Profit Pro.
@@ -42,59 +57,174 @@ func newHTTPUploader(url string) uploader {
 // e sem essa marcacao adicionar um segundo destino depois mandaria o nosso token de ingest
 // junto para um terceiro.
 func newHTTPUploaderAuth(url string) uploader {
-	url = strings.Replace(url, "https+token", "https", -1)
-	url = strings.Replace(url, "http+token", "http", -1)
+	url = stripTokenScheme(url)
+	_, token, _ := configuredConnection()
+	return buildHTTPUploader(url, true, token)
+}
 
-	return &httpUploader{
-		baseURL:   url,
-		transport: &http.Transport{},
-		apiToken:  ConfigGlobal.ApiToken,
+func stripTokenScheme(rawURL string) string {
+	switch {
+	case strings.HasPrefix(rawURL, "https+token://"):
+		return "https://" + strings.TrimPrefix(rawURL, "https+token://")
+	case strings.HasPrefix(rawURL, "http+token://"):
+		return "http://" + strings.TrimPrefix(rawURL, "http+token://")
+	default:
+		return rawURL
 	}
 }
 
-func (u *httpUploader) sendToIngest(body []byte, topic string, state *albionState, identifier string) {
-	// not handling sending identifier since the official usage is with http_pow
+func buildHTTPUploader(baseURL string, authenticated bool, apiToken string) *httpUploader {
+	transport := &http.Transport{}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &httpUploader{
+		baseURL:   baseURL,
+		transport: transport,
+		client:    &http.Client{Transport: transport, Timeout: ingestRequestTimeout},
+		ctx:       ctx,
+		cancel:    cancel,
+		retry: httpRetryPolicy{
+			maxAttempts: defaultIngestMaxAttempts,
+			baseDelay:   defaultRetryBaseDelay,
+			maxDelay:    defaultRetryMaxDelay,
+		},
+		authenticated: authenticated,
+		apiToken:      apiToken,
+	}
+}
 
-	client := &http.Client{Transport: u.transport, Timeout: ingestRequestTimeout}
-
-	fullURL := u.baseURL + "/" + topic
-
-	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer([]byte(body)))
-	if err != nil {
-		log.Errorf("Error while create new request: %v", err)
+func (u *httpUploader) sendToIngest(body []byte, topic string, metadata uploadMetadata, identifier string) {
+	if u.authenticated && !authenticatedUploadsAllowed() {
 		return
 	}
+	// not handling sending identifier since the official usage is with http_pow
+	realm := "unknown"
+	// PATCH LOCAL (Albion Profit Pro): realm is product metadata and only leaves
+	// through authenticated +token destinations. Unknown realm holds the upload.
+	if u.authenticated {
+		server, ok := albionServerFromID(metadata.serverID)
+		if !ok {
+			return
+		}
+		realm = string(server)
+	}
 
+	for attempt := 1; attempt <= u.retry.maxAttempts; attempt++ {
+		status, retryAfter, err := u.doRequest(body, topic, realm)
+		if err == nil && status >= 200 && status <= 299 {
+			log.Infof(
+				"Ingest request completed (attempt=%d destination=%s topic=%s realm=%s result=success status=%d)",
+				attempt, sanitizeDestination(u.baseURL), topic, realm, status,
+			)
+			return
+		}
+
+		retryable := err != nil || isRetryableHTTPStatus(status)
+		if !retryable || attempt == u.retry.maxAttempts {
+			if u.authenticated && status == http.StatusUnauthorized {
+				markUploadUnauthorized()
+			}
+			if u.authenticated && (err != nil || isRetryableHTTPStatus(status)) {
+				markUploadBackendUnavailable()
+			}
+			if err != nil {
+				log.Errorf(
+					"Ingest request failed (attempt=%d destination=%s topic=%s realm=%s result=failed error_type=%T)",
+					attempt, sanitizeDestination(u.baseURL), topic, realm, err,
+				)
+			} else {
+				log.Errorf(
+					"Ingest request rejected (attempt=%d destination=%s topic=%s realm=%s result=failed status=%d)",
+					attempt, sanitizeDestination(u.baseURL), topic, realm, status,
+				)
+			}
+			return
+		}
+
+		delay := u.retryDelay(attempt, retryAfter)
+		log.Warnf(
+			"Retrying ingest request (attempt=%d destination=%s topic=%s realm=%s result=retry delay=%s status=%d)",
+			attempt, sanitizeDestination(u.baseURL), topic, realm, delay, status,
+		)
+		if !u.waitForRetry(delay) {
+			return
+		}
+	}
+}
+
+func (u *httpUploader) doRequest(body []byte, topic string, realm string) (int, time.Duration, error) {
+	fullURL := u.baseURL + "/" + topic
+	req, err := http.NewRequestWithContext(u.ctx, http.MethodPost, fullURL, bytes.NewReader(body))
+	if err != nil {
+		return 0, 0, err
+	}
 	req.Header.Set("Content-Type", "application/json")
-	// PATCH LOCAL (Albion Profit Pro): o uploader pow ja mandava User-Agent, o http puro
-	// nao -- sem isso nao da para saber, do lado do servidor, qual versao de client mandou
-	// o dado (necessario quando um patch do jogo quebrar o contrato).
 	req.Header.Set("User-Agent", fmt.Sprintf("albiondata-client/%v", version))
-	// PATCH LOCAL (Albion Profit Pro): so destinos "+token" tem apiToken preenchido.
+	if u.authenticated {
+		req.Header.Set("X-Albion-Server", realm)
+	}
 	if u.apiToken != "" {
 		req.Header.Set("Authorization", "Bearer "+u.apiToken)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := u.client.Do(req)
 	if err != nil {
-		log.Errorf("Error while sending ingest with data: %v", err)
-		return
+		return 0, 0, err
 	}
-	// PATCH LOCAL (Albion Profit Pro): o defer estava no fim da funcao, entao o return do
-	// status ruim (abaixo) pulava o Close e vazava a conexao -- justamente no caminho de
-	// erro, que e quando o client mais precisa sobreviver.
-	defer resp.Body.Close()
+	retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	return resp.StatusCode, retryAfter, nil
+}
 
-	// PATCH LOCAL (Albion Profit Pro): faixa 2xx em vez de == 200, e o log passa a dizer
-	// QUAL destino e QUAL topico falhou (com 6 topicos publicos, "bad response code: 404"
-	// sozinho nao identifica nada).
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		log.Errorf("Got bad response code: %v (url: %v, topic: %v)", resp.StatusCode, u.baseURL, topic)
-		return
+func (u *httpUploader) retryDelay(attempt int, retryAfter time.Duration) time.Duration {
+	if retryAfter > 0 {
+		if retryAfter > u.retry.maxDelay {
+			return u.retry.maxDelay
+		}
+		return retryAfter
 	}
+	delay := u.retry.baseDelay << (attempt - 1)
+	if delay > u.retry.maxDelay {
+		delay = u.retry.maxDelay
+	}
+	// Jitter entre 50% e 100% preserva o teto e evita clientes sincronizados.
+	return time.Duration(float64(delay) * (0.5 + rand.Float64()*0.5))
+}
 
-	// See: https://stackoverflow.com/questions/17948827/reusing-http-connections-in-golang
-	io.Copy(ioutil.Discard, resp.Body)
+func (u *httpUploader) waitForRetry(delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-u.ctx.Done():
+		return false
+	}
+}
 
-	log.Infof("Successfully sent ingest request to %v", u.baseURL)
+func (u *httpUploader) close() {
+	u.cancel()
+	u.transport.CloseIdleConnections()
+}
+
+func isRetryableHTTPStatus(status int) bool {
+	return status == http.StatusRequestTimeout || status == http.StatusTooManyRequests || (status >= 500 && status <= 599)
+}
+
+func parseRetryAfter(value string, now time.Time) time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	if seconds, err := strconv.Atoi(value); err == nil {
+		if seconds > 0 {
+			return time.Duration(seconds) * time.Second
+		}
+		return 0
+	}
+	when, err := http.ParseTime(value)
+	if err != nil || !when.After(now) {
+		return 0
+	}
+	return when.Sub(now)
 }

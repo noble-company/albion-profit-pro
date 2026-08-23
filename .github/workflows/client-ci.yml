@@ -1,0 +1,43 @@
+name: Client CI
+
+# PATCH LOCAL (Albion Profit Pro): workflows must live at the monorepo root.
+on:
+  push:
+    paths:
+      - "albiondata-client/**"
+      - ".github/workflows/client-ci.yml"
+  pull_request:
+    paths:
+      - "albiondata-client/**"
+      - ".github/workflows/client-ci.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: albiondata-client
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: albiondata-client/go.mod
+          cache-dependency-path: albiondata-client/go.sum
+      - name: Install packet-capture headers
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+      - name: Test
+        run: go test ./...
+      - name: Vet
+        run: go vet ./client/
+      # PATCH LOCAL (Albion Profit Pro): albionState e uploader sao concorrentes em
+      # producao; o runner Linux tem CGO + libpcap e e a fonte de verdade do race detector.
+      - name: Race detector
+        run: go test -race ./...
+      - name: Build
+        run: go build -o /tmp/albion-profit-pro-client .
+      - name: Validate formatting without rewriting CRLF files
+        env:
+          FORMAT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: scripts/validate-fmt.sh

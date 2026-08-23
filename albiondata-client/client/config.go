@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ao-data/albiondata-client/log"
 
@@ -22,16 +23,15 @@ const (
 	maxLogFiles = 10
 )
 
-// PATCH LOCAL (Albion Profit Pro): destino padrao do -i. Era
-// "https+pow://albion-online-data.com" -- o client deixou de contribuir com o Albion Data
-// Project (decisao explicita do usuario, 2026-08-23) e passa a mandar para o nosso backend.
-//
-// Constante nomeada, e nao literal no flag.StringVar, porque SetupFlags() e chamado do
-// init() do pacote main -- que nao roda em `go test ./client/`. Sem a constante, o default
-// nao e observavel de nenhum teste do pacote client.
-//
-// Ainda nao ha dominio de producao: trocar por ele no deploy.
-const defaultPublicIngestBaseURL = "http+token://localhost:8000"
+// PATCH LOCAL (Albion Profit Pro): go build local continua conveniente, mas artefatos de
+// release recebem buildProfile=release via ldflags. Sem URL oficial injetada ou configurada,
+// release inicia fail-closed e nunca tenta localhost silenciosamente.
+const developmentPublicIngestBaseURL = "http+token://localhost:8000"
+
+var (
+	buildProfile               = "development"
+	releasePublicIngestBaseURL string
+)
 
 // ansiStripWriter wraps an io.Writer and strips ANSI escape codes before writing
 type ansiStripWriter struct {
@@ -63,6 +63,10 @@ type config struct {
 	ApiToken string
 	// origem do token ("flag -token" / "config.yaml"), so para diagnostico no log
 	apiTokenOrigem                 string
+	publicIngestOrigem             string
+	apiTokenFlag                   string
+	publicIngestFlag               string
+	disableUploadFlag              bool
 	Debug                          bool
 	Trace                          bool
 	DebugEvents                    map[int]bool
@@ -84,15 +88,13 @@ type config struct {
 	PublicIngestBaseUrls           string
 	NoCPULimit                     bool
 	PrintVersion                   bool
-	UpdateGithubOwner              string
-	UpdateGithubRepo               string
 }
 
 // config global config data
 var ConfigGlobal = &config{
-	LogLevel:          "INFO",
-	UpdateGithubOwner: "ao-data",
-	UpdateGithubRepo:  "albiondata-client"}
+	LogLevel: "INFO"}
+
+var connectionConfigMu sync.RWMutex
 
 func (config *config) SetupFlags() {
 	config.setupWebsocketFlags()
@@ -100,12 +102,24 @@ func (config *config) SetupFlags() {
 	config.setupCommonFlags()
 
 	flag.Parse()
+	config.apiTokenFlag = config.ApiToken
+	config.publicIngestFlag = config.PublicIngestBaseUrls
+	config.disableUploadFlag = config.DisableUpload
 
 	// PATCH LOCAL (Albion Profit Pro): resolucao do token tem que acontecer AQUI, depois
 	// do flag.Parse(). setupWebsocketFlags() le o viper la em cima, antes das flags sequer
 	// existirem -- resolver antes faria o default vazio da flag sobrescrever o valor do
 	// config.yaml no Parse.
 	config.ApiToken, config.apiTokenOrigem = resolveApiToken(config.ApiToken, viper.GetString("ApiToken"))
+	config.PublicIngestBaseUrls, config.publicIngestOrigem = resolvePublicIngestBaseURLs(
+		config.PublicIngestBaseUrls,
+		viper.GetString("PublicIngestBaseUrls"),
+		buildProfile,
+		releasePublicIngestBaseURL,
+	)
+	if strings.EqualFold(buildProfile, "release") && config.PublicIngestBaseUrls == "" {
+		config.DisableUpload = true
+	}
 
 	if config.OfflinePath != "" {
 		config.Offline = true
@@ -115,7 +129,7 @@ func (config *config) SetupFlags() {
 			config.DisableUpload = false
 		}
 
-		log.Infof("config.PublicIngestBaseUrls: %v", config.PublicIngestBaseUrls)
+		log.Infof("config.PublicIngestBaseUrls: %v", sanitizeTargetsForLog(config.PublicIngestBaseUrls))
 		log.Infof("config.DisableUpload: %v", config.DisableUpload)
 	}
 
@@ -131,6 +145,42 @@ func (config *config) SetupFlags() {
 		log.Infof("Albion Profit Pro: token de API carregado de %v (final ...%v)",
 			config.apiTokenOrigem, tokenSufixo(config.ApiToken))
 	}
+	if config.PublicIngestBaseUrls != "" {
+		log.Infof("Albion Profit Pro: destino de ingest carregado de %v (%v)",
+			config.publicIngestOrigem, sanitizeTargetsForLog(config.PublicIngestBaseUrls))
+	} else if strings.EqualFold(buildProfile, "release") {
+		log.Warn("Albion Profit Pro: release sem destino de ingest; uploads permanecem desabilitados ate configurar PublicIngestBaseUrls ou -i.")
+	}
+}
+
+func configuredConnection() (targets, token string, disabled bool) {
+	connectionConfigMu.RLock()
+	defer connectionConfigMu.RUnlock()
+	return ConfigGlobal.PublicIngestBaseUrls, ConfigGlobal.ApiToken, ConfigGlobal.DisableUpload
+}
+
+func reloadConnectionConfigFromFile() error {
+	if err := viper.ReadInConfig(); err != nil {
+		return err
+	}
+	token, tokenOrigin := resolveApiToken(ConfigGlobal.apiTokenFlag, viper.GetString("ApiToken"))
+	targets, targetOrigin := resolvePublicIngestBaseURLs(
+		ConfigGlobal.publicIngestFlag,
+		viper.GetString("PublicIngestBaseUrls"),
+		buildProfile,
+		releasePublicIngestBaseURL,
+	)
+	disabled := ConfigGlobal.disableUploadFlag ||
+		(strings.EqualFold(buildProfile, "release") && targets == "")
+
+	connectionConfigMu.Lock()
+	ConfigGlobal.ApiToken = token
+	ConfigGlobal.apiTokenOrigem = tokenOrigin
+	ConfigGlobal.PublicIngestBaseUrls = targets
+	ConfigGlobal.publicIngestOrigem = targetOrigin
+	ConfigGlobal.DisableUpload = disabled
+	connectionConfigMu.Unlock()
+	return nil
 }
 
 // resolveApiToken decide de onde vem o token: flag vence config.yaml, config.yaml vence
@@ -143,6 +193,33 @@ func resolveApiToken(fromFlag string, fromFile string) (token string, origem str
 		return fromFile, "config.yaml"
 	}
 	return "", ""
+}
+
+func resolvePublicIngestBaseURLs(fromFlag, fromFile, profile, releaseDefault string) (string, string) {
+	if strings.TrimSpace(fromFlag) != "" {
+		return strings.TrimSpace(fromFlag), "flag -i"
+	}
+	if strings.TrimSpace(fromFile) != "" {
+		return strings.TrimSpace(fromFile), "config.yaml"
+	}
+	if strings.EqualFold(profile, "release") {
+		if strings.TrimSpace(releaseDefault) != "" {
+			return strings.TrimSpace(releaseDefault), "build de release"
+		}
+		return "", "release sem destino"
+	}
+	return developmentPublicIngestBaseURL, "default de desenvolvimento"
+}
+
+func sanitizeTargetsForLog(targets string) string {
+	if strings.TrimSpace(targets) == "" {
+		return "disabled"
+	}
+	parts := strings.Split(targets, ",")
+	for i, target := range parts {
+		parts[i] = sanitizeDestination(strings.TrimSpace(target))
+	}
+	return strings.Join(parts, ",")
 }
 
 // tokenSufixo devolve os 4 ultimos caracteres do token para log/diagnostico, sem expor o
@@ -174,14 +251,6 @@ func (config *config) setupWebsocketFlags() {
 	config.EnableWebsockets = viper.GetBool("EnableWebsockets")
 	config.AllowedWSHosts = viper.GetStringSlice("AllowedWebsocketHosts")
 
-	// // Keeping for local development, but commenting out so it's not live.
-	// // Read update configuration (use defaults if not specified)
-	// if viper.IsSet("UpdateGithubOwner") {
-	// 	config.UpdateGithubOwner = viper.GetString("UpdateGithubOwner")
-	// }
-	// if viper.IsSet("UpdateGithubRepo") {
-	// 	config.UpdateGithubRepo = viper.GetString("UpdateGithubRepo")
-	// }
 }
 
 func (config *config) setupDebugFlags() {
@@ -282,7 +351,7 @@ func (config *config) setupCommonFlags() {
 	flag.StringVar(
 		&config.PublicIngestBaseUrls,
 		"i",
-		defaultPublicIngestBaseURL, // PATCH LOCAL (Albion Profit Pro) -- ver a constante
+		"", // PATCH LOCAL: resolvido depois do Parse conforme perfil/flag/config.yaml
 		"Base URL to send PUBLIC data to: 'http(s)+token://' (Albion Profit Pro, authenticated), 'http(s)+pow://', 'http(s)://', 'nats://' or 'noop'. Multiple uploaders, comma separated.",
 	)
 

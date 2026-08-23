@@ -1,17 +1,22 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel
+
+from src.prices.constants import AlbionServer
 
 
 class LadoDoLivro(BaseModel):
     """Um lado do livro de ofertas — venda (`offer`) ou compra (`request`). São universos de
-    preço separados (achado C3: no algodão T2 real, venda ficou 37-39 e compra 1-35 — nunca
+    preço separados (no algodão T2 real, venda ficou 37-39 e compra 1-35 — nunca
     devem se misturar num preço só)."""
 
-    preco: Decimal | None = None  # menor preço de venda, ou maior preço de compra
-    total_unidades: int = 0
-    qtd_ordens: int = 0
+    melhor_preco: Decimal | None = None
+    unidades_observadas: int = 0
+    ordens_observadas: int = 0
+    observado_em: datetime | None = None
+    idade_segundos: int | None = None
 
 
 class VolumeVendido(BaseModel):
@@ -29,15 +34,23 @@ class PrecoPorLocal(BaseModel):
     venda: LadoDoLivro
     compra: LadoDoLivro
     vendido_24h: VolumeVendido | None = None
-    # last_seen_at mais recente do livro pra essa combinação — reflete a idade do dado mesmo
-    # quando a profundidade zerou por estar fora da janela de frescor (task 29).
-    varredura_em: datetime | None = None
+    cobertura: Literal["parcial"]
+    janela_frescor_segundos: int
 
 
 class ItemPricesOut(BaseModel):
+    """Preços globais ou combinações cobertas pelo usuário, conforme `scope`.
+
+    Em `mine`, a cobertura de livro e a de histórico são independentes.
+    """
+
+    server: AlbionServer
     item_id: str
-    scope: str  # "all" | "mine"
+    scope: Literal["all", "mine"]
     prices: list[PrecoPorLocal]
+    total: int
+    limit: int
+    offset: int
 
 
 class ItemResumo(BaseModel):
@@ -48,7 +61,8 @@ class ItemResumo(BaseModel):
 class LivroOut(BaseModel):
     venda: LadoDoLivro
     compra: LadoDoLivro
-    varredura_em: datetime | None = None
+    cobertura: Literal["parcial"]
+    janela_frescor_segundos: int
 
 
 class VendidoOut(BaseModel):
@@ -64,10 +78,12 @@ class PontoSerie6h(BaseModel):
 
 
 class DemandOut(BaseModel):
-    """Task 31 — responde "quanta gente está comprando isso agora": `livro` é demanda
+    """Responde "quanta gente está comprando isso agora": `livro` é demanda
     parada esperando no livro de ofertas, `vendido` é giro real transacionado em 3 janelas,
-    `serie_6h` é a série bruta pra quem quiser plotar tendência."""
+    `serie_6h` é a série bruta pra quem quiser plotar tendência. A visão é global e não
+    herda o `scope` do endpoint de preços."""
 
+    server: AlbionServer
     item: ItemResumo
     location_id: str
     livro: LivroOut

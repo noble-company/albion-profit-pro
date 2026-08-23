@@ -40,3 +40,20 @@ Nenhuma task de código. Deve ser compatível com a task 03 quando ela entrar.
 Comparar, por SQL, soma dos buckets de 6h de vários dias com `market_history_daily` antes/depois do
 reparo e executar o job duas vezes.
 
+## Resultado da implementação (2026-08-23)
+
+- O reparo usa limites de dias completos em UTC. O dia corrente nunca é materializado e o dia que
+  contém a borda da retenção funciona como folga integral: ele é removido dos derivados, mas não é
+  reconstruído porque instalações antigas podem já ter podado parte dele.
+- Em cada execução, diários recuperáveis são apagados e reconstruídos na mesma transação a partir
+  dos buckets de 6h. Em seguida, os meses afetados são reconstruídos a partir dos diários, mantendo
+  média ponderada por volume e isolamento por realm.
+- O beat não agenda mais diário e mensal como jobs concorrentes. O job horário executa a sequência
+  diário → mensal; a task mensal foi mantida para replay/operação, mas também faz a sequência
+  completa.
+- A poda de buckets de 6h foi alinhada à meia-noite UTC e sua task executa reparo diário → mensal
+  antes de remover o bruto. O offset operacional mudou para 02:30 UTC.
+- Derivados anteriores à retenção do bruto são preservados: sem os buckets-fonte não existe reparo
+  matematicamente seguro. A rotina corrige somente o intervalo comprovadamente reconstruível.
+- Testes com relógio determinístico cobrem borda, duas execuções separadas por uma hora, bucket
+  atrasado, diário/mensal, idempotência, média ponderada, realm e reparo antes da poda.

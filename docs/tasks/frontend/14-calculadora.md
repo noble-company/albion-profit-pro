@@ -9,6 +9,8 @@ resultado econômico.
 
 ## O que implementar
 - `CalculadoraPage`, `FormularioCraft`, `ResultadoSimulacao` e hook de mutation.
+- `server` vem do estado global da task 09 e é enviado em todo `POST /craft/simulate`; o formulário
+  não o redigita.
 - Inputs: item canônico, quantidade, cidade, qualidade do produto, scope, retorno, estação,
   foco/Premium, taxas editáveis, qualidades e preços manuais quando necessários.
 - Defaults documentados; persistir apenas preferências não secretas em localStorage com schema e

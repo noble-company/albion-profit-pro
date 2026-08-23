@@ -62,3 +62,16 @@ Task 01. A task 02 deve estar concluída antes de distribuir o client alterado.
 - Informar o realm dos dados legados ou autorizar limpeza dos fatos regeneráveis.
 - Testar contas/personagens em realms diferentes, se disponíveis.
 
+## Resultado da implementação (2026-08-23)
+
+- O usuário confirmou que todos os fatos de mercado legados foram coletados no **West**. A
+  migration `c8f3e4a5b6d7` registra essa proveniência e faz backfill explícito para `west`, sem
+  apagar usuários, tokens, receitas ou fatos de mercado.
+- O client traduz `AODataServerID` 1/2/3 para `west`/`east`/`europe`, envia
+  `X-Albion-Server` apenas no uploader autenticado `+token` e segura esse upload enquanto o
+  servidor é desconhecido, com aviso debounced.
+- Backend, Celery, cinco tabelas de mercado, constraints/upserts, rollups, Redis/pub-sub,
+  `scope=mine` e endpoints de preço/demanda carregam realm obrigatoriamente.
+- Validação automatizada concluída: suíte Go completa, suíte Python completa, Ruff e testes
+  específicos de colisão entre realms. A validação dentro do jogo permanece manual para a task
+  final de E2E.

@@ -1,0 +1,129 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - "docs/**"
+      - "README.md"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "scripts/verify_repository.py"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "docs/**"
+      - "README.md"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "scripts/verify_repository.py"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v9
+        with:
+          version: "0.11.10"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install Python 3.13
+        run: uv python install 3.13
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --frozen
+      - name: Lint
+        working-directory: backend
+        run: uv run ruff check .
+      - name: Formatting
+        working-directory: backend
+        run: uv run ruff format --check .
+      - name: Tests with real datastores
+        working-directory: backend
+        run: uv run pytest tests/ -v
+
+  migrations-and-image:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: profitpro
+          POSTGRES_PASSWORD: profitpro
+          POSTGRES_DB: profitpro
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U profitpro"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://profitpro:profitpro@localhost:5432/profitpro
+      REDIS_URL: redis://localhost:6379/0
+      RABBITMQ_URL: amqp://guest:guest@localhost:5672//
+      JWT_SECRET: ci-secret-not-for-production-32-characters
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v9
+        with:
+          version: "0.11.10"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install Python and dependencies
+        run: |
+          uv python install 3.13
+          cd backend
+          uv sync --frozen
+      - name: Validate one migration head
+        working-directory: backend
+        run: test "$(uv run alembic heads | wc -l)" -eq 1
+      - name: Upgrade from empty schema
+        working-directory: backend
+        run: uv run alembic upgrade head
+      - name: Validate previous-schema upgrade
+        working-directory: backend
+        run: |
+          uv run alembic downgrade -1
+          uv run alembic upgrade head
+          uv run alembic current --check-heads
+      - name: Build production image
+        working-directory: backend
+        run: docker build -t profitpro-backend:ci .
+      - name: Inspect image contract
+        run: |
+          test "$(docker image inspect profitpro-backend:ci --format '{{.Config.User}}')" = "app"
+          docker run --rm \
+            -e DATABASE_URL=postgresql+asyncpg://ci:ci@localhost/ci \
+            -e REDIS_URL=redis://localhost:6379/0 \
+            -e RABBITMQ_URL=amqp://guest:guest@localhost:5672// \
+            -e JWT_SECRET=ci-secret-not-for-production-32-characters \
+            profitpro-backend:ci python -m scripts.seed_static_data --help
+          docker run --rm profitpro-backend:ci python -m scripts.run_after_bootstrap --help
+      - name: Run migration and idempotent seed from image
+        run: |
+          COMMON_ARGS=(
+            --rm --network host
+            -e DATABASE_URL=postgresql+asyncpg://profitpro:profitpro@localhost:5432/profitpro
+            -e REDIS_URL=redis://localhost:6379/0
+            -e RABBITMQ_URL=amqp://guest:guest@localhost:5672//
+            -e JWT_SECRET=ci-secret-not-for-production-32-characters
+          )
+          docker run "${COMMON_ARGS[@]}" profitpro-backend:ci alembic upgrade head
+          docker run "${COMMON_ARGS[@]}" profitpro-backend:ci python -m scripts.seed_static_data
+          docker run "${COMMON_ARGS[@]}" profitpro-backend:ci python -m scripts.seed_static_data
+          docker run "${COMMON_ARGS[@]}" profitpro-backend:ci \
+            python -m scripts.run_after_bootstrap --require dataset -- python -c "print('bootstrap ready')"
+
+  repository:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Verify documentation and repository invariants
+        run: python scripts/verify_repository.py

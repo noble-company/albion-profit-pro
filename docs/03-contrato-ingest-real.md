@@ -204,6 +204,23 @@ de tempo, identidade), não de formato.
 Devem substituir os dicts inventados nos testes de contrato.
 Ver [task 36](tasks/backend/36-limpeza-e-refactor-de-testes.md).
 
+## 8a. Realm no transporte e na identidade (implementado em 2026-08-23)
+
+O corpo JSON original do Albion Data Client não identifica a economia de origem. No Profit Pro,
+o uploader autenticado acrescenta o header obrigatório `X-Albion-Server`, com um dos valores
+canônicos `west`, `east` ou `europe`. O valor vem do `AODataServerID` já descoberto pelo tráfego
+do jogo: 1 = West, 2 = East, 3 = Europe. Destinos HTTP comuns e `+pow` não recebem esse metadado.
+
+Realm desconhecido nunca vira West por default: o client segura somente o upload autenticado,
+loga e avisa de forma debounced até identificar o servidor. O backend valida o header antes do
+RabbitMQ e inclui realm no envelope Celery. A identidade de ordens, buckets históricos,
+cobertura, rollups, cache, pub/sub e leituras inclui o realm; as APIs exigem `server`
+explicitamente e o devolvem na resposta.
+
+Para a migration dos dados anteriores a esse contrato, o proprietário confirmou em 2026-08-23
+que toda a coleta legada ocorreu no **West**. Portanto o backfill para `west` é uma decisão com
+proveniência explícita, não uma inferência técnica.
+
 ## 8b. Craft e refino — `evCraftItemFinished` (medido 2026-08-23)
 
 > Capturado com `-events "10,49,71,94" -operations "2,47,48" -debug -d`, personagem
@@ -334,3 +351,99 @@ The players location has not yet been set. Please transition zones so the locati
 É preciso atravessar uma passagem de zona com o client já rodando. Isso é um problema de
 produto pra Fase 2/3, não só de teste — ver
 [01-mapeamento-albiondata-client.md](01-mapeamento-albiondata-client.md) seção 9.
+
+## 10. Validação aplicada na borda (Fase 2.5, Task 07)
+
+Os limites abaixo combinam os structs Go, as fixtures reais desta documentação e a capacidade das
+colunas PostgreSQL. Números no JSON precisam ser números de verdade; strings numéricas não são
+coagidas.
+
+### `marketorders.ingest`
+
+| Campo | Domínio aceito |
+|---|---|
+| `Id` | inteiro positivo de 64 bits |
+| `ItemTypeId` | string não vazia, até 64 caracteres |
+| `ItemGroupTypeId` | até 64 caracteres; vazio continua aceito porque já ocorre no client |
+| `LocationId` | string não vazia, até 64 caracteres; formatos numérico, `-` e `@` continuam válidos |
+| `QualityLevel` | `1..5` |
+| `EnchantmentLevel` | `0..4` |
+| `UnitPriceSilver` | inteiro positivo de 64 bits, ainda na escala ×10.000 do wire |
+| `Amount` | inteiro positivo de 64 bits |
+| `AuctionType` | somente `offer` ou `request` |
+| `Expires` | `YYYY-MM-DDTHH:MM:SS`, com 0..6 casas decimais e timezone ausente, `Z` ou offset |
+
+`Expires` sem timezone é interpretado como UTC, pois é o formato real do client. Qualquer timezone
+explícito é convertido para UTC e o valor interno sai canônico com `+00:00`.
+
+### `markethistories.ingest`
+
+- `AlbionId` é positivo e cabe em `int32`, exatamente como o struct Go;
+- qualidade é `1..5`, timescale é `0..2` e localização segue o mesmo limite de 64 caracteres;
+- `MarketHistories` contém `1..5000` pontos;
+- `ItemAmount` é `0..int64`, porque o client corrige/descarta negativos mas não descarta zero;
+- `SilverAmount` é `0..uint64`;
+- `Timestamp` é tick .NET a partir de 1970 e precisa converter para um `datetime` UTC suportado.
+  Isso rejeita epoch Unix ou overflow ainda na API, antes do RabbitMQ.
+
+### `goldprices.ingest`
+
+O ouro é a exceção temporal: seu struct usa **epoch Unix**, não ticks .NET. `Prices` e
+`Timestamps` aceitam inteiros não negativos de 64 bits, no máximo 5000 elementos, e precisam ter
+o mesmo tamanho. O tópico continua fora do escopo de persistência, mas payload desalinhado não
+chega ao worker.
+
+### Defesa em profundidade e tamanho do corpo
+
+As invariantes essenciais também existem como `CheckConstraint` em `market_order`,
+`market_history_entry` e `market_scan`. Assim, bug no worker ou outro produtor não contorna o
+contrato HTTP.
+
+A aplicação limita o corpo bruto a **10 MiB (10.485.760 bytes)** com o middleware oficial do
+Starlette. O limite conta os bytes recebidos mesmo sem `Content-Length`, com transferência
+chunked ou com header subestimado. Header malformado retorna 400; corpo acima do teto retorna 413.
+Respostas 422 e logs contêm somente caminho/localização/tipo/mensagem do erro — nunca o valor
+rejeitado ou o corpo inteiro. Referências: [Starlette — RequestBodyLimitMiddleware](https://www.starlette.io/middleware/#requestbodylimitmiddleware)
+e [FastAPI — RequestValidationError](https://fastapi.tiangolo.com/tutorial/handling-errors/#override-request-validation-exceptions).
+
+Quando o stack Traefik for materializado na Task 11, o router da API deve receber o middleware de
+buffering com o mesmo teto:
+
+```text
+traefik.http.middlewares.profitpro-body-limit.buffering.maxRequestBodyBytes=10485760
+```
+
+O proxy rejeita cedo; o limite da aplicação continua obrigatório para acesso direto e defesa em
+profundidade.
+O comportamento esperado do proxy está documentado em
+[Traefik — Buffering](https://doc.traefik.io/traefik/middlewares/http/buffering/).
+
+## 11. Cobertura do livro: recorte parcial (Fase 2.5, Task 12)
+
+As capturas disponíveis **não comprovam snapshot completo** de uma combinação. A fixture real
+versionada contém 50 ordens, e a captura original produziu lotes de 50/47/47/50 ordens com IDs
+repetidos entre respostas. O protocolo observado não traz número de página, total esperado,
+`scan_id` nem marcador confiável de conclusão. Portanto, ausência em um lote posterior não prova
+que uma ordem foi comprada ou cancelada.
+
+A decisão conservadora é tratar toda resposta de `marketorders.ingest` como **recorte parcial**:
+
+- o ingest faz upsert por `(realm, source_id)` e nunca remove uma ordem apenas porque ela não veio
+  no lote seguinte;
+- ordens expiradas ou fora da janela configurada não entram nos agregados;
+- a API usa `melhor_preco`, `unidades_observadas` e `ordens_observadas`, com `observado_em` e
+  `idade_segundos` separados para compra e venda; o instante/idade pertence à ordem que definiu o
+  melhor preço, não simplesmente à ordem mais recente daquele lado;
+- cada combinação declara `cobertura: "parcial"` e `janela_frescor_segundos`;
+- o default de frescor continua em 6 horas, centralizado em `prices.policy`, mas permanece uma
+  decisão de produto a validar com operação real.
+
+`GET /items/{item}/prices` consulta somente combinações existentes para item/realm/escopo, aceita
+filtro repetível `location_id` e pagina com `limit`/`offset`; o retorno inclui `total`. Uma chave
+Redis sem combinação correspondente no PostgreSQL é ignorada, e o namespace versionado `livro:v2`
+impede que o contrato antigo seja reutilizado.
+
+O plano representativo foi medido com `EXPLAIN (ANALYZE, BUFFERS)` sobre 3.000 ordens. O PostgreSQL
+usou `ix_market_order_book` para reduzir por realm/item/local/qualidade; encantamento, lado,
+expiração e frescor permaneceram como filtros do agregado. Não houve evidência que justificasse
+uma migration adicional nesta escala; o teste automatizado preserva essa medição como regressão.

@@ -2,6 +2,10 @@
 
 > Corrige **C3**, **C4**, **C5** e **M1** de [../../04-revisao-fase-1.md](../../04-revisao-fase-1.md).
 > Base empírica em [../../03-contrato-ingest-real.md](../../03-contrato-ingest-real.md) seção 5.
+>
+> **Contrato supersedido em parte pela Fase 2.5/Task 12:** como snapshot completo não foi
+> comprovado, os campos atuais dizem `melhor_preco`, `unidades_observadas`, `ordens_observadas`,
+> `observado_em` e `idade_segundos` por lado, com cobertura parcial. Veja o doc 03 §11.
 
 ## Objetivo
 Refazer cache e leitura de preços em torno da pergunta que a calculadora realmente faz:

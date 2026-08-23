@@ -49,3 +49,35 @@ Task 01 (identidade do repositório/canal de release).
 - Escolher repositório/canal oficial e, futuramente, certificado de assinatura.
 - Autorizar publicação de release.
 
+## Resultado da implementação (2026-08-23)
+
+- Updater desabilitado explicitamente por padrão, inclusive em builds versionados.
+- Origem upstream removida da configuração; o único canal habilitável é
+  `noble-company/albion-profit-pro`, compilado no binário e validado com falha fechada.
+- Versão, canal, origem e estado agora são registrados no log e apresentados no systray.
+- Scripts e workflow raiz geram artefatos versionados e checksums SHA-256 para Windows, Linux e
+  macOS. Assinatura de código continua como gate humano antes de habilitar auto-update.
+- Workflows mortos dentro de `albiondata-client/.github/workflows/` foram substituídos por
+  workflows válidos na raiz do monorepo.
+- O glob legado `albiondata-client*` deixou de esconder o entrypoint Go, os ícones e a fonte NSIS;
+  esses arquivos agora fazem parte do baseline reproduzível necessário ao build em clone limpo.
+- Política de release, verificação e sincronização seletiva com upstream documentada em
+  [../../07-releases-do-client.md](../../07-releases-do-client.md).
+
+### Validação executada
+
+- `go test ./...`: verde.
+- `go vet . ./clientupdate ./systray`: verde. O vet global mantém somente o warning upstream de
+  `unsafe.Pointer` já registrado na auditoria e reservado para a Task 14.
+- Três builds `1.2.3` exercitados com `-version`: padrão explicitamente desabilitado; origem
+  `ao-data/albiondata-client` rejeitada e reduzida a estado seguro; origem própria aceita.
+- SHA-256 do build versionado conferido antes/depois da execução: executável inalterado.
+- `scripts/validate-fmt.sh`: verde nos arquivos alterados, comparando conteúdo com EOL
+  normalizado sem executar `gofmt -w`.
+- Workflows raiz analisados como YAML e scripts de build validados com `bash -n`.
+
+### Validações ainda humanas
+
+- Abrir o build Windows e conferir visualmente a linha de versão/canal/estado no systray.
+- Autorizar e acompanhar a primeira GitHub Release para validar os três runners e seus assets.
+- Adquirir/selecionar o certificado e fechar assinatura e rollback antes de habilitar auto-update.

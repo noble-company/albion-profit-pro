@@ -12,6 +12,7 @@ func processOffline(path string) {
 
 	r := newRouter()
 	go r.run()
+	defer r.shutdown()
 
 	_, err := os.Stat(path)
 

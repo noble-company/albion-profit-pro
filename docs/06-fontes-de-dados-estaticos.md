@@ -49,3 +49,40 @@ uma licença explícita para redistribuição na revisão verificada. Por isso:
 
 O significado e a junção entre os arquivos estão documentados em
 [`02-dados-de-receita.md`](02-dados-de-receita.md).
+
+## Bootstrap reproduzível
+
+O manifesto executável do dataset fica em
+[`backend/datasets/albion-static-2026-08-23.json`](../backend/datasets/albion-static-2026-08-23.json).
+Ele fixa origem, revisão, tamanho, SHA-256 e contagens esperadas dos dois arquivos.
+
+No diretório `backend/`, o seed pode baixar diretamente a revisão fixada:
+
+```bash
+uv run python -m scripts.seed_static_data
+```
+
+Ou consumir um volume somente leitura que contenha `items.json` e `ITEM DUMP.json`:
+
+```bash
+uv run python -m scripts.seed_static_data --dataset-dir /datasets
+```
+
+O comando valida os dois artefatos e todas as contagens antes de alterar o catálogo. A aplicação
+de itens, receitas e versão ativa ocorre em uma única transação protegida por advisory lock do
+PostgreSQL; assim, execuções concorrentes são serializadas e leitores observam o catálogo antigo
+ou o novo, nunca uma troca parcial. Se o mesmo manifesto já estiver ativo, o resultado é
+`unchanged` e os dados não são reimportados.
+
+| Resultado esperado | Contagem |
+|---|---:|
+| Entradas de item na fonte | 12.071 |
+| Itens importados | 12.062 |
+| Itens pulados por nome longo | 9 |
+| Receitas importadas | 5.553 |
+| Receitas alternativas puladas | 3.219 |
+| Receitas sem item correspondente | 78 |
+
+O endpoint `/ready` permanece indisponível enquanto não existir uma versão ativa do dataset. Em
+produção, a ordem obrigatória é `migrate → seed → API/worker/beat`; a materialização dos processos
+e filas no stack é escopo da task 11 da Fase 2.5.

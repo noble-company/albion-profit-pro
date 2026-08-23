@@ -9,8 +9,11 @@ custo de consumir cada nível do livro.
 
 ## O que implementar
 - Criar `src/craft/{schemas,service,router}.py` e registrar em `main.py`.
-- Request: `output_item` canônico, quantidade, local, qualidade do produto, `scope`, retorno,
-  estação por execução, foco/premium, overrides de imposto/setup e preços manuais por item/lado.
+- Request: `server` (`AlbionServer`, obrigatório — mesmo enum de `prices/constants.py`), `output_item`
+  canônico, quantidade, local, qualidade do produto, `scope`, retorno, estação por execução,
+  foco/premium, overrides de imposto/setup e preços manuais por item/lado. `server` é repassado
+  integralmente às chamadas de `prices.service` (task de estabilização 03) — sem ele a consulta de
+  livro não sabe qual economia ler.
 - Ingredientes usam qualidade 1 por default, com override explícito quando aplicável.
 - Implementar consulta bulk de fill: ofertas em preço ascendente para compra imediata e requests em
   preço descendente para venda imediata, acumulando quantidade e custo/receita até o lote pedido.

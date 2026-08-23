@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "dataset_name": "albion-static",
+  "version": "2026-08-23-5cf2e8e9",
+  "source": {
+    "repository": "https://github.com/ao-data/ao-bin-dumps",
+    "revision": "5cf2e8e9b7021f98683181fa5b0e3c64575978e4"
+  },
+  "files": {
+    "items": {
+      "filename": "items.json",
+      "url": "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/5cf2e8e9b7021f98683181fa5b0e3c64575978e4/formatted/items.json",
+      "size": 23954341,
+      "sha256": "226a22be333c949f47021130eadce697f921bf55ad3cf740e86e254b0d89163f"
+    },
+    "item_dump": {
+      "filename": "ITEM DUMP.json",
+      "url": "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/5cf2e8e9b7021f98683181fa5b0e3c64575978e4/items.json",
+      "size": 17219057,
+      "sha256": "fc009a9fb60fb9219c9e44391a842fa6032b5a1d218d1b53e0ffdaa28f29c077"
+    }
+  },
+  "expected": {
+    "source_items": 12071,
+    "imported_items": 12062,
+    "skipped_long_item_names": 9,
+    "recipes": 5553,
+    "skipped_multiple_recipes": 3219,
+    "recipes_without_item_id": 78
+  }
+}

@@ -2,17 +2,20 @@
 Mesmo motivo de scripts/import_recipes.py (ver docstring de lá) — `python
 scripts/import_items.py` direto falha com `ModuleNotFoundError: No module named 'src'`.
 
-Já é idempotente por construção (upsert via `ON CONFLICT DO UPDATE` em `unique_name`, task
-28) — a task 35 só corrigiu os caminhos hardcoded relativos ao CWD (mesmo problema de
+É idempotente por construção (upsert via `ON CONFLICT DO UPDATE` em `unique_name`). Os caminhos
+são resolvidos a partir do repositório, nunca do CWD (mesmo problema de
 `import_recipes.py`) e trocou os `print` por log estruturado.
 """
 
 import asyncio
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import structlog
+from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from scripts._dumps import iter_category_entries, load_item_dump_items, load_items_json
 from src.database import async_session_maker
@@ -36,6 +39,13 @@ CHUNK_SIZE = 2000
 # "UNTRADEABLE" — nunca aparecem em marketorders/markethistories.ingest por definição, então
 # são pulados em vez de forçar um alargamento de coluna que não ajudaria em nada.
 MAX_UNIQUE_NAME_LENGTH = 64
+
+
+@dataclass(frozen=True)
+class ItemImportPlan:
+    rows: list[dict]
+    source_count: int
+    skipped_too_long: list[str]
 
 
 def _base_name(unique_name: str) -> str:
@@ -96,15 +106,26 @@ def build_items(
     return rows
 
 
-async def import_items() -> None:
-    dump_metadata = load_dump_metadata(ITEM_DUMP_PATH)
+def prepare_item_import(
+    items_json_path: Path = ITEMS_JSON_PATH, item_dump_path: Path = ITEM_DUMP_PATH
+) -> ItemImportPlan:
+    source_count = len(load_items_json(items_json_path))
+    dump_metadata = load_dump_metadata(item_dump_path)
     skipped_too_long: list[str] = []
-    rows = build_items(ITEMS_JSON_PATH, dump_metadata, skipped_too_long)
+    rows = build_items(items_json_path, dump_metadata, skipped_too_long)
+    return ItemImportPlan(rows, source_count, skipped_too_long)
 
-    async with async_session_maker() as session:
-        for i in range(0, len(rows), CHUNK_SIZE):
-            chunk = rows[i : i + CHUNK_SIZE]
-            stmt = pg_insert(Item).values(chunk)
+
+async def apply_item_import(
+    session: AsyncSession, plan: ItemImportPlan, *, replace: bool = False
+) -> None:
+    if replace:
+        await session.execute(delete(Item))
+
+    for i in range(0, len(plan.rows), CHUNK_SIZE):
+        chunk = plan.rows[i : i + CHUNK_SIZE]
+        stmt = pg_insert(Item).values(chunk)
+        if not replace:
             stmt = stmt.on_conflict_do_update(
                 index_elements=["unique_name"],
                 set_={
@@ -117,14 +138,21 @@ async def import_items() -> None:
                     "shop_subcategory": stmt.excluded.shop_subcategory,
                 },
             )
-            await session.execute(stmt)
+        await session.execute(stmt)
+
+
+async def import_items() -> None:
+    plan = prepare_item_import(ITEMS_JSON_PATH, ITEM_DUMP_PATH)
+
+    async with async_session_maker() as session:
+        await apply_item_import(session, plan)
         await session.commit()
 
     log.info(
         "import_items.concluido",
-        itens_processados=len(rows),
-        pulados_nome_longo=len(skipped_too_long),
-        pulados_nome_longo_amostra=skipped_too_long[:20],
+        itens_processados=len(plan.rows),
+        pulados_nome_longo=len(plan.skipped_too_long),
+        pulados_nome_longo_amostra=plan.skipped_too_long[:20],
     )
 
 

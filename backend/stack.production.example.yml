@@ -1,0 +1,194 @@
+version: "3.9"
+
+x-image: &backend-image "${BACKEND_IMAGE:?defina BACKEND_IMAGE com imagem imutável}"
+x-common-environment: &common-environment
+  ENVIRONMENT: production
+  DATABASE_URL_FILE: /run/secrets/profitpro_database_url
+  REDIS_URL_FILE: /run/secrets/profitpro_redis_url
+  RABBITMQ_URL_FILE: /run/secrets/profitpro_rabbitmq_url
+  JWT_SECRET_FILE: /run/secrets/profitpro_jwt_secret
+  RESET_PASSWORD_TOKEN_SECRET_FILE: /run/secrets/profitpro_reset_password_secret
+  VERIFICATION_TOKEN_SECRET_FILE: /run/secrets/profitpro_verification_secret
+  CORS_ORIGINS: '${CORS_ORIGINS:?informe JSON com as origens permitidas}'
+  TRUSTED_PROXY_CIDRS: '${TRUSTED_PROXY_CIDRS:?informe JSON com os CIDRs do Traefik}'
+x-common-secrets: &common-secrets
+  - profitpro_database_url
+  - profitpro_redis_url
+  - profitpro_rabbitmq_url
+  - profitpro_jwt_secret
+  - profitpro_reset_password_secret
+  - profitpro_verification_secret
+services:
+  migrate:
+    image: *backend-image
+    environment: *common-environment
+    secrets: *common-secrets
+    command: ["python", "-m", "scripts.run_with_secrets", "--", "alembic", "upgrade", "head"]
+    networks: [profitpro_services]
+    healthcheck:
+      disable: true
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: none
+
+  seed:
+    image: *backend-image
+    environment: *common-environment
+    secrets: *common-secrets
+    command:
+      - python
+      - -m
+      - scripts.run_with_secrets
+      - --
+      - python
+      - -m
+      - scripts.run_after_bootstrap
+      - --require
+      - migrations
+      - --
+      - python
+      - -m
+      - scripts.seed_static_data
+    networks: [profitpro_services]
+    healthcheck:
+      disable: true
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+  api:
+    image: *backend-image
+    environment: *common-environment
+    secrets: *common-secrets
+    command:
+      - python
+      - -m
+      - scripts.run_with_secrets
+      - --
+      - python
+      - -m
+      - scripts.run_after_bootstrap
+      - --require
+      - dataset
+      - --
+      - uvicorn
+      - src.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --no-proxy-headers
+    networks: [profitpro_services, traefik_public]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.profitpro-api.rule=Host(`${API_HOST:?defina API_HOST}`)
+        - traefik.http.routers.profitpro-api.entrypoints=websecure
+        - traefik.http.routers.profitpro-api.tls=true
+        - traefik.http.routers.profitpro-api.middlewares=profitpro-body-limit@docker
+        - traefik.http.middlewares.profitpro-body-limit.buffering.maxRequestBodyBytes=10485760
+        - traefik.http.services.profitpro-api.loadbalancer.server.port=8000
+
+  worker-ingest:
+    image: *backend-image
+    environment: *common-environment
+    secrets: *common-secrets
+    command: ["python", "-m", "scripts.run_with_secrets", "--", "python", "-m", "scripts.run_after_bootstrap", "--require", "dataset", "--", "celery", "-A", "src.celery_app.celery_app", "worker", "--queues", "ingest", "--concurrency", "4", "--prefetch-multiplier", "1", "--hostname", "ingest@%h", "--loglevel", "INFO"]
+    networks: [profitpro_services]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.celery_app.celery_app inspect ping --destination ingest@$$(hostname) --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  worker-maintenance:
+    image: *backend-image
+    environment: *common-environment
+    secrets: *common-secrets
+    command: ["python", "-m", "scripts.run_with_secrets", "--", "python", "-m", "scripts.run_after_bootstrap", "--require", "dataset", "--", "celery", "-A", "src.celery_app.celery_app", "worker", "--queues", "maintenance", "--concurrency", "1", "--prefetch-multiplier", "1", "--hostname", "maintenance@%h", "--loglevel", "INFO"]
+    networks: [profitpro_services]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.celery_app.celery_app inspect ping --destination maintenance@$$(hostname) --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  worker-quarantine:
+    image: *backend-image
+    environment: *common-environment
+    secrets: *common-secrets
+    command: ["python", "-m", "scripts.run_with_secrets", "--", "python", "-m", "scripts.run_after_bootstrap", "--require", "dataset", "--", "celery", "-A", "src.celery_app.celery_app", "worker", "--queues", "quarantine", "--concurrency", "1", "--prefetch-multiplier", "1", "--hostname", "quarantine@%h", "--loglevel", "INFO"]
+    networks: [profitpro_services]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.celery_app.celery_app inspect ping --destination quarantine@$$(hostname) --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  beat:
+    image: *backend-image
+    environment: *common-environment
+    secrets: *common-secrets
+    command: ["python", "-m", "scripts.run_with_secrets", "--", "python", "-m", "scripts.run_after_bootstrap", "--require", "dataset", "--", "celery", "-A", "src.celery_app.celery_app", "beat", "--schedule", "/tmp/celerybeat-schedule", "--pidfile", "/tmp/celerybeat.pid", "--loglevel", "INFO"]
+    networks: [profitpro_services]
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /tmp/celerybeat.pid && kill -0 $$(cat /tmp/celerybeat.pid)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+
+secrets:
+  profitpro_database_url:
+    external: true
+  profitpro_redis_url:
+    external: true
+  profitpro_rabbitmq_url:
+    external: true
+  profitpro_jwt_secret:
+    external: true
+  profitpro_reset_password_secret:
+    external: true
+  profitpro_verification_secret:
+    external: true
+
+networks:
+  profitpro_services:
+    external: true
+  traefik_public:
+    external: true

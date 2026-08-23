@@ -17,6 +17,7 @@ type marketHistoryInfo struct {
 	albionId  int32
 	timescale lib.Timescale
 	quality   uint8
+	messageID uint64
 }
 
 type albionState struct {
@@ -35,12 +36,19 @@ type albionState struct {
 	// por operacao -- sem isso era uma notificacao nativa do SO por pacote rejeitado.
 	// Mesmo padrao dos dois campos acima.
 	LocationWarningLastSentAt time.Time
+	// PATCH LOCAL (Albion Profit Pro): authenticated uploads are held until the
+	// packet source identifies west/east/europe. Debounce avoids one toast per packet.
+	ServerWarningLastSentAt time.Time
 
 	// A lot of information is sent out but not contained in the response when requesting marketHistory (e.g. ID)
 	// This information is stored in marketHistoryInfo
 	// This array acts as a type of cache for that info
 	// The index is the message number (param255) % CacheSize
 	marketHistoryIDLookup [CacheSize]marketHistoryInfo
+	// PATCH LOCAL (Albion Profit Pro): respostas podem chegar antes da requisicao quando
+	// varias interfaces capturam o mesmo fluxo. O router serializado guarda a resposta em
+	// vez de dormir e bloquear todas as operacoes por ate 30 segundos.
+	pendingMarketHistoryResponses map[uint64]operationAuctionGetItemAverageStatsResponse
 	// TODO could this be improved?!
 }
 
@@ -51,6 +59,9 @@ var pushNotification = notification.Push
 // locationWarningInterval e a janela de debounce do aviso de localizacao. 60s, mesmo valor
 // que eventFestivitiesUpdate ja usa para o proprio throttle.
 const locationWarningInterval = 60 * time.Second
+
+// PATCH LOCAL (Albion Profit Pro): same user-facing debounce policy as location.
+const serverWarningInterval = 60 * time.Second
 
 // PATCH LOCAL (Albion Profit Pro): receiver por PONTEIRO (era por valor). Alem de copiar o
 // struct inteiro -- incluindo marketHistoryIDLookup, um array de 8192 posicoes -- a cada
@@ -97,6 +108,26 @@ func (state *albionState) avisarLocalizacao(msg string) {
 	}
 	state.LocationWarningLastSentAt = time.Now()
 	pushNotification(msg)
+}
+
+// serverForAuthenticatedUpload returns no default on purpose. Market economies
+// are isolated by realm, so sending an unidentified payload would corrupt data.
+func (state *albionState) serverForAuthenticatedUpload() (AlbionServer, bool) {
+	server, ok := albionServerFromID(state.AODataServerID)
+	if ok {
+		markRealmReady(server)
+		return server, true
+	}
+	markRealmUnknown()
+
+	msg := "Albion Profit Pro ainda nao identificou o servidor (West/East/Europe); o upload de mercado foi pausado. Atravesse uma passagem de zona com o client aberto."
+	log.Error(msg)
+	if state.ServerWarningLastSentAt.IsZero() ||
+		time.Since(state.ServerWarningLastSentAt) >= serverWarningInterval {
+		state.ServerWarningLastSentAt = time.Now()
+		pushNotification(msg)
+	}
+	return "", false
 }
 
 func (state albionState) GetServer() (int, string) {

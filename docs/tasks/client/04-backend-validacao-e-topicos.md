@@ -110,8 +110,9 @@ Dois pontos de atenção:
    `api_tokens_router` vs `auth_router`. Se a ordem parecer frágil, declarar as três rotas
    explicitamente em vez de usar curinga; é mais verboso e mais seguro.
 2. **Não parsear o corpo.** Não vale a pena escrever schema Pydantic pra dado que descartamos. O
-   middleware `LimitarTamanhoDoCorpo` (`src/main.py:27-36`) já rejeita acima de 10 MB antes do
-   parse, então basta logar `request.headers.get("content-length")` sem ler o corpo.
+   `RequestBodyLimitMiddleware` oficial do Starlette (adotado na Fase 2.5 Task 07) rejeita acima
+   de 10 MiB e também mede corpos sem `Content-Length`/chunked. Portanto basta logar o header sem
+   ler o corpo no próprio handler.
 
 Um `topico` fora da lista conhecida deve continuar dando 404 — não queremos aceitar qualquer coisa
 que apareça, só o que sabemos que o client manda.

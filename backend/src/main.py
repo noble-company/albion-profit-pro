@@ -1,11 +1,12 @@
 import structlog
 from fastapi import FastAPI, Request
-from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
-from starlette.middleware.base import BaseHTTPMiddleware
+from sqlalchemy import select, text
+from starlette.datastructures import Headers
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.api_tokens.router import client_router
 from src.api_tokens.router import router as api_tokens_router
@@ -16,29 +17,39 @@ from src.database import async_session_maker
 from src.ingest.router import router as ingest_router
 from src.logging_config import configure_logging
 from src.prices.router import router as prices_router
+from src.readiness import check_rabbitmq
+from src.static_data.models import StaticDatasetVersion
 
 configure_logging()
 
 log = structlog.get_logger()
 settings = get_settings()
 
-MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB (task 33, achado A6)
+MAX_CONTENT_LENGTH = 10 * 1024 * 1024
 
 
-class LimitarTamanhoDoCorpo(BaseHTTPMiddleware):
-    """Rejeita pelo `Content-Length` antes do corpo ser parseado — sem isso, um JSON
-    gigante consome CPU/memória só pra ser rejeitado depois pelo limite do schema
-    (`max_length` em src/ingest/schemas.py), que já leu o corpo inteiro."""
+class ValidarContentLengthMiddleware:
+    """Rejeita o header malformado; o middleware oficial abaixo mede o corpo real."""
 
-    async def dispatch(self, request: Request, call_next):
-        content_length = request.headers.get("content-length")
-        if content_length is not None and int(content_length) > MAX_CONTENT_LENGTH:
-            return JSONResponse(status_code=413, content={"detail": "Payload muito grande"})
-        return await call_next(request)
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            content_length = Headers(scope=scope).get("content-length")
+            if content_length is not None and not content_length.isdigit():
+                response = JSONResponse(
+                    status_code=400,
+                    content={"detail": "Content-Length inválido"},
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 app = FastAPI(title="Albion Profit Pro API")
-app.add_middleware(LimitarTamanhoDoCorpo)
+app.add_middleware(RequestBodyLimitMiddleware, max_body_size=MAX_CONTENT_LENGTH)
+app.add_middleware(ValidarContentLengthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -62,9 +73,24 @@ app.include_router(prices_router)
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Payload rejeitado (422) — ex: client Go mandando algo fora do contrato — deixa de
-    desaparecer sem rastro (ver task 24, docs/04-revisao-fase-1.md, achado A5)."""
-    log.warning("ingest.payload_rejeitado", path=request.url.path, errors=exc.errors())
-    return JSONResponse(status_code=422, content=jsonable_encoder({"detail": exc.errors()}))
+    desaparecer sem rastro."""
+    # `exc.errors()` também inclui o valor bruto em `input`; não o logamos nem devolvemos,
+    # pois um campo inválido pode conter token/senha ou um corpo hostil enorme.
+    safe_errors = [
+        {
+            "loc": list(error["loc"]),
+            "type": error["type"],
+            "msg": error["msg"],
+        }
+        for error in exc.errors()
+    ]
+    log.warning(
+        "ingest.payload_rejeitado",
+        method=request.method,
+        path=request.url.path,
+        errors=safe_errors,
+    )
+    return JSONResponse(status_code=422, content={"detail": safe_errors})
 
 
 @app.get("/health")
@@ -75,18 +101,25 @@ async def health():
 
 @app.get("/ready")
 async def ready():
-    """Confirma que Postgres e Redis estão acessíveis — usado pelo orquestrador pra decidir se roteia tráfego."""
+    """Confirma as dependências obrigatórias antes de o orquestrador rotear tráfego."""
     checks = {}
 
     try:
         async with async_session_maker() as session:
             await session.execute(text("SELECT 1"))
+            dataset_active = await session.scalar(
+                select(StaticDatasetVersion.id)
+                .where(StaticDatasetVersion.active.is_(True))
+                .limit(1)
+            )
         checks["postgres"] = "ok"
+        checks["dataset"] = "ok" if dataset_active is not None else "ausente"
     except Exception:
         # detalhe completo (host/usuário/DSN podem vazar em str(exc)) só no log — o
-        # endpoint não é autenticado (task 33, achado A3)
+        # O endpoint não é autenticado; detalhes internos ficam somente no log.
         log.error("ready.postgres_falhou", exc_info=True)
         checks["postgres"] = "erro"
+        checks["dataset"] = "erro"
 
     try:
         await get_redis().ping()
@@ -94,6 +127,13 @@ async def ready():
     except Exception:
         log.error("ready.redis_falhou", exc_info=True)
         checks["redis"] = "erro"
+
+    try:
+        await check_rabbitmq()
+        checks["rabbitmq"] = "ok"
+    except Exception:
+        log.error("ready.rabbitmq_falhou", exc_info=True)
+        checks["rabbitmq"] = "erro"
 
     all_ok = all(v == "ok" for v in checks.values())
     status_code = 200 if all_ok else 503

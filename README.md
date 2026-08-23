@@ -5,8 +5,8 @@ coletados pelo jogador no mercado do jogo.
 
 > [!WARNING]
 > O projeto está na Fase 2.5 de estabilização. Backend e coleta funcionam ponta a ponta, mas o
-> client ainda não deve ser distribuído amplamente até concluir updater próprio, isolamento por
-> realm, retry e controle de concorrência.
+> client ainda não deve ser distribuído amplamente até concluir os gates restantes de configuração
+> no ambiente real e validação E2E.
 
 ## Arquitetura
 
@@ -24,9 +24,9 @@ FastAPI ──► RabbitMQ ──► Celery worker ──► PostgreSQL
 
 | Diretório | Responsabilidade | Estado |
 |---|---|---|
-| `albiondata-client/` | Captura preços do tráfego local e envia ao backend | Fase 2 concluída; estabilização pendente |
-| `backend/` | Auth, ingest, preços, receitas, filas e persistência | Fases 1 e 1.5 concluídas; estabilização pendente |
-| `frontend/` | SPA da calculadora | Ainda não criado; bloqueado pela Fase 2.5 |
+| `albiondata-client/` | Captura preços do tráfego local e envia ao backend | Fase 2 e estabilização concluídas |
+| `backend/` | Auth, ingest, preços, receitas, filas e persistência | Fases 1, 1.5 e estabilização concluídas |
+| `frontend/` | SPA da calculadora | Ainda não criado; próximo passo |
 | `docs/` | Decisões, contratos, auditorias e specs executáveis | Fonte de verdade do projeto |
 
 PostgreSQL é a fonte de verdade. Redis é somente cache e pode ser esvaziado sem perda de dados.
@@ -50,10 +50,11 @@ git clone https://github.com/noble-company/albion-profit-pro.git
 Set-Location 'albion-profit-pro'
 ```
 
-### 2. Obter os dados estáticos
+### 2. Dados estáticos
 
-Os dumps não são versionados enquanto sua licença de redistribuição não estiver explícita. Baixe
-a revisão fixada pelo projeto:
+Os dumps não são versionados enquanto sua licença de redistribuição não estiver explícita. O job
+de seed baixa a revisão imutável registrada em `backend/datasets/` e valida tamanho, SHA-256 e
+contagens. Para trabalhar offline, obtenha os arquivos antecipadamente:
 
 ```powershell
 $dumpRevision = '5cf2e8e9b7021f98683181fa5b0e3c64575978e4'
@@ -73,8 +74,8 @@ Copy-Item '.env.example' '.env'
 uv sync
 docker compose up -d
 uv run alembic upgrade head
-uv run python -m scripts.import_items
-uv run python -m scripts.import_recipes
+uv run python -m scripts.seed_static_data
+# Com os dumps na raiz: uv run python -m scripts.seed_static_data --dataset-dir ..
 ```
 
 Em terminais separados:
@@ -84,7 +85,10 @@ uv run uvicorn src.main:app --reload
 ```
 
 ```powershell
-uv run celery -A src.celery_app.celery_app worker --loglevel=info
+uv run celery -A src.celery_app.celery_app worker -Q ingest -c 4 --loglevel=info
+uv run celery -A src.celery_app.celery_app worker -Q maintenance -c 1 --loglevel=info
+uv run celery -A src.celery_app.celery_app worker -Q quarantine -c 1 --loglevel=info
+uv run celery -A src.celery_app.celery_app beat --loglevel=info
 ```
 
 ### 4. Compilar o client
@@ -96,9 +100,11 @@ go build -o albiondata-client.exe .
 Copy-Item 'config.yaml.example' 'config.yaml'
 ```
 
-Configure `ApiToken` no `config.yaml`. O arquivo real é ignorado pelo Git. No Windows, confirme
-que o Npcap está instalado e faça uma troca de zona no jogo antes de abrir o mercado; sem uma
-localização válida o client descarta os eventos capturados.
+Configure `PublicIngestBaseUrls` e `ApiToken` no `config.yaml`. O arquivo real é ignorado pelo Git.
+Build local usa localhost; release sem URL explícita bloqueia uploads. O client valida `/client/me`
+no boot e mostra o estado no systray. No Windows, confirme que o Npcap está instalado e faça uma
+troca de zona no jogo antes de abrir o mercado; sem localização/realm válidos o client segura os
+eventos capturados.
 
 ## Desenvolvimento e testes
 
@@ -126,15 +132,25 @@ prejudica comparações futuras. Patches próprios devem continuar marcados com
 
 - Fases 1 e 1.5: backend concluído.
 - Fase 2: integração do client concluída e validada no jogo real.
-- Fase 2.5: estabilização em andamento, 1 de 14 tasks.
-- Fase 3: frontend especificado, mas bloqueado até o gate da Fase 2.5.
-- West, East e Europe ainda não estão isolados no contrato persistido; não misture realms.
-- O updater do client ainda aponta para o projeto upstream; não publique binários antes da Task
-  02 da Fase 2.5.
-- O seed da imagem/deploy ainda não é reproduzível; será fechado na Task 10.
+- Fase 2.5: estabilização concluída, 14/14 tasks. O gate automatizado está verde.
+- Fase 3: frontend especificado e liberado como próximo passo.
+- O ensaio integrado com Albion/Npcap, systray, domínio e Swarm reais será executado após o
+  frontend completo, para validar toda a jornada de uma vez.
+- West, East e Europe estão isolados no wire autenticado, persistência, cache e leitura desde a
+  Task 03.
+- O updater é desabilitado por padrão e rejeita qualquer origem diferente do repositório do
+  Profit Pro. A publicação real ainda exige autorização e assinatura manual.
+- O seed estático reproduzível foi fechado na Task 10. A semântica parcial e a escala da leitura
+  do livro foram fechadas na Task 12; a janela padrão de 6h ainda requer validação de produto.
+- Filas e processos de produção foram fechados na Task 11; o stack de referência ainda precisa ser
+  adaptado às redes, secrets e labels reais do Swarm/Traefik.
+- A Task 13 tornou releases fail-closed e adicionou autenticação no boot; ainda falta definir a URL
+  oficial e validar visualmente os estados do systray no Windows.
 
 O plano, os contratos medidos e os checklists ficam em [`docs/README.md`](docs/README.md). A
 prioridade atual é [`docs/tasks/estabilizacao/`](docs/tasks/estabilizacao/README.md).
+O procedimento e as evidências do fechamento estão no
+[`docs/10-gate-final-fase-2-5.md`](docs/10-gate-final-fase-2-5.md).
 
 ## Git, upstream e releases
 
@@ -145,8 +161,9 @@ prioridade atual é [`docs/tasks/estabilizacao/`](docs/tasks/estabilizacao/READM
 - commits devem ser pequenos e descrever uma mudança coerente, preferencialmente no padrão
   Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`);
 - não fazer push direto, reescrever `main` ou publicar releases sem revisão e autorização;
-- releases do produto usam tags `vMAJOR.MINOR.PATCH`; o canal próprio do client será definido na
-  Task 02 da Fase 2.5.
+- releases do produto usam tags `vMAJOR.MINOR.PATCH`; os artefatos e checksums são gerados pelo
+  workflow próprio, com updater desabilitado até existir assinatura de código;
+- a política completa está em [`docs/07-releases-do-client.md`](docs/07-releases-do-client.md).
 
 A sincronização com o upstream do client é deliberada: comparar uma revisão conhecida em clone
 separado, portar somente mudanças relevantes em commits pequenos, preservar CRLF e reaplicar/testar

@@ -21,6 +21,7 @@ async def test_join_crosses_from_albion_id_to_item_type_id(db_session):
     db_session.add(Item(unique_name=UNIQUE_NAME, albion_id=ALBION_ID))
     db_session.add(
         MarketHistoryEntry(
+            server_id="west",
             item_id=ALBION_ID,
             location_id="1002",
             quality_level=1,
@@ -32,6 +33,7 @@ async def test_join_crosses_from_albion_id_to_item_type_id(db_session):
     )
     db_session.add(
         MarketOrder(
+            server_id="west",
             source_id=950001999,
             item_id=UNIQUE_NAME,
             group_type_id="",

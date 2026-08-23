@@ -42,13 +42,24 @@ Não há subcomandos (sem Cobra) — é um binário único com flags via `flag` 
 ### Build
 `Makefile` na raiz só chama os scripts em `scripts/` (`build-windows.sh`, `build-linux.sh`, `build-darwin.sh`). Em dev, `go build` direto funciona (Go 1.24, módulos com `vendor/` completo — dá pra buildar offline).
 
-### Config opcional (`config.yaml`, lido via viper)
-Só controla o **WebSocket local** (ver seção 7):
+### Configuração (`config.yaml`, lido via viper)
+
+Além do WebSocket local, o arquivo configura o destino e o token do Profit Pro:
 ```yaml
+PublicIngestBaseUrls: https+token://api.seu-dominio.com
+ApiToken: apk_exemplo
 EnableWebsockets: true
 AllowedWebsocketHosts:
   - localhost
 ```
+
+Precedência: flags `-i`/`-token` → `config.yaml` → URL injetada no build de release → default
+`http+token://localhost:8000` somente em desenvolvimento. Release sem URL fica fail-closed, com
+upload desabilitado. No boot, `client/bootstrap.go` deriva `/client/me` com `net/url`, valida o
+token em até 5 segundos e só então libera destinos autenticados. `401` pausa; `5xx`/timeout entram
+em uma única recuperação com backoff. O systray mostra o estado e oferece **Reload Configuration**.
+Realm não faz parte de `/client/me`: ele só é conhecido após observar tráfego real do Albion e é
+um segundo gate obrigatório antes de enfileirar dados.
 
 ## 3. Estrutura de pastas
 
@@ -103,17 +114,31 @@ NIC (interface física)
        tipada, preenchida via mapstructure a partir dos parâmetros
   → struct implementa a interface `operation { Process(state *albionState) }`
        (client/operation_*.go ou client/event_*.go)
-  → client/router.go: Router.run() → go op.Process(albionState)
+  → client/router.go: Router.run() → op.Process(albionState), serializado
   → Process() monta um lib.*Upload e chama
        client/dispatcher.go: sendMsgToPublicUploaders / sendMsgToPrivateUploaders
-  → dispatcher serializa em JSON, resolve o servidor regional
-       (west/east/europe, baseado no IP do servidor de jogo capturado),
-       e envia para cada uploader configurado + espelha no WebSocket local
-  → client/uploader_{http_pow,http,nats}.go — três transportes possíveis,
-       selecionados pelo esquema da URL de destino
+  → dispatcher serializa em JSON e enfileira por destino configurado
+       + espelha no WebSocket local
+  → client/uploader_queue.go → fila limitada + um worker ordenado por destino
+  → client/bootstrap.go → valida configuração/token em /client/me e mantém o gate autenticado
+  → client/uploader_{http_pow,http,nats}.go — três transportes reutilizáveis,
+       selecionados pelo esquema da URL de destino; somente `http(s)+token`
+       traduz AODataServerID 1/2/3 para west/east/europe e envia
+       `X-Albion-Server`; se ainda for 0/desconhecido, segura esse upload
+       autenticado e emite log/notificação debounced
 ```
 
-**Estado compartilhado**: `client/albion_state.go` (`albionState`) guarda `LocationId`, `CharacterId/Name`, IP do servidor de jogo e o servidor de ingest resolvido — é passado para todo `Process()`, permitindo que eventos posteriores (ex: ofertas de mercado) saibam a localização atual do jogador.
+**Estado compartilhado**: `client/albion_state.go` (`albionState`) guarda `LocationId`,
+`CharacterId/Name`, IP do servidor de jogo e o servidor de ingest resolvido. Desde a Fase 2.5 task
+09, listeners transformam mudanças de servidor/criptografia em operações e apenas a goroutine do
+router executa `Process()`. Uploaders recebem um snapshot mínimo do realm, nunca o estado vivo.
+Respostas de histórico fora de ordem ficam em cache limitado pelo `MessageID` exato, sem bloquear
+o router esperando a requisição correlata.
+
+**Contrato de realm (Fase 2.5 task 03):** o listener atualiza `AODataServerID` pelo IP de origem
+antes do decode. `client/market_server.go` é a única tradução para os valores de produto
+`west`/`east`/`europe`. O header nunca é anexado aos uploaders comuns ou `+pow`, evitando vazar
+metadado do Profit Pro para terceiros. Veja também [doc 03 §8a](03-contrato-ingest-real.md).
 
 ## 5. O que é capturado hoje
 

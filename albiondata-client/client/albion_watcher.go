@@ -22,7 +22,7 @@ func newAlbionProcessWatcher() *albionProcessWatcher {
 	}
 }
 
-func (apw *albionProcessWatcher) run() error {
+func (apw *albionProcessWatcher) run(stop <-chan struct{}) error {
 	log.Print("Watching Albion")
 	physicalInterfaces, err := getAllPhysicalInterface()
 	if err != nil {
@@ -32,16 +32,20 @@ func (apw *albionProcessWatcher) run() error {
 	log.Debugf("Will listen to these devices: %v", apw.devices)
 	go apw.r.run()
 
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-apw.quit:
 			apw.closeWatcher()
 			return nil
-		default:
+		case <-stop:
+			apw.closeWatcher()
+			return nil
+		case <-ticker.C:
 			if len(apw.listeners) == 0 {
 				apw.createListeners()
 			}
-			time.Sleep(time.Second)
 		}
 	}
 }
@@ -57,7 +61,7 @@ func (apw *albionProcessWatcher) closeWatcher() {
 		delete(apw.listeners, port)
 	}
 
-	apw.r.quit <- true
+	apw.r.shutdown()
 }
 
 func (apw *albionProcessWatcher) createListeners() {

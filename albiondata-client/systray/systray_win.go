@@ -4,7 +4,7 @@ package systray
 
 import (
 	"fmt"
-	"os"
+	"time"
 
 	"github.com/ao-data/albiondata-client/client"
 
@@ -63,19 +63,32 @@ func onReady() {
 		hideConsole()
 	}
 	systray.SetIcon(icon.Data)
-	systray.SetTitle("Albion Data Client")
-	systray.SetTooltip("Albion Data Client")
+	// PATCH LOCAL (Albion Profit Pro): make the build and updater state inspectable.
+	systray.SetTitle("Albion Profit Pro Client")
+	systray.SetTooltip("Albion Profit Pro Client | " + buildInfoLabel())
+	mBuildInfo := systray.AddMenuItem(buildInfoLabel(), "Compiled release and updater state")
+	mBuildInfo.Disable()
+	mConnection := systray.AddMenuItem("Connection: "+client.ConnectionStatusLabel(), "Backend authentication and realm state")
+	mConnection.Disable()
+	mReloadConfig := systray.AddMenuItem("Reload Configuration", "Reload config.yaml and revalidate backend access")
+	systray.AddSeparator()
 	mConHideShow := systray.AddMenuItem(GetActionTitle(), "Show/Hide Console")
 	mQuit := systray.AddMenuItem("Quit", "Close the Albion Data Client")
 
 	func() {
 		for {
 			select {
+			case status := <-client.ConnectionStatusChanges():
+				mConnection.SetTitle("Connection: " + status)
+				systray.SetTooltip("Albion Profit Pro Client | " + status)
+			case <-mReloadConfig.ClickedCh:
+				go client.RevalidateConnectionConfiguration()
 			case <-mQuit.ClickedCh:
 				fmt.Println("Requesting quit")
+				client.RequestShutdown(12 * time.Second)
 				systray.Quit()
-				os.Exit(0)
 				fmt.Println("Finished quitting")
+				return
 
 			case <-mConHideShow.ClickedCh:
 				if consoleHidden == true {

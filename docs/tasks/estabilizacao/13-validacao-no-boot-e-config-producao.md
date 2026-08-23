@@ -50,3 +50,26 @@ abrir arquivo de log.
 
 URL oficial de produção e qualidade/clareza da UX no sistema operacional.
 
+## Resultado da implementação (2026-08-23)
+
+- Builds locais mantêm `localhost` como conveniência; scripts/workflow injetam perfil `release` e
+  a URL opcional `PROFITPRO_INGEST_URL`. Release sem URL/config fica com upload desabilitado.
+- `client/bootstrap.go` normaliza somente o esquema `http(s)+token`, rejeita userinfo/query/fragment
+  e chama `/client/me` com timeout de 5s antes de liberar uploads autenticados.
+- Token ausente/401 bloqueia; 5xx/timeout inicia uma única recuperação com backoff. Um 401 posterior
+  no ingest também pausa a fila, sem retry infinito.
+- Estados de configuração, autenticação, backend e realm aparecem em log/systray. **Reload
+  Configuration** recarrega URL/token, fecha uploaders antigos e refaz o handshake sem reiniciar.
+- Realm não foi enviado a `/client/me`: ele ainda não existe no boot. Continua como gate separado,
+  descoberto do tráfego real antes do primeiro upload, conforme o contrato das Tasks 03/09.
+- URL, userinfo, query, header e token cru não são registrados; somente destino sanitizado e sufixo
+  já permitido aparecem no diagnóstico.
+
+Validações automatizadas: suíte Go completa verde; build real com `buildProfile=release` e URL vazia
+registrou upload desabilitado sem mencionar localhost; formatação dos arquivos da task validada com
+EOL normalizado. `go vet` manteve somente o aviso upstream preexistente de `unsafe.Pointer` em
+`net_interface_filter_win.go:75`. O detector `-race` não pôde rodar nesta máquina porque não há GCC
+no PATH; os testes concorrentes normais permanecem verdes.
+
+Pendente de validação humana: definir a URL oficial (`PROFITPRO_INGEST_URL`) e conferir no Windows
+a clareza visual de cada estado do systray.

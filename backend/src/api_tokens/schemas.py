@@ -16,7 +16,7 @@ class ApiTokenCreated(BaseModel):
 
 class ApiTokenPublic(BaseModel):
     """Usado ao listar tokens existentes — nunca reexpõe o valor do token, só o suficiente
-    pra identificar qual token é qual na UI (task 32)."""
+    para identificar o token na UI sem revelar o segredo."""
 
     id: uuid.UUID
     token_sufixo: str

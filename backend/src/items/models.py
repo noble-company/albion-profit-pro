@@ -8,9 +8,9 @@ class Item(Base):
     """Ponte entre os dois identificadores que o jogo usa pro mesmo item: `ItemTypeId`
     (string, usado por `marketorders.ingest`) e `AlbionId`/`Index` (int, usado por
     `markethistories.ingest`). Sem essa tabela não dá pra juntar histórico com preço nem com
-    receita pra matéria-prima não craftável (achado N3). Populada por
+    receita pra matéria-prima não craftável. Populada por
     `scripts/import_items.py` a partir de `items.json` (+ tier/categoria do `ITEM DUMP.json`).
-    Ver task 28."""
+    """
 
     __tablename__ = "item"
 
@@ -32,8 +32,7 @@ class Location(Base):
     `location_id` que aparecer em `marketorders.ingest`/`markethistories.ingest` vira uma
     linha aqui, com `kind` inferido do formato. Uma lista curada de cidades reais pode
     sobrescrever `name`/`is_royal_city` depois — o ingest nunca falha por localização
-    desconhecida (achado N3: `"1000-HellDen"` não é o código numérico de 4 dígitos que a
-    lista antiga em `src/prices/service.py` assumia). Ver task 28."""
+    desconhecida (`"1000-HellDen"`, por exemplo, não é um código numérico de 4 dígitos)."""
 
     __tablename__ = "location"
 

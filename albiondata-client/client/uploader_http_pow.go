@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -20,6 +21,9 @@ import (
 type httpUploaderPow struct {
 	baseURL   string
 	transport *http.Transport
+	client    *http.Client
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 type Pow struct {
@@ -42,37 +46,46 @@ func newHTTPUploaderPow(url string) uploader {
 	url = strings.Replace(url, "https+pow", "https", -1)
 	url = strings.Replace(url, "http+pow", "http", -1)
 
+	transport := &http.Transport{}
+	ctx, cancel := context.WithCancel(context.Background())
 	return &httpUploaderPow{
 		baseURL:   url,
-		transport: &http.Transport{},
+		transport: transport,
+		client:    &http.Client{Transport: transport, Timeout: ingestRequestTimeout},
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 }
 
-func (u *httpUploaderPow) getPow(target interface{}) {
+func (u *httpUploaderPow) getPow(target interface{}) bool {
 	log.Debugf("GETTING POW")
 	fullURL := u.baseURL + "/pow"
 
-	client := &http.Client{}
-	req, _ := http.NewRequest("GET", fullURL, nil)
+	req, err := http.NewRequestWithContext(u.ctx, http.MethodGet, fullURL, nil)
+	if err != nil {
+		log.Errorf("Error creating Pow Get request: %v", err)
+		return false
+	}
 	req.Header.Add("User-Agent", fmt.Sprintf("albiondata-client/%v", version))
-	resp, err := client.Do(req)
+	resp, err := u.client.Do(req)
 
 	if err != nil {
 		log.Errorf("Error in Pow Get request: %v", err)
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		log.Errorf("Got bad response code: %v", resp.StatusCode)
-		return
+		return false
 	}
 
-	json.NewDecoder(resp.Body).Decode(target)
+	err = json.NewDecoder(resp.Body).Decode(target)
 	if err != nil {
 		log.Errorf("Error in parsing Pow Get request: %v", err)
-		return
+		return false
 	}
+	return true
 }
 
 // Proves to the server that a pow was solved by submitting
@@ -82,7 +95,6 @@ func (u *httpUploaderPow) uploadWithPow(pow Pow, solution string, natsmsg []byte
 
 	fullURL := u.baseURL + "/pow/" + topic
 
-	client := &http.Client{}
 	data := url.Values{
 		"key":        {pow.Key},
 		"solution":   {solution},
@@ -90,9 +102,13 @@ func (u *httpUploaderPow) uploadWithPow(pow Pow, solution string, natsmsg []byte
 		"natsmsg":    {string(natsmsg)},
 		"identifier": {string(identifier)},
 	}
-	req, _ := http.NewRequest("POST", fullURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(u.ctx, http.MethodPost, fullURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		log.Errorf("Error creating Pow upload request: %v", err)
+		return
+	}
 	req.Header.Add("User-Agent", fmt.Sprintf("albiondata-client/%v", version))
-	resp, err := client.Do(req)
+	resp, err := u.client.Do(req)
 
 	if err != nil {
 		log.Errorf("Error while proving pow: %v", err)
@@ -104,7 +120,8 @@ func (u *httpUploaderPow) uploadWithPow(pow Pow, solution string, natsmsg []byte
 	if resp.StatusCode != 200 {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Fatal(err)
+			log.Errorf("Could not read Pow error response: %v", err)
+			return
 		}
 		log.Errorf("HTTP Error while proving pow. returned: %v (%v)", resp.StatusCode, string(body))
 		return
@@ -115,11 +132,11 @@ func (u *httpUploaderPow) uploadWithPow(pow Pow, solution string, natsmsg []byte
 
 // Generates a random hex string e.g.: faa2743d9181dca5
 func randomHex(n int) string {
-    b := make([]byte, n)
-    rand.Read(b)
-    dst := make([]byte, n*2)
-    hex.Encode(dst, b)
-    return string(dst)
+	b := make([]byte, n)
+	rand.Read(b)
+	dst := make([]byte, n*2)
+	hex.Encode(dst, b)
+	return string(dst)
 }
 
 // Converts a string to bits e.g.: 0110011...
@@ -171,9 +188,16 @@ func solvePow(pow Pow) string {
 	}
 }
 
-func (u *httpUploaderPow) sendToIngest(body []byte, topic string, state *albionState, identifier string) {
+func (u *httpUploaderPow) sendToIngest(body []byte, topic string, metadata uploadMetadata, identifier string) {
 	pow := Pow{}
-	u.getPow(&pow)
+	if !u.getPow(&pow) {
+		return
+	}
 	solution := solvePow(pow)
-	u.uploadWithPow(pow, solution, body, topic, state.AODataServerID, identifier)
+	u.uploadWithPow(pow, solution, body, topic, metadata.serverID, identifier)
+}
+
+func (u *httpUploaderPow) close() {
+	u.cancel()
+	u.transport.CloseIdleConnections()
 }

@@ -10,10 +10,10 @@ This is a monorepo with four parts, at different stages of completion:
 
 | Path | Status | What it is |
 |---|---|---|
-| `albiondata-client/` | **Fase 2 complete; Fase 2.5 pending** | Authenticated fork validated with the real game. Do not distribute broadly before updater, realm, retry and concurrency tasks in `docs/tasks/estabilizacao/`. Keep `PATCH LOCAL`, public channel `-i`, and never run `gofmt -w` because upstream is CRLF. |
-| `backend/` | **Fase 1 + 1.5 complete; Fase 2.5 pending** | FastAPI/Celery/PostgreSQL/Redis with 131 tests and live-client validation. Audit found integrity, failure, realm, seed and operational gaps not covered by the green suite. |
-| `frontend/` | **Not created — Fase 3 specified but blocked** | 0/19 tasks; do not start before Fase 2.5 gate. Specs remain in `docs/tasks/frontend/README.md`. |
-| `docs/` | **Fase 2.5 in progress, 1/14 tasks** | Current priority: `docs/05-revisao-fases-0-a-2.md` and `docs/tasks/estabilizacao/README.md`. |
+| `albiondata-client/` | **Fase 2 complete; Fase 2.5 client stabilized** | Authenticated fork validated with the real game. Bounded queues, safe retry and boot-time `/client/me` validation are implemented; releases without a destination fail closed. Windows systray UX remains a manual check. Keep `PATCH LOCAL`, public channel `-i`, and never run `gofmt -w` because upstream is CRLF. |
+| `backend/` | **Fase 1 + 1.5 complete; Fase 2.5 pending** | FastAPI/Celery/PostgreSQL/Redis with 229 tests and live-client validation. Realm, rollups, ingest validation, partial-book semantics, static seed and isolated Celery operation are enforced. |
+| `frontend/` | **Not created — Fase 3 is next** | 0/19 tasks; Fase 2.5 is complete. Specs remain in `docs/tasks/frontend/README.md`. |
+| `docs/` | **Fase 2.5 complete, 14/14 tasks** | Integrated Windows/game/Swarm validation is deferred until the frontend is complete. |
 
 Root also has two large reference data files: `items.json` (official Albion item name/ID localization dump) and `ITEM DUMP.json` (official `items.xml` dump — crafting/refining recipes). Both are read-only reference data, not something to edit.
 
@@ -45,7 +45,7 @@ When you make an architecture decision, discover something non-obvious about the
 | Area | Decision |
 |---|---|
 | Backend language/framework | Python 3.13 (**not 3.14** — Celery has no confirmed 3.14 support yet; pin via `uv`) + FastAPI |
-| Task queue | Celery, broker = RabbitMQ (already running on the user's Swarm host), result backend = Redis |
+| Task queue | Celery/RabbitMQ with durable `ingest`, `maintenance` and `quarantine` queues. Redis backend stays configured, but fire-and-forget results are ignored. |
 | Auth | `fastapi-users` (SQLAlchemy adapter) — JWT backend for the web frontend, separate opaque-token (`ApiToken`) backend for the Go client. Library is in maintenance mode; auth code is isolated in `src/auth/`/`src/api_tokens/` to ease a future swap. |
 | DB / ORM | PostgreSQL 16 (+ pgvector available, unused for now) via SQLAlchemy 2.0 async + `asyncpg>=0.31.0` (older asyncpg has no 3.13/3.14 wheels) + Alembic |
 | Cache/pub-sub | Redis — "latest price" cache with short TTL, pub/sub channel for live frontend price pushes |
@@ -55,7 +55,7 @@ When you make an architecture decision, discover something non-obvious about the
 | Frontend | React 19 + Vite 8 + strict TypeScript + React Router 8 + Tailwind CSS 4 + shadcn/ui + TanStack Query 5; Vitest/RTL/MSW + Playwright |
 | Local dev infra | Docker Compose (Postgres 16, Redis, RabbitMQ) isolated from the user's real Swarm-hosted services; production deploys onto the existing Traefik/Swarm host (deploy conventions TBD, user will share their `stack.yml` pattern) |
 | Ingest transport | Client POSTs plain JSON to `{base_url}/{topic}` and sends bearer auth only to `http+token://` destinations; implemented and validated in Fase 2. |
-| Market realm | Realm (`west`/`east`/`europe`) becomes mandatory across wire, facts, cache and reads in Fase 2.5 task 03. Until then deployment is single-realm-only. |
+| Market realm | Realm (`west`/`east`/`europe`) is mandatory across authenticated wire, facts, cache/pub-sub and reads since Fase 2.5 task 03. Legacy facts were confirmed as West. |
 
 ## Commands
 
@@ -65,7 +65,10 @@ Backend (`backend/`) is fully implemented (Fase 1 + Fase 1.5 complete) — these
 # Backend, run from backend/
 uv sync                                                    # install deps
 uv run uvicorn src.main:app --reload                       # run the API locally
-uv run celery -A src.celery_app.celery_app worker --loglevel=info  # run the worker
+uv run celery -A src.celery_app.celery_app worker -Q ingest -c 4 --loglevel=info
+uv run celery -A src.celery_app.celery_app worker -Q maintenance -c 1 --loglevel=info
+uv run celery -A src.celery_app.celery_app worker -Q quarantine -c 1 --loglevel=info
+uv run celery -A src.celery_app.celery_app beat --loglevel=info
 uv run alembic upgrade head                                 # apply DB migrations
 uv run alembic revision --autogenerate -m "message"          # generate a migration
 uv run pytest tests/ -v                                      # run tests (spins up testcontainers)

@@ -15,9 +15,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     verification_token_secret = settings.verification_secret
 
     async def validate_password(self, password: str, user: schemas.UC | models.UP) -> None:
-        """Task 33, achado P8: sem isso, `"senha123"` (6 caracteres) era aceito — inclusive
-        pelos próprios testes. Só comprimento importa aqui, nenhuma regra de complexidade
-        (símbolo obrigatório etc.) — é o que a spec pede de propósito."""
+        """Exige comprimento mínimo e impede que o e-mail componha a senha."""
         if len(password) < SENHA_MIN_LENGTH:
             raise exceptions.InvalidPasswordException(
                 reason=f"A senha precisa ter pelo menos {SENHA_MIN_LENGTH} caracteres."

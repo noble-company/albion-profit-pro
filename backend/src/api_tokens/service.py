@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api_tokens.models import ApiToken
 
 # Granularidade do update de `ultimo_uso_em` — token de API é usado a cada request de
-# ingest; escrever a cada uma dessas tornaria isso o gargalo do caminho quente (task 32).
+# ingest; escrever a cada uma tornaria isso o gargalo do caminho quente.
 ULTIMO_USO_GRANULARIDADE = timedelta(hours=1)
 
 
@@ -24,7 +24,7 @@ def hash_token(cru: str) -> str:
 async def create_token(session: AsyncSession, user_id: uuid.UUID) -> ApiToken:
     """Devolve a instância com o valor cru acessível via `.token` — atributo Python comum,
     não uma coluna mapeada, então nunca é persistido. É a única vez que esse valor existe
-    fora da memória do processo que gerou (task 32, achado A1)."""
+    fora da memória do processo que gerou."""
     raw = generate_token()
     token = ApiToken(user_id=user_id, token_hash=hash_token(raw), token_sufixo=raw[-4:])
     session.add(token)

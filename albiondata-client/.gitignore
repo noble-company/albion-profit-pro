@@ -12,7 +12,9 @@ config.yaml
 .secrets
 .DS_Store
 act.sh
-albiondata-client*
+# PATCH LOCAL (Albion Profit Pro): ignore only the extensionless binary. The old
+# glob also hid albiondata-client.go, leaving a fresh monorepo clone without main.
+/albiondata-client
 buildall.sh
 run.sh
 *.log

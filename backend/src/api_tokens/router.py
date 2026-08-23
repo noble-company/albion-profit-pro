@@ -3,33 +3,28 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api_tokens.dependencies import require_api_token
+from src.api_tokens.dependencies import rate_limited_api_token
 from src.api_tokens.models import ApiToken
 from src.api_tokens.schemas import ApiTokenCreated, ApiTokenPublic, ClientIdentity
 from src.api_tokens.service import create_token, list_tokens_for_user, revoke_token
 from src.auth.dependencies import current_active_user
 from src.auth.models import User
 from src.database import get_session
-from src.rate_limit import identificar_por_token, rate_limit
 
 router = APIRouter(prefix="/auth/tokens", tags=["api-tokens"])
 
 # Router separado porque `/client/me` não pertence ao prefixo `/auth/tokens` — e, diferente
 # das rotas acima, é autenticado pelo token opaco do client Go, não pelo JWT da web.
-client_router = APIRouter(
-    prefix="/client",
-    tags=["client"],
-    # Por token, igual ao ingest. Limite baixo: o client chama isso uma vez por boot, então
-    # 30/min já cobre reinício e retry, e ainda fecha a porta pra varredura de tokens.
-    dependencies=[
-        Depends(rate_limit("rl:client", limit=30, seconds=60, identifier=identificar_por_token))
-    ],
-)
+client_router = APIRouter(prefix="/client", tags=["client"])
+
+# O client chama uma vez por boot. O dependency valida primeiro e usa o ID persistido do token;
+# credenciais invalidas recebem somente uma identidade HMAC no Redis.
+require_client_api_token = rate_limited_api_token("rl:client", limit=30, seconds=60)
 
 
 @client_router.get("/me", response_model=ClientIdentity)
 async def client_me(
-    token: ApiToken = Depends(require_api_token),
+    token: ApiToken = Depends(require_client_api_token),
     session: AsyncSession = Depends(get_session),
 ):
     """Ping autenticado pro client Go conferir, no boot, que o token dele é válido — sem

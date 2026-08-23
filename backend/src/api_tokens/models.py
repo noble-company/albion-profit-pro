@@ -9,7 +9,7 @@ from src.database import Base
 
 
 class ApiToken(Base):
-    """Guarda só o hash do token (task 32, achado A1) — o valor cru nunca fica persistido;
+    """Guarda só o hash do token; o valor cru nunca fica persistido e
     existe só na resposta HTTP da criação. `create_token` devolve o valor cru como atributo
     Python transiente (não mapeado) na própria instância, não como coluna."""
 

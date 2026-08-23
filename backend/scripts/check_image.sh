@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Task 34 — build da imagem de produção + os testes manuais da spec, num script só.
-# Build de imagem Docker não entra no pytest (lento, depende de Docker rodando) — esta
-# task é validada por este script, não pela suíte automatizada (ver
-# docs/tasks/backend/README.md).
+# Validação local do contrato da imagem de produção.
+# O build depende do daemon Docker e fica separado da suíte pytest.
 #
 # Requer: `docker compose up -d` já rodando (backend/docker-compose.yml) — o script conecta
 # na mesma rede pra alcançar Postgres/Redis/RabbitMQ pelo nome do serviço.

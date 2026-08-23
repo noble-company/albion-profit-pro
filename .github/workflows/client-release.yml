@@ -1,0 +1,103 @@
+name: Client Release
+
+# PATCH LOCAL (Albion Profit Pro): product-owned, versioned release artifacts.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: albiondata-client
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: albiondata-client/go.mod
+          cache-dependency-path: albiondata-client/go.sum
+      - name: Build versioned client with updater disabled
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+          UPDATE_CHANNEL: disabled
+          BUILD_PROFILE: release
+          PUBLIC_INGEST_BASE_URL: ${{ vars.PROFITPRO_INGEST_URL }}
+        run: scripts/build-linux.sh
+      - name: Upload Linux assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" update-linux-amd64.gz update-linux-amd64.gz.sha256 --clobber
+
+  windows:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: albiondata-client
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: albiondata-client/go.mod
+          cache-dependency-path: albiondata-client/go.sum
+      - name: Install NSIS
+        run: sudo apt-get update && sudo apt-get install -y nsis
+      - name: Build versioned client with updater disabled
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+          UPDATE_CHANNEL: disabled
+          BUILD_PROFILE: release
+          PUBLIC_INGEST_BASE_URL: ${{ vars.PROFITPRO_INGEST_URL }}
+        run: scripts/build-windows.sh
+      - name: Upload Windows assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload "${{ github.event.release.tag_name }}"
+          update-windows-amd64.exe.gz
+          update-windows-amd64.exe.gz.sha256
+          albiondata-client-amd64-installer.exe
+          albiondata-client-amd64-installer.exe.sha256
+          --clobber
+
+  macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: albiondata-client
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: albiondata-client/go.mod
+          cache-dependency-path: albiondata-client/go.sum
+      - name: Build versioned client with updater disabled
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+          PUBLIC_INGEST_BASE_URL: ${{ vars.PROFITPRO_INGEST_URL }}
+        run: |
+          VERSION="${VERSION#v}"
+          CGO_ENABLED=1 GOARCH=amd64 CC="clang -arch x86_64" CGO_LDFLAGS="-arch x86_64" \
+            go build -ldflags "-s -w -X main.version=${VERSION} -X main.updateChannel=disabled -X github.com/ao-data/albiondata-client/client.buildProfile=release -X github.com/ao-data/albiondata-client/client.releasePublicIngestBaseURL=${PUBLIC_INGEST_BASE_URL}" albiondata-client.go
+          gzip -k9 albiondata-client
+          mv albiondata-client.gz update-darwin-amd64.gz
+          mkdir -p scripts/albiondata-client
+          cp albiondata-client scripts/albiondata-client/albiondata-client-executable
+          cp scripts/run.command scripts/albiondata-client/run.command
+          chmod 755 scripts/albiondata-client/*
+          (cd scripts && zip -r ../albiondata-client-amd64-mac.zip albiondata-client)
+          shasum -a 256 update-darwin-amd64.gz > update-darwin-amd64.gz.sha256
+          shasum -a 256 albiondata-client-amd64-mac.zip > albiondata-client-amd64-mac.zip.sha256
+      - name: Upload macOS assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload "${{ github.event.release.tag_name }}"
+          update-darwin-amd64.gz
+          update-darwin-amd64.gz.sha256
+          albiondata-client-amd64-mac.zip
+          albiondata-client-amd64-mac.zip.sha256
+          --clobber

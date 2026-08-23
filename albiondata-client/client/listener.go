@@ -116,7 +116,9 @@ func (l *listener) run() {
 		select {
 		case <-l.quit:
 			log.Debugf("Listener shutting down (%s)...", l.displayName)
-			l.handle.Close()
+			if l.handle != nil {
+				l.handle.Close()
+			}
 			return
 		case packet := <-l.sourcePackets:
 			if packet != nil {
@@ -133,8 +135,13 @@ func (l *listener) run() {
 }
 
 func (l *listener) stop() {
-	l.quit <- true
-	l.handle.Close()
+	select {
+	case l.quit <- true:
+	default:
+	}
+	if l.handle != nil {
+		l.handle.Close()
+	}
 }
 
 func (l *listener) processPacket(packet gopacket.Packet) {
@@ -151,10 +158,9 @@ func (l *listener) processPacket(packet gopacket.Packet) {
 		return
 	}
 
-	l.router.albionstate.GameServerIP = ipv4.SrcIP.String()
-	l.router.albionstate.AODataServerID, l.router.albionstate.AODataIngestBaseURL = l.router.albionstate.GetServer()
-	log.Tracef("Server ID: %d", l.router.albionstate.AODataServerID)
-	log.Tracef("Using AODataIngestBaseURL: %s", l.router.albionstate.AODataIngestBaseURL)
+	// PATCH LOCAL (Albion Profit Pro): o listener nao toca mais no estado compartilhado.
+	// Esta operacao entra antes das operacoes decodificadas do mesmo pacote.
+	l.router.enqueueOperation(serverPacketOperation{ip: ipv4.SrcIP.String()})
 
 	// Extract the raw Photon payload from the UDP or TCP layer.
 	var payload []byte
@@ -169,17 +175,14 @@ func (l *listener) processPacket(packet gopacket.Packet) {
 	}
 
 	if ConfigGlobal.RecordPath != "" {
-		l.router.recordRawPacket <- photon.RawPacket{Payload: payload}
+		l.router.enqueueRawPacket(photon.RawPacket{Payload: payload})
 	}
 
 	l.parser.ReceivePacket(payload)
 }
 
 func (l *listener) onEncrypted() {
-	if l.router.albionstate.WaitingForMarketData {
-		l.router.albionstate.WaitingForMarketData = false
-		log.Info("Market data is encrypted. Please see https://www.albion-online-data.com/client/encryption.html for more information.")
-	}
+	l.router.enqueueOperation(encryptedMarketOperation{})
 }
 
 func (l *listener) onRequest(opCode byte, params map[byte]interface{}) {
@@ -272,7 +275,7 @@ func (l *listener) dispatchOperation(op operation, err error, params map[byte]in
 		return
 	}
 	if op != nil {
-		l.router.newOperation <- op
+		l.router.enqueueOperation(op)
 	}
 }
 
@@ -300,4 +303,3 @@ func normalizeLocationID(v string) string {
 	}
 	return ""
 }
-

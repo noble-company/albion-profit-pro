@@ -1,8 +1,6 @@
 """
-Task 24 — confirma que erro transitório (Postgres/Redis fora do ar) aciona o
-`autoretry_for` do Celery e a task conclui assim que o recurso volta, e que erro de
-programação (payload mal-formado, bug) NÃO aciona retry — é logado e descartado, porque
-retentar não conserta, só multiplica o log (ver docs/04-revisao-fase-1.md, achado A5).
+Task 24/Task 06 da Fase 2.5 — confirma que erro transitório aciona `autoretry_for`,
+enquanto erro de programação não é repetido, mas termina em FAILURE e quarentena.
 
 Usa `task_always_eager` (mesmo padrão de tests/test_celery_app.py) pra rodar a task
 inteira — incluindo o mecanismo de retry do Celery — sem precisar de um worker separado.
@@ -54,7 +52,7 @@ async def _apply_eager(task, *args):
     celery_app.conf.update(task_always_eager=True, task_eager_propagates=False)
     try:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: task.apply(args=args).get())
+        return await loop.run_in_executor(None, lambda: task.apply(args=args))
     finally:
         celery_app.conf.task_always_eager = previous
 
@@ -63,15 +61,18 @@ async def test_process_market_orders_retries_transient_error_then_succeeds(monke
     real_save = tasks_module.save_market_orders
     calls = {"n": 0}
 
-    async def flaky(sessionmaker, redis, payload, user_id=None):
+    async def flaky(sessionmaker, redis, payload, server_id, user_id=None):
         calls["n"] += 1
         if calls["n"] < 3:
             raise OperationalError("SELECT 1", {}, Exception("conexão caiu"))
-        return await real_save(sessionmaker, redis, payload)
+        return await real_save(sessionmaker, redis, payload, server_id)
 
     monkeypatch.setattr(tasks_module, "save_market_orders", flaky)
 
-    await _apply_eager(tasks_module.process_market_orders, PAYLOAD, str(uuid.uuid4()))
+    result = await _apply_eager(
+        tasks_module.process_market_orders, PAYLOAD, str(uuid.uuid4()), "west"
+    )
+    result.get()
 
     assert calls["n"] == 3  # 2 falhas transitórias + 1 sucesso
     result = await db_session.execute(select(MarketOrder).where(MarketOrder.source_id == 999))
@@ -90,35 +91,39 @@ async def test_process_market_orders_retries_raw_connection_refused_then_succeed
     real_save = tasks_module.save_market_orders
     calls = {"n": 0}
 
-    async def flaky(sessionmaker, redis, payload, user_id=None):
+    async def flaky(sessionmaker, redis, payload, server_id, user_id=None):
         calls["n"] += 1
         if calls["n"] < 3:
             raise ConnectionRefusedError("Postgres fora do ar")
-        return await real_save(sessionmaker, redis, payload)
+        return await real_save(sessionmaker, redis, payload, server_id)
 
     monkeypatch.setattr(tasks_module, "save_market_orders", flaky)
 
-    await _apply_eager(tasks_module.process_market_orders, PAYLOAD, str(uuid.uuid4()))
+    result = await _apply_eager(
+        tasks_module.process_market_orders, PAYLOAD, str(uuid.uuid4()), "west"
+    )
+    result.get()
 
     assert calls["n"] == 3
     result = await db_session.execute(select(MarketOrder).where(MarketOrder.source_id == 999))
     assert len(result.scalars().all()) == 1
 
 
-async def test_process_market_orders_does_not_retry_programming_error(monkeypatch):
+async def test_process_market_orders_programming_error_is_failure_without_retry(monkeypatch):
     calls = {"n": 0}
 
     class _Model(BaseModel):
         a: int
 
-    async def broken(sessionmaker, redis, payload, user_id=None):
+    async def broken(sessionmaker, redis, payload, server_id, user_id=None):
         calls["n"] += 1
         _Model(a="not-an-int")  # dispara pydantic.ValidationError de verdade
 
     monkeypatch.setattr(tasks_module, "save_market_orders", broken)
 
-    await _apply_eager(
-        tasks_module.process_market_orders, PAYLOAD, str(uuid.uuid4())
-    )  # não levanta
+    result = await _apply_eager(
+        tasks_module.process_market_orders, PAYLOAD, str(uuid.uuid4()), "west"
+    )
 
     assert calls["n"] == 1  # sem retry — ValidationError não está no autoretry_for
+    assert result.state == "FAILURE"

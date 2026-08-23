@@ -2,9 +2,24 @@
 # de onde voce roda o client) e descomente o que for usar.
 # "config.yaml" esta no .gitignore -- seu token nao corre risco de ser commitado.
 
-# Token de API do Albion Profit Pro. Gere em /auth/tokens e cole aqui.
-# Preferir este arquivo a flag -token: flag aparece na lista de processos.
+# Destino autenticado do Albion Profit Pro. Em desenvolvimento, o default e
+# http+token://localhost:8000. Uma release oficial sem URL compilada ou esta chave inicia
+# com uploads bloqueados: nunca tenta localhost silenciosamente.
+# PublicIngestBaseUrls: https+token://api.seu-dominio.com
+
+# Token de API do Albion Profit Pro. Gere em /auth/tokens e cole aqui. Preferir este
+# arquivo a flag -token: a flag aparece na lista de processos.
 # ApiToken: apk_troque-por-um-token-de-verdade
+
+# Precedencia: flags -i/-token > este arquivo > URL compilada na release > default local
+# apenas em build de desenvolvimento. West/East/Europe e detectado automaticamente pelo
+# trafego do Albion; nao configure realm manualmente.
+
+# Depois de editar, use "Reload Configuration" no systray. Estados:
+# - token ausente/invalido: gere outro token no site e recarregue;
+# - backend indisponivel: o client tenta recuperar com espera progressiva;
+# - realm desconhecido: atravesse uma passagem de zona com o client aberto;
+# - destino invalido: use somente http+token:// ou https+token:// numa release.
 
 # EnableWebsockets: False
 # AllowedWebsocketHosts:

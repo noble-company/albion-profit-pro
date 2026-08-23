@@ -46,6 +46,7 @@ async def test_market_order_has_no_user_id_or_is_public_columns():
 
 async def test_insert_and_select_market_order(db_session):
     order = MarketOrder(
+        server_id="west",
         source_id=1,
         item_id="T2_FIBER",
         group_type_id="",

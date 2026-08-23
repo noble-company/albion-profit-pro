@@ -34,7 +34,7 @@ async def test_real_fixture_writes_with_bucket_seconds_from_timescale(
     payload = _dump(payload_historico_real)
     item_id = payload["albion_id"]
 
-    await save_market_history(async_session_maker, get_redis(), payload)
+    await save_market_history(async_session_maker, get_redis(), payload, "west")
 
     result = await db_session.execute(
         select(MarketHistoryEntry).where(MarketHistoryEntry.item_id == item_id)
@@ -48,8 +48,10 @@ async def test_reprocessing_same_payload_is_idempotent(payload_historico_real, d
     payload = _dump(payload_historico_real)
     item_id = payload["albion_id"]
 
-    await save_market_history(async_session_maker, get_redis(), payload)
-    await save_market_history(async_session_maker, get_redis(), payload)  # reprocessar não duplica
+    await save_market_history(async_session_maker, get_redis(), payload, "west")
+    await save_market_history(
+        async_session_maker, get_redis(), payload, "west"
+    )  # reprocessar não duplica
 
     result = await db_session.execute(
         select(MarketHistoryEntry).where(MarketHistoryEntry.item_id == item_id)
@@ -67,8 +69,8 @@ async def test_timescale_1_and_2_collapse_into_the_same_rows(payload_historico_r
     subset = ts2_payload["histories"][:5]
     ts1_payload = {**ts2_payload, "timescale": 1, "histories": subset}
 
-    await save_market_history(async_session_maker, get_redis(), ts1_payload)
-    await save_market_history(async_session_maker, get_redis(), ts2_payload)
+    await save_market_history(async_session_maker, get_redis(), ts1_payload, "west")
+    await save_market_history(async_session_maker, get_redis(), ts2_payload, "west")
 
     result = await db_session.execute(
         select(MarketHistoryEntry).where(MarketHistoryEntry.item_id == item_id)
@@ -92,8 +94,8 @@ async def test_on_conflict_do_update_corrects_partial_bucket_through_task(
         "histories": [{**point, "item_amount": 99999, "silver_amount": 999990000}],
     }
 
-    await save_market_history(async_session_maker, get_redis(), small)
-    await save_market_history(async_session_maker, get_redis(), big)
+    await save_market_history(async_session_maker, get_redis(), small, "west")
+    await save_market_history(async_session_maker, get_redis(), big, "west")
 
     result = await db_session.execute(
         select(MarketHistoryEntry).where(MarketHistoryEntry.item_id == item_id)
@@ -119,7 +121,9 @@ async def test_intra_batch_duplicate_bucket_does_not_raise(payload_historico_rea
         ],
     }
 
-    await save_market_history(async_session_maker, get_redis(), payload)  # não pode levantar
+    await save_market_history(
+        async_session_maker, get_redis(), payload, "west"
+    )  # não pode levantar
 
     result = await db_session.execute(
         select(MarketHistoryEntry).where(MarketHistoryEntry.item_id == item_id)

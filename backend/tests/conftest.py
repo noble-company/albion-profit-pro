@@ -19,6 +19,7 @@ subir os containers e setar as env vars — garante que a primeira chamada de
 arquivo de teste for importado primeiro.
 """
 
+import ipaddress
 import json
 import os
 import uuid
@@ -86,16 +87,13 @@ def pytest_unconfigure(config: pytest.Config) -> None:
 
 @pytest_asyncio.fixture
 async def client():
-    """`X-Forwarded-For` sintético e único por teste (task 33): o rate limit de
-    `/auth/login`/`/auth/register` é por IP, e todo request via `ASGITransport` chega com
-    o mesmo IP de teste — sem isso, testes diferentes que registram usuário colidiriam no
-    mesmo bucket e um esbarraria no 429 do outro. Mesmo código de produção (atrás de um
-    proxy reverso de verdade, é assim que o IP real do cliente chega)."""
+    """Peer IPv6 sintético e único por teste, sem confiar em header encaminhado arbitrário."""
     from src.main import app
 
-    transport = ASGITransport(app=app)
-    headers = {"X-Forwarded-For": str(uuid.uuid4())}
-    async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
+    documentation_prefix = int(ipaddress.IPv6Address("2001:db8::"))
+    peer = str(ipaddress.IPv6Address(documentation_prefix | (uuid.uuid4().int & ((1 << 96) - 1))))
+    transport = ASGITransport(app=app, client=(peer, 12345))
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
 
@@ -191,10 +189,19 @@ async def _limpa_tabelas_apos_teste():
     import src.auth.models  # noqa: F401
     import src.items.models  # noqa: F401
     import src.prices.models  # noqa: F401
+    import src.quarantine.models  # noqa: F401
     import src.recipes.models  # noqa: F401
+    import src.static_data.models  # noqa: F401
     from src.database import Base, async_session_maker
 
     async with async_session_maker() as session:
         for table in reversed(Base.metadata.sorted_tables):
             await session.execute(table.delete())
         await session.commit()
+
+    from src.cache.redis_client import get_redis
+
+    redis = get_redis()
+    keys = [key async for key in redis.scan_iter(match="rl:*")]
+    if keys:
+        await redis.delete(*keys)

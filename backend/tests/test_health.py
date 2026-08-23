@@ -1,15 +1,46 @@
+from src.static_data.models import StaticDatasetVersion
+
+
 async def test_health_always_returns_ok(client):
     resp = await client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
 
-async def test_ready_returns_ok_when_dependencies_are_up(client):
+async def _mark_dataset_active(db_session):
+    db_session.add(
+        StaticDatasetVersion(
+            dataset_name="test-static-data",
+            version="test-v1",
+            source_revision="a" * 40,
+            manifest_sha256="b" * 64,
+            items_sha256="c" * 64,
+            item_dump_sha256="d" * 64,
+            item_count=1,
+            recipe_count=1,
+            skipped_recipe_count=0,
+            active=True,
+        )
+    )
+    await db_session.commit()
+
+
+async def test_ready_returns_ok_when_dependencies_and_dataset_are_ready(client, db_session):
+    await _mark_dataset_active(db_session)
     resp = await client.get("/ready")
     assert resp.status_code == 200
     body = resp.json()
     assert body["postgres"] == "ok"
     assert body["redis"] == "ok"
+    assert body["dataset"] == "ok"
+    assert body["rabbitmq"] == "ok"
+
+
+async def test_ready_returns_503_before_static_seed(client):
+    resp = await client.get("/ready")
+
+    assert resp.status_code == 503
+    assert resp.json()["dataset"] == "ausente"
 
 
 async def test_ready_returns_503_without_leaking_dsn_when_postgres_fails(client, monkeypatch):
@@ -33,8 +64,12 @@ async def test_ready_returns_503_without_leaking_dsn_when_postgres_fails(client,
     assert "connection refused" not in resp.text
 
 
-async def test_ready_returns_503_without_leaking_details_when_redis_fails(client, monkeypatch):
+async def test_ready_returns_503_without_leaking_details_when_redis_fails(
+    client, db_session, monkeypatch
+):
     import src.main as main_module
+
+    await _mark_dataset_active(db_session)
 
     class _BrokenRedis:
         async def ping(self):
@@ -47,6 +82,25 @@ async def test_ready_returns_503_without_leaking_details_when_redis_fails(client
     body = resp.json()
     assert body["redis"] == "erro"
     assert body["postgres"] == "ok"
+    assert body["dataset"] == "ok"
+    assert "segredo" not in resp.text
+
+
+async def test_ready_returns_503_without_leaking_details_when_rabbitmq_fails(
+    client, db_session, monkeypatch
+):
+    import src.main as main_module
+
+    await _mark_dataset_active(db_session)
+
+    async def _broken_broker():
+        raise ConnectionError("amqp://usuario:segredo@rabbit-interno:5672 unreachable")
+
+    monkeypatch.setattr(main_module, "check_rabbitmq", _broken_broker)
+    resp = await client.get("/ready")
+
+    assert resp.status_code == 503
+    assert resp.json()["rabbitmq"] == "erro"
     assert "segredo" not in resp.text
 
 

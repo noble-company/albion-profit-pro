@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +20,7 @@ type requisicaoCapturada struct {
 	authorization string
 	userAgent     string
 	contentType   string
+	albionServer  string
 	path          string
 	recebeu       bool
 }
@@ -34,6 +36,7 @@ func servidorDeTeste(t *testing.T, status int) (*httptest.Server, *requisicaoCap
 		capturada.authorization = r.Header.Get("Authorization")
 		capturada.userAgent = r.Header.Get("User-Agent")
 		capturada.contentType = r.Header.Get("Content-Type")
+		capturada.albionServer = r.Header.Get("X-Albion-Server")
 		capturada.path = r.URL.Path
 		w.WriteHeader(status)
 	}))
@@ -59,7 +62,7 @@ func TestUploaderAuthEnviaAuthorizationERemoveMarcadorDaURL(t *testing.T) {
 	alvo := strings.Replace(srv.URL, "http://", "http+token://", 1)
 	u := newHTTPUploaderAuth(alvo)
 
-	u.sendToIngest([]byte(`{"Orders":[]}`), "marketorders.ingest", &albionState{}, "id-1")
+	u.sendToIngest([]byte(`{"Orders":[]}`), "marketorders.ingest", uploadMetadata{serverID: 1}, "id-1")
 
 	if !capturada.recebeu {
 		t.Fatal("servidor nao recebeu requisicao -- o marcador +token provavelmente nao foi removido da URL")
@@ -69,6 +72,9 @@ func TestUploaderAuthEnviaAuthorizationERemoveMarcadorDaURL(t *testing.T) {
 	}
 	if got, want := capturada.path, "/marketorders.ingest"; got != want {
 		t.Errorf("path = %q, esperado %q", got, want)
+	}
+	if got, want := capturada.albionServer, "west"; got != want {
+		t.Errorf("X-Albion-Server = %q, esperado %q", got, want)
 	}
 	if strings.Contains(capturada.path, "+token") {
 		t.Errorf("o marcador +token vazou para a URL da requisicao: %q", capturada.path)
@@ -82,13 +88,16 @@ func TestUploaderComumNuncaEnviaAuthorization(t *testing.T) {
 	comApiToken(t, "apk_secreto_1234")
 
 	u := newHTTPUploader(srv.URL)
-	u.sendToIngest([]byte(`{"Orders":[]}`), "marketorders.ingest", &albionState{}, "id-1")
+	u.sendToIngest([]byte(`{"Orders":[]}`), "marketorders.ingest", uploadMetadata{}, "id-1")
 
 	if !capturada.recebeu {
 		t.Fatal("servidor nao recebeu requisicao")
 	}
 	if capturada.authorization != "" {
 		t.Errorf("destino sem marcador +token recebeu Authorization = %q -- token vazou", capturada.authorization)
+	}
+	if capturada.albionServer != "" {
+		t.Errorf("destino comum recebeu X-Albion-Server = %q", capturada.albionServer)
 	}
 }
 
@@ -98,7 +107,7 @@ func TestUploaderAuthComTokenVazioNaoMandaHeader(t *testing.T) {
 
 	alvo := strings.Replace(srv.URL, "http://", "http+token://", 1)
 	u := newHTTPUploaderAuth(alvo)
-	u.sendToIngest([]byte(`{}`), "marketorders.ingest", &albionState{}, "id-1")
+	u.sendToIngest([]byte(`{}`), "marketorders.ingest", uploadMetadata{serverID: 1}, "id-1")
 
 	if !capturada.recebeu {
 		t.Fatal("servidor nao recebeu requisicao")
@@ -113,7 +122,7 @@ func TestUploaderMandaUserAgentEContentType(t *testing.T) {
 	srv, capturada := servidorDeTeste(t, http.StatusOK)
 
 	u := newHTTPUploader(srv.URL)
-	u.sendToIngest([]byte(`{}`), "marketorders.ingest", &albionState{}, "id-1")
+	u.sendToIngest([]byte(`{}`), "marketorders.ingest", uploadMetadata{}, "id-1")
 
 	if !strings.HasPrefix(capturada.userAgent, "albiondata-client/") {
 		t.Errorf("User-Agent = %q, esperado prefixo %q", capturada.userAgent, "albiondata-client/")
@@ -129,7 +138,7 @@ func TestUploaderAceitaFaixa2xx(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusNoContent} {
 		srv, capturada := servidorDeTeste(t, status)
 		u := newHTTPUploader(srv.URL)
-		u.sendToIngest([]byte(`{}`), "marketorders.ingest", &albionState{}, "id-1")
+		u.sendToIngest([]byte(`{}`), "marketorders.ingest", uploadMetadata{}, "id-1")
 		if !capturada.recebeu {
 			t.Errorf("status %d: servidor nao recebeu requisicao", status)
 		}
@@ -143,7 +152,8 @@ func TestUploaderNaoPanicaEmStatusDeErro(t *testing.T) {
 	for _, status := range []int{http.StatusUnauthorized, http.StatusNotFound, http.StatusTooManyRequests, http.StatusInternalServerError} {
 		srv, _ := servidorDeTeste(t, status)
 		u := newHTTPUploader(srv.URL)
-		u.sendToIngest([]byte(`{}`), "marketorders.ingest", &albionState{}, "id-1")
+		u.(*httpUploader).retry.maxAttempts = 1
+		u.sendToIngest([]byte(`{}`), "marketorders.ingest", uploadMetadata{}, "id-1")
 	}
 }
 
@@ -151,7 +161,8 @@ func TestUploaderNaoPanicaEmStatusDeErro(t *testing.T) {
 // para isso). Porta 1 nao tem nada escutando.
 func TestUploaderNaoPanicaComDestinoInalcancavel(t *testing.T) {
 	u := newHTTPUploader("http://127.0.0.1:1")
-	u.sendToIngest([]byte(`{}`), "marketorders.ingest", &albionState{}, "id-1")
+	u.(*httpUploader).retry.maxAttempts = 1
+	u.sendToIngest([]byte(`{}`), "marketorders.ingest", uploadMetadata{}, "id-1")
 }
 
 // Guarda de regressao do timeout: se alguem remover o Timeout do http.Client, este teste
@@ -160,5 +171,58 @@ func TestUploaderNaoPanicaComDestinoInalcancavel(t *testing.T) {
 func TestTimeoutDeIngestNaoEZero(t *testing.T) {
 	if ingestRequestTimeout <= 0 {
 		t.Fatalf("ingestRequestTimeout = %v -- sem timeout, um backend travado prende a goroutine para sempre", ingestRequestTimeout)
+	}
+}
+
+func TestUploaderAuthSeguraUploadComServidorDesconhecido(t *testing.T) {
+	srv, capturada := servidorDeTeste(t, http.StatusOK)
+	comApiToken(t, "apk_secreto_1234")
+
+	alvo := strings.Replace(srv.URL, "http://", "http+token://", 1)
+	u := newHTTPUploaderAuth(alvo)
+	u.sendToIngest([]byte(`{}`), "marketorders.ingest", uploadMetadata{}, "id-1")
+
+	if capturada.recebeu {
+		t.Fatal("uploader autenticado enviou payload sem identificar o realm")
+	}
+}
+func TestUploaderAuthEnviaCadaRealmCanonico(t *testing.T) {
+	for serverID, want := range map[int]string{1: "west", 2: "east", 3: "europe"} {
+		srv, capturada := servidorDeTeste(t, http.StatusOK)
+		comApiToken(t, "apk_secreto_1234")
+		alvo := strings.Replace(srv.URL, "http://", "http+token://", 1)
+
+		newHTTPUploaderAuth(alvo).sendToIngest(
+			[]byte(`{}`), "marketorders.ingest", uploadMetadata{serverID: serverID}, "id-1",
+		)
+
+		if got := capturada.albionServer; got != want {
+			t.Errorf("server ID %d enviou %q, esperado %q", serverID, got, want)
+		}
+	}
+}
+
+func TestUploaderAuth401PausaUploadsPosteriores(t *testing.T) {
+	srv, capturada := servidorDeTeste(t, http.StatusUnauthorized)
+	ctx, cancel := context.WithCancel(context.Background())
+	controller := &bootstrapController{ctx: ctx, cancel: cancel}
+	controller.authReady.Store(true)
+	activeBootstrap.Lock()
+	activeBootstrap.controller = controller
+	activeBootstrap.Unlock()
+	uploadBootstrapRunning.Store(true)
+	t.Cleanup(stopUploadBootstrap)
+
+	u := buildHTTPUploader(srv.URL, true, "apk_revogado_1234")
+	u.retry.maxAttempts = 1
+	u.sendToIngest([]byte(`{}`), "marketorders.ingest", uploadMetadata{serverID: 1}, "id-1")
+	if !capturada.recebeu {
+		t.Fatal("primeira requisicao nao chegou ao servidor")
+	}
+	if authenticatedUploadsAllowed() {
+		t.Fatal("401 nao pausou os uploads autenticados")
+	}
+	if currentConnectionState() != ConnectionUnauthorized {
+		t.Fatalf("estado depois do 401 = %s", currentConnectionState())
 	}
 }

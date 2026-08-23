@@ -2,7 +2,6 @@ package client
 
 import (
 	"sort"
-	"time"
 
 	"github.com/ao-data/albiondata-client/lib"
 	"github.com/ao-data/albiondata-client/log"
@@ -35,10 +34,15 @@ func (op operationAuctionGetItemAverageStats) Process(state *albionState) {
 		albionId:  itemId,
 		timescale: op.Timescale,
 		quality:   op.Quality,
+		messageID: op.MessageID,
 	}
 
 	state.marketHistoryIDLookup[index] = mhInfo
 	log.Debugf("Market History - Caching %d at %d.", mhInfo.albionId, index)
+	if pending, ok := state.pendingMarketHistoryResponses[op.MessageID]; ok {
+		delete(state.pendingMarketHistoryResponses, op.MessageID)
+		pending.Process(state)
+	}
 }
 
 type operationAuctionGetItemAverageStatsResponse struct {
@@ -49,22 +53,26 @@ type operationAuctionGetItemAverageStatsResponse struct {
 }
 
 func (op operationAuctionGetItemAverageStatsResponse) Process(state *albionState) {
+	if op.MessageID < 0 {
+		log.Warnf("Market History - ignoring negative message ID %d", op.MessageID)
+		return
+	}
+	messageID := uint64(op.MessageID)
 	var index = op.MessageID % CacheSize
 
-	// Wait for the correlating Request if it has not yet been processed
-	waits := 0
-	for waits < 30 {
-		if state.marketHistoryIDLookup[index].albionId < 1 {
-			time.Sleep(1 * time.Second)
-			waits += 1
-		} else {
-			break
+	// PATCH LOCAL (Albion Profit Pro): nunca espere dentro do router serializado. Guarde
+	// respostas fora de ordem por ID exato; usar apenas messageID%CacheSize poderia casar
+	// uma resposta antiga com outro item depois de uma colisao no anel.
+	if state.marketHistoryIDLookup[index].albionId < 1 || state.marketHistoryIDLookup[index].messageID != messageID {
+		if state.pendingMarketHistoryResponses == nil {
+			state.pendingMarketHistoryResponses = make(map[uint64]operationAuctionGetItemAverageStatsResponse)
 		}
-	}
-
-	// Still no correlating Request has been processed
-	if state.marketHistoryIDLookup[index].albionId < 1 {
-		log.Warnf("Market History - Market history at index %d is invalid. Has albionId: %d ", index, state.marketHistoryIDLookup[index].albionId)
+		if len(state.pendingMarketHistoryResponses) >= CacheSize {
+			log.Warnf("Market History - pending correlation cache is full; dropping message ID %d", op.MessageID)
+			return
+		}
+		state.pendingMarketHistoryResponses[messageID] = op
+		log.Debugf("Market History - response %d arrived before its request; holding correlation", op.MessageID)
 		return
 	}
 

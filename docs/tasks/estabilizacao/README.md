@@ -4,9 +4,9 @@ Derivada da [revisão das Fases 0 a 2](../../05-revisao-fases-0-a-2.md). É uma 
 há trabalho no repositório, client Go, backend, dados e operação.
 
 **Objetivo:** remover bloqueadores de correção, distribuição e reprodução antes de iniciar o
-frontend. A fase só termina quando uma release controlada do client envia dados identificados por
-realm para um ambiente novo, inicializado de forma reproduzível, e todas as verificações da task
-14 passam.
+frontend. A fase termina quando o repositório e o pipeline reproduzível passam pelo gate
+automatizado da task 14. O ensaio integrado com cliente Windows, jogo e Swarm será executado com o
+frontend completo, quando toda a jornada puder ser validada de ponta a ponta.
 
 ## Ordem e dependências
 
@@ -53,19 +53,19 @@ explícita antes de alterar código.
 ## Status
 
 - [x] 01 — Baseline Git e README raiz
-- [ ] 02 — Updater e releases do client
-- [ ] 03 — Realm ponta a ponta
-- [ ] 04 — Integridade do rollup diário
-- [ ] 05 — Isolamento da fonte no `scope=mine`
-- [ ] 06 — Falhas Celery e DLQ
-- [ ] 07 — Validação do contrato de ingest
-- [ ] 08 — Segurança do rate limit
-- [ ] 09 — Uploader resiliente e concorrência
-- [ ] 10 — Seed de dados reproduzível
-- [ ] 11 — Filas e operação Celery
-- [ ] 12 — Semântica e escala do livro
-- [ ] 13 — Validação no boot e configuração de produção
-- [ ] 14 — Limpeza documental e validação final
+- [x] 02 — Updater e releases do client
+- [x] 03 — Realm ponta a ponta
+- [x] 04 — Integridade do rollup diário
+- [x] 05 — Isolamento da fonte no `scope=mine`
+- [x] 06 — Falhas Celery e DLQ
+- [x] 07 — Validação do contrato de ingest
+- [x] 08 — Segurança do rate limit
+- [x] 09 — Uploader resiliente e concorrência
+- [x] 10 — Seed de dados reproduzível
+- [x] 11 — Filas e operação Celery
+- [x] 12 — Semântica e escala do livro
+- [x] 13 — Validação no boot e configuração de produção
+- [x] 14 — Limpeza documental e validação final
 
 ## Gate de saída
 
@@ -75,5 +75,8 @@ explícita antes de alterar código.
 - Nenhum erro inesperado de worker recebe sucesso silencioso.
 - Imagem + jobs de deploy conseguem migrar e semear banco vazio.
 - Ingest não compete com rollup/poda e não persiste resultados inúteis.
-- Testes Python/Go, migrations, imagem Docker e teste real no jogo verdes.
+- Testes Python/Go, migrations, imagem Docker e ambiente limpo verdes.
 - `AGENTS.md`, `CLAUDE.md`, plano macro, READMEs e checklists concordam.
+
+Os testes integrados no cliente Windows, Albion Online e Swarm real foram transferidos, por decisão
+do proprietário em 2026-08-23, para o gate posterior à implementação completa do frontend.

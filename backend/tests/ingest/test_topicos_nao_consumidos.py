@@ -27,7 +27,7 @@ FIXTURE_MAPDATA = (
 async def test_topico_nao_consumido_responde_200(client, token_api, topico):
     resp = await client.post(
         f"/{topico}.ingest",
-        headers={"Authorization": f"Bearer {token_api}"},
+        headers={"Authorization": f"Bearer {token_api}", "X-Albion-Server": "west"},
         json={"qualquer": "coisa"},
     )
     assert resp.status_code == 200, resp.text
@@ -39,7 +39,7 @@ async def test_mapdata_real_do_jogo_e_aceito(client, token_api):
     payload = json.loads(FIXTURE_MAPDATA.read_text())
     resp = await client.post(
         "/mapdata.ingest",
-        headers={"Authorization": f"Bearer {token_api}"},
+        headers={"Authorization": f"Bearer {token_api}", "X-Albion-Server": "west"},
         json=payload,
     )
     assert resp.status_code == 200, resp.text
@@ -58,7 +58,7 @@ async def test_topico_nao_consumido_nao_grava_nada(client, token_api, db_session
 
     resp = await client.post(
         f"/{topico}.ingest",
-        headers={"Authorization": f"Bearer {token_api}"},
+        headers={"Authorization": f"Bearer {token_api}", "X-Albion-Server": "west"},
         json={"Orders": [{"Id": 1}], "ZoneID": 5003},
     )
     assert resp.status_code == 200, resp.text
@@ -75,7 +75,7 @@ async def test_topico_desconhecido_continua_404(client, token_api):
     404, e a gente perderia o sinal de que ele está mandando coisa que não existe."""
     resp = await client.post(
         "/naoexiste.ingest",
-        headers={"Authorization": f"Bearer {token_api}"},
+        headers={"Authorization": f"Bearer {token_api}", "X-Albion-Server": "west"},
         json={},
     )
     assert resp.status_code == 404, resp.text
@@ -103,7 +103,7 @@ async def test_topicos_consumidos_continuam_roteando_para_o_handler_certo(client
     }
     resp = await client.post(
         "/marketorders.ingest",
-        headers={"Authorization": f"Bearer {token_api}"},
+        headers={"Authorization": f"Bearer {token_api}", "X-Albion-Server": "west"},
         json=payload,
     )
     # 422 prova que o schema de marketorders foi aplicado — ou seja, a rota certa respondeu.

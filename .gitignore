@@ -3,6 +3,14 @@ albiondata-client/albiondata-client.exe
 albiondata-client/albiondata-client.log
 albiondata-client/*.gob
 albiondata-client/bin/
+albiondata-client/.cache/
+# PATCH LOCAL (Albion Profit Pro): generated client release artifacts.
+albiondata-client/update-*.gz
+albiondata-client/update-*.sha256
+albiondata-client/*-installer.exe
+albiondata-client/*-installer.exe.sha256
+albiondata-client/*-mac.zip
+albiondata-client/*-mac.zip.sha256
 
 # Python (backend)
 backend/.venv/

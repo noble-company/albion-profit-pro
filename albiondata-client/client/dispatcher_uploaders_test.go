@@ -22,7 +22,7 @@ import (
 func tipoDoUploader(u uploader) string {
 	switch v := u.(type) {
 	case *httpUploader:
-		if v.apiToken != "" {
+		if v.authenticated {
 			return "http+auth"
 		}
 		return "http"
@@ -141,10 +141,11 @@ func TestCreateUploadersAparaEspacoEmListaComVirgula(t *testing.T) {
 // Afirma sobre a constante, e nao sobre ConfigGlobal.PublicIngestBaseUrls: SetupFlags() e
 // chamado do init() do pacote main, que nao roda em `go test ./client/` -- ali o campo fica
 // no zero value e o teste passaria/falharia por motivo errado.
-func TestDefaultDoIngestApontaParaNosso(t *testing.T) {
-	if !strings.HasPrefix(defaultPublicIngestBaseURL, "http+token://") {
+func TestDefaultDeDesenvolvimentoApontaParaNosso(t *testing.T) {
+	resolved, _ := resolvePublicIngestBaseURLs("", "", "development", "")
+	if !strings.HasPrefix(resolved, "http+token://") {
 		t.Errorf("default do -i = %q, esperado prefixo http+token:// (destino autenticado do Albion Profit Pro)",
-			defaultPublicIngestBaseURL)
+			resolved)
 	}
 
 	// o default tem que ser reconhecido pelo proprio createUploaders, senao o client sobe
@@ -153,11 +154,30 @@ func TestDefaultDoIngestApontaParaNosso(t *testing.T) {
 	t.Cleanup(func() { ConfigGlobal.ApiToken = anterior })
 	ConfigGlobal.ApiToken = "apk_teste"
 
-	us := createUploaders([]string{defaultPublicIngestBaseURL})
+	us := createUploaders([]string{resolved})
 	if len(us) != 1 {
 		t.Fatalf("createUploaders(default) devolveu %d uploaders, esperado 1", len(us))
 	}
 	if got := tipoDoUploader(us[0]); got != "http+auth" {
 		t.Errorf("default do -i gerou uploader %s, esperado http+auth", got)
+	}
+}
+
+func TestReleaseSemDestinoNaoHerdaLocalhost(t *testing.T) {
+	resolved, origem := resolvePublicIngestBaseURLs("", "", "release", "")
+	if resolved != "" {
+		t.Fatalf("release sem URL resolveu %q (%s), esperado upload desabilitado", resolved, origem)
+	}
+	if strings.Contains(resolved, "localhost") {
+		t.Fatal("release sem URL apontou silenciosamente para localhost")
+	}
+}
+
+func TestDestinoExplicitoVenceDefaultDoPerfil(t *testing.T) {
+	resolved, origem := resolvePublicIngestBaseURLs(
+		"https+token://api.profit.test", "https+token://arquivo.test", "release", "",
+	)
+	if resolved != "https+token://api.profit.test" || origem != "flag -i" {
+		t.Fatalf("resolucao = %q (%s), esperado destino da flag", resolved, origem)
 	}
 }

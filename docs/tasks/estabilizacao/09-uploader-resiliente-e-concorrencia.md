@@ -53,3 +53,33 @@ Tasks 02 e 03 (release controlada e realm no uploader).
 
 UX de notificações e comportamento com jogo/Npcap real durante indisponibilidade.
 
+## Resultado da implementação (2026-08-23)
+
+- O dispatcher mantém uma instância por destino durante todo o ciclo do client. HTTP reutiliza
+  `Client`/`Transport`; PoW reutiliza o mesmo transporte; NATS conecta no worker e todas as
+  conexões são fechadas no shutdown.
+- Cada destino tem fila em memória de 256 posições e um worker. Destinos diferentes trabalham em
+  paralelo, mas cada destino preserva a ordem observada. Saturação descarta deterministicamente a
+  mensagem mais nova, incrementa contador e nunca bloqueia a captura em rede.
+- HTTP comum e `+token` fazem até quatro tentativas somente para erro de rede, timeout, 408, 429 e
+  5xx, com `Retry-After`, backoff exponencial, jitter e teto de cinco segundos. Erros 4xx de
+  contrato/autenticação encerram imediatamente.
+- Toda mensagem enfileira somente payload e snapshot mínimo do realm. O token permanece apenas no
+  uploader autenticado e destinos de log têm credenciais, query e fragmento removidos.
+- Todas as mutações de `albionState` passaram a ser serializadas pelo router. A correlação de
+  histórico deixou de dormir por até 30 segundos: respostas fora de ordem são guardadas pelo
+  `MessageID` exato em cache limitado e consumidas quando a requisição correspondente chega.
+- Quit pela systray, processamento offline e reinício pelo updater passam pelo mesmo shutdown:
+  parar captura, drenar router/fila por prazo limitado, cancelar requisições e fechar recursos.
+- O spool durável foi conscientemente adiado. O wire atual não carrega o instante original da
+  observação; reproduzir lotes após reinício faria o backend registrar dado antigo com
+  `last_seen_at` novo. Dados de mercado são regeneráveis, portanto a alternativa correta até o
+  contrato ganhar timestamp é fila limitada em memória, sem persistir token ou dados pessoais.
+- A CI Linux executa `go test -race ./...`. No Windows local o race detector não pôde ser executado
+  porque a máquina não possui compilador C para CGO; `go test ./...` e a validação de formato com
+  EOL normalizado passaram.
+
+### Validação manual pendente
+
+- Derrubar/restaurar o backend durante uma captura real com Albion/Npcap e observar retry, fila,
+  memória, goroutines, notificações e encerramento pela systray.

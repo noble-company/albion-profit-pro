@@ -1,120 +1,170 @@
-> [!IMPORTANT]
-> Esta pasta é o fork modificado usado pelo **Albion Profit Pro**. Ela pertence ao monorepo
-> <https://github.com/noble-company/albion-profit-pro>, não possui `.git` próprio e não é um
-> submódulo. A origem do código é <https://github.com/ao-data/albiondata-client>.
->
-> Atualizações upstream devem ser comparadas em clone separado e portadas seletivamente em commits
-> pequenos. Preserve CRLF, mantenha todo patch próprio marcado `PATCH LOCAL (Albion Profit Pro)` e
-> rode `go test ./...` depois da integração. O updater não pode publicar ou instalar releases do
-> upstream no produto; o canal próprio será fechado na Fase 2.5.
+# Albion Profit Pro — Client
 
-<!-- [![CircleCI](https://circleci.com/gh/broderickhyman/albiondata-client/tree/master.svg?style=svg)](https://circleci.com/gh/broderickhyman/albiondata-client/tree/master) [![Go Report Card](https://goreportcard.com/badge/github.com/broderickhyman/albiondata-client)](https://goreportcard.com/report/github.com/broderickhyman/albiondata-client)
--->
+Cliente desktop que observa passivamente o tráfego local do Albion Online, extrai dados de mercado
+e os envia de forma autenticada ao backend do Albion Profit Pro.
 
-# Albion Data - Client
-Distributed client for the [Albion Online Data](https://www.albion-online-data.com/)
-project.
+Esta pasta é um fork modificado do
+[`ao-data/albiondata-client`](https://github.com/ao-data/albiondata-client), distribuído sob a
+licença MIT. Ela faz parte do monorepo
+[`noble-company/albion-profit-pro`](https://github.com/noble-company/albion-profit-pro), não tem
+`.git` próprio e não é um submódulo.
 
-A quick note on the legality of this application and if it
-violates the Terms and Conditions for Albion Online. Here is
-the response from SBI when asked if we are allowed to do
-monitor network packets relating to Albion Online:
-> Our position is quite simple. As long as you just look and
-analyze we are ok with it. The moment you modify or manipulate
-something or somehow interfere with our services we will react
-(e.g. perma-ban, take legal action, whatever).
+## Segurança e escopo
 
-~ MadDave - Technical Lead for Albion Online
+O cliente somente lê pacotes recebidos pela máquina. Ele não injeta, altera ou responde ao tráfego
+do jogo. Os patches do Profit Pro adicionam:
 
-Source: https://forum.albiononline.com/index.php/Thread/51604-Is-it-allowed-to-scan-your-internet-trafic-and-pick-up-logs/?postID=512670#post512670
+- destino e token próprios de ingest;
+- isolamento dos realms West, East e Europe;
+- fila limitada, transporte reutilizável e retry controlado;
+- validação de configuração/token antes do primeiro upload;
+- estados operacionais e recarga de configuração pelo systray;
+- canal de releases próprio e updater fail-closed.
 
-This client monitors local network traffic, identifies UDP packets
-that contain relevant data for Albion Online, and ships the information
-off to a central NATS server that anyone can subscribe to.
+Dados de mercado usam exclusivamente o canal público `-i`. O canal privado `-p` permanece vazio;
+configurá-lo com o mesmo destino duplicaria os payloads públicos.
 
-<!--
-[Client download stats](https://www.somsubhra.com/github-release-stats/?username=broderickhyman&repository=albiondata-client)
--->
+## Requisitos
 
-<!-- 
-### Contributing
-This process is run on a [DigitalOcean Droplet](https://www.digitalocean.com) in order to ensure almost perfect uptime and high performance for the users. If you find this project beneficial to you then please consider a donation, thanks!!
+### Windows
 
--->
+- Go compatível com o `go.mod`, para compilar;
+- Npcap instalado, para capturar pacotes;
+- acesso às interfaces de rede usadas pelo jogo.
 
-# Contributions
-Many thanks to the original developers:
-- [Regner](https://github.com/Regner)
-- [pcdummy](https://github.com/pcdummy)
-- [Ultraporing](https://github.com/Ultraporing)
+### Linux
 
-
-Many thanks also to [broderickhyman](https://github.com/broderickhyman) for picking up development and funding for the the last few years of the project!
-
-As of 2023-01-01, [Stanx](https://github.com/phendryx) is the primary maintainer and provides funding of the related projects.  
-
-[Walkynn](https://github.com/walkeralencar) has been a long time maintainer of different aspets of the project as well.
-
-# Downloads
-Downloads can be found here: https://github.com/ao-data/albiondata-client/releases
-
-Stats for the client releases can be viewed [here](https://tooomm.github.io/github-release-stats/?username=ao-data&repository=albiondata-client).
-## Running on Mac
-
-### Running from the Finder
-1. Download the latest `albiondata-client-amd64-mac.zip` file from [the Releases page](https://github.com/ao-data/albiondata-client/releases)
-2. Unzip that file from the Finder
-3. Enter the `albiondata-client` folder.
-4. Double click the `run.command` file. It will ask for your password for permissions reasons.
-
-### Running from the Terminal
-1. Download the latest `update-darwin-amd64.gz` file from [the Releases page](https://github.com/ao-data/albiondata-client/releases)
-2. Unzip that file from the Finder or with `gunzip update-darwin-amd64.gz`
-3. The unzipped `albiondata-client` file is a Golang binary file. You'll need to make this file executable so it can be run directly. You can do this from your Terminal with: `chmod +x albiondata-client`
-4. Run the client from your Terminal with `./albiondata-client`
-
-## Running on Debian or Debian based distros
-
-### Install app binary
-<sup>`~/.local/bin` requires systemd. If you don't roll with systemd use something else. </sup>
-
-1. Create ~/.local/bin folder: `mkdir -p ~/.local/bin`
-2. Download latest `update-linux-amd64.gz` version from [the Releases page](https://github.com/ao-data/albiondata-client/releases)  
-`curl -L https://github.com/ao-data/albiondata-client/releases/latest/download/update-linux-amd64.gz -o - | gzip -d > ~/.local/bin/albiondata-client`
-3. Give user execution permission: `chmod u+x ~/.local/bin/albiondata-client`
-
-### Install dependency libpcap
+- Go;
+- `libpcap-dev`;
+- capability de captura no binário, se não for executado como root:
 
 ```bash
-sudo apt install libpcap-dev
+sudo setcap cap_net_raw,cap_net_admin=eip ./albiondata-client
 ```
 
-### Give binary permission to capture network traffic
+### macOS
 
-To allow binary to capture data without using sudo
+O sistema solicita privilégio para captura. O pacote de release inclui `run.command` para iniciar o
+binário com a permissão necessária.
+
+## Build e testes
+
+```powershell
+go test ./...
+go vet ./client/
+go build -o albiondata-client.exe .
+```
+
+No Windows, `go vet ./client/` mantém um aviso conhecido do upstream em
+`client/net_interface_filter_win.go` sobre `unsafe.Pointer`. O race detector roda no CI Linux, que
+possui CGO e `libpcap`:
 
 ```bash
-sudo setcap cap_net_raw,cap_net_admin=eip ~/.local/bin/albiondata-client
+go test -race ./...
 ```
 
-# Related Projects
-- [albiondata-deduper-dotNet](https://github.com/ao-data/albiondata-deduper-dotNet)
-- [albiondata-sql-dotNet](https://github.com/ao-data/albiondata-sql-dotNet)
-- [albiondata-api-dotNet](https://github.com/ao-data/albiondata-api-dotNet)
-- [AlbionData.Models](https://github.com/ao-data/albiondata-models-dotNet) [![NuGet](https://img.shields.io/nuget/v/AlbionData.Models.svg)](https://www.nuget.org/packages/AlbionData.Models/)
-- [albion-data-website](https://github.com/ao-data/albion-data-website)
+Não execute `gofmt -w` sobre o fork inteiro. O upstream usa CRLF e uma reescrita global destrói a
+qualidade do diff. Use `scripts/validate-fmt.sh`, que valida apenas arquivos Go alterados sem
+reescrevê-los.
 
-# Contact Us
-The best way to get in touch with us is on the Albion Online Fansites Discord server in either the #proj-albiondata or the #developers channel. A permanent invite link can be found here: [https://discord.gg/TjWdq24](https://discord.gg/TjWdq24)
+## Configuração
 
-# Developer Setup
-### Mac/Linux Setup
-- Install go
-- Build the project (Go modules will download automatically)
+Copie o exemplo e edite o arquivo local:
 
-### Windows Setup
-[Windows Setup Guide](https://github.com/ao-data/albiondata-client/wiki/Building-in-Windows)
+```powershell
+Copy-Item 'config.yaml.example' 'config.yaml'
+```
 
-# License
-This project, and all contributed code, are licensed under the MIT
-License. A copy of the MIT License may be found in the repository.
+```yaml
+PublicIngestBaseUrls: https+token://api.exemplo.com
+ApiToken: apk_substitua_pelo_token_real
+EnableWebsockets: true
+AllowedWebsocketHosts:
+  - localhost
+```
+
+Precedência de configuração:
+
+1. flags `-i` e `-token`;
+2. `config.yaml`;
+3. URL injetada durante o build de release;
+4. `http+token://localhost:8000`, somente em build de desenvolvimento.
+
+Uma release sem destino explícito inicia com upload desabilitado. O token é enviado apenas para
+destinos `http+token://` ou `https+token://`; URLs comuns nunca recebem `Authorization`.
+
+## Execução
+
+```powershell
+.\albiondata-client.exe
+```
+
+Flags úteis:
+
+| Flag | Uso |
+|---|---|
+| `-i <url>` | Sobrescreve o destino público de ingest |
+| `-token <token>` | Sobrescreve o token de API |
+| `-d` | Desabilita todos os uploads |
+| `-debug` | Ativa diagnóstico detalhado |
+| `-l <interfaces>` | Restringe interfaces de captura |
+| `-o <arquivo>` | Reproduz captura `.pcap`/`.gob` offline |
+| `-record <arquivo>` | Grava pacotes Photon para diagnóstico |
+| `-version` | Mostra versão, origem e política do updater |
+
+No boot, o cliente chama `GET /client/me` com timeout antes de liberar uploads autenticados.
+Timeout e erros 5xx entram em recuperação com backoff; 401/403 pausam até o usuário corrigir a
+configuração. Depois de editar `config.yaml`, selecione **Reload Configuration** no systray.
+
+## Realm e localização
+
+O realm é inferido do IP do servidor observado no tráfego do jogo e enviado como
+`X-Albion-Server: west|east|europe`. Ele nunca é enviado a destinos não autenticados.
+
+Localização e realm só ficam disponíveis depois que o cliente observa uma transição de zona. Ao
+iniciar parado dentro de uma cidade, atravesse uma passagem antes de abrir o mercado. Até isso
+acontecer, os dados autenticados permanecem bloqueados e o systray informa o estado.
+
+## Estados e solução de problemas
+
+| Estado | Ação recomendada |
+|---|---|
+| Upload disabled | Remova `-d` e configure um destino em builds de release |
+| Missing token | Configure `ApiToken` ou use `-token` |
+| Unauthorized/revoked | Gere um token novo e recarregue a configuração |
+| Backend unavailable | Verifique rede/backend; o cliente tenta recuperar automaticamente |
+| Unknown realm | Entre no jogo e atravesse uma zona |
+| Invalid destination | Use uma URL `http(s)+token://` válida e sem credenciais/query |
+
+Se nenhuma interface aparecer no Windows, confirme que o serviço do Npcap está ativo. Logs ficam em
+`albiondata-client.log`; URL e token são sanitizados antes de qualquer diagnóstico.
+
+## Releases e updater
+
+Releases oficiais pertencem a
+[`noble-company/albion-profit-pro`](https://github.com/noble-company/albion-profit-pro/releases).
+Os workflows geram binários/instaladores e arquivos `.sha256`. O updater é desabilitado por padrão
+e rejeita qualquer origem diferente do repositório do produto.
+
+O destino oficial é injetado pela variável de repositório `PROFITPRO_INGEST_URL`. Publicação,
+assinatura e push exigem autorização humana. Veja a
+[política de releases](../docs/07-releases-do-client.md).
+
+## Contribuição e atualização do upstream
+
+Todo patch do produto deve continuar marcado com `PATCH LOCAL (Albion Profit Pro)`. Para incorporar
+uma atualização upstream:
+
+1. compare a revisão desejada num clone separado;
+2. porte somente mudanças relevantes em commits pequenos;
+3. preserve os finais de linha existentes;
+4. recoloque os patches locais onde houver conflito;
+5. rode testes, race detector no CI e builds de release.
+
+Não conecte o `origin` do monorepo nem o updater do produto ao repositório upstream.
+
+## Licença e créditos
+
+O código original e as modificações permanecem sob a licença MIT em [LICENSE](LICENSE). Créditos
+aos criadores e mantenedores do Albion Online Data Project, incluindo Regner, pcdummy,
+Ultraporing, broderickhyman, Stanx e Walkynn.

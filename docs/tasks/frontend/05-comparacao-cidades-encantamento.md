@@ -8,8 +8,9 @@ A pergunta central é onde produzir. Para encantamento, o dump descreve cada upg
 nível anterior; usar só o recurso do nível final subestima a rota.
 
 ## O que implementar
-- Corpo igual ao simulate, sem local fixo. Comparar somente localizações elegíveis configuradas
-  (inicialmente cidades reais confirmadas), nunca toda linha oportunística de `location`.
+- Corpo igual ao simulate (`server` obrigatório incluído), sem local fixo. Comparar somente
+  localizações elegíveis configuradas (inicialmente cidades reais confirmadas), nunca toda linha
+  oportunística de `location`.
 - Nesta fase, compra, craft e venda acontecem na mesma cidade; transporte/arbitragem fica fora do
   escopo e deve estar explícito na resposta/UI.
 - Carregar itens, ordens e receitas em lote; queries não crescem com o número de cidades.

@@ -69,8 +69,8 @@ async def test_process_market_orders_survives_two_consecutive_task_calls(db_sess
     # conexão presa a um loop já fechado pela 1ª). Desde a task 27, `market_order` é
     # upsert por source_id — as duas chamadas usam o MESMO payload (mesmo source_id),
     # então o resultado esperado é 50 linhas, não 100 (a 2ª "varredura" atualiza a 1ª).
-    await loop.run_in_executor(None, process_market_orders, payload, str(user.id))
-    await loop.run_in_executor(None, process_market_orders, payload, str(user.id))
+    await loop.run_in_executor(None, process_market_orders, payload, str(user.id), "west")
+    await loop.run_in_executor(None, process_market_orders, payload, str(user.id), "west")
 
     count = await db_session.scalar(
         select(func.count()).select_from(MarketOrder).where(MarketOrder.source_id.in_(source_ids))
@@ -93,8 +93,8 @@ async def test_process_market_history_survives_two_consecutive_task_calls(db_ses
     baseline = await _worker_connection_count()
 
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, process_market_history, payload, str(user.id))
-    await loop.run_in_executor(None, process_market_history, payload, str(user.id))
+    await loop.run_in_executor(None, process_market_history, payload, str(user.id), "west")
+    await loop.run_in_executor(None, process_market_history, payload, str(user.id), "west")
 
     count = await db_session.scalar(
         select(func.count())

@@ -14,6 +14,7 @@ from src.database import async_session_maker
 from src.ingest.normalize import TICKS_PER_SECOND, TICKS_UNIX_EPOCH
 from src.ingest.service import save_market_history, save_market_orders
 from src.items.models import Item
+from src.prices.constants import MarketScanSource
 from src.prices.models import MarketScan
 from tests.conftest import criar_usuario
 
@@ -48,14 +49,14 @@ async def test_resending_same_scan_upserts_instead_of_duplicating(db_session):
         ]
     }
 
-    await save_market_orders(async_session_maker, get_redis(), payload, str(user.id))
-    await save_market_orders(async_session_maker, get_redis(), payload, str(user.id))
+    await save_market_orders(async_session_maker, get_redis(), payload, "west", str(user.id))
+    await save_market_orders(async_session_maker, get_redis(), payload, "west", str(user.id))
 
     result = await db_session.execute(select(MarketScan).where(MarketScan.item_key == item_id))
     rows = result.scalars().all()
     assert len(rows) == 1  # não duplicou — upsert
     assert rows[0].n_varreduras == 2
-    assert rows[0].fonte == "livro"
+    assert rows[0].fonte == MarketScanSource.BOOK
     assert rows[0].user_id == user.id
     assert rows[0].location_id == "1002"
     assert rows[0].quality_level == 1
@@ -86,12 +87,12 @@ async def test_market_history_scan_resolves_unique_name_via_item_table(db_sessio
         ],
     }
 
-    await save_market_history(async_session_maker, get_redis(), payload, str(user.id))
+    await save_market_history(async_session_maker, get_redis(), payload, "west", str(user.id))
 
     result = await db_session.execute(select(MarketScan).where(MarketScan.item_key == unique_name))
     rows = result.scalars().all()
     assert len(rows) == 1
-    assert rows[0].fonte == "historico"
+    assert rows[0].fonte == MarketScanSource.HISTORY
     assert rows[0].user_id == user.id
     assert rows[0].location_id == "1002"
     assert rows[0].quality_level == 1

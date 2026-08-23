@@ -33,6 +33,7 @@ async def test_market_history_entry_has_no_user_id_or_is_public_columns():
 
 def _sample_entry(item_id: int = 999999001) -> dict:
     return {
+        "server_id": "west",
         "item_id": item_id,
         "location_id": "1002",
         "quality_level": 1,

@@ -26,9 +26,9 @@
 - Semântica do dado corrigida contra o contrato real medido no jogo ([03-contrato-ingest-real.md](03-contrato-ingest-real.md)): prata ÷10⁴, ticks .NET → `TIMESTAMPTZ`, `market_order`/`market_history_entry` remodelados (estado atual do livro / bucket global idempotente), tabela `item`+`location` (ponte `Index ↔ UniqueName`, locais dinâmicos).
 - Leitura de preços cache-first, por lado do livro e profundidade, com cobertura por usuário (`GET /items/{id}/prices?scope=all|mine`), retenção + rollup diário/mensal e `GET /items/{id}/demand`.
 - Hardening HTTP (CORS, `/ready`, rate limit, limites de payload) e migrations validadas em produção (imagem roda como não-root).
-- Dados de receita importados localmente e reimportáveis (`ITEM DUMP.json`/`items.json`, `backend/scripts/import_recipes.py`) — **5553 receitas** no Postgres local; o seed reproduzível da imagem/deploy é pendência da Fase 2.5 task 10.
-- Suíte de testes com `testcontainers` (Postgres/Redis/RabbitMQ efêmeros) — **131 testes**, sobre fixtures compartilhadas e payloads reais capturados do jogo, sem limpeza manual entre testes.
-- `Dockerfile` multi-stage validado e não-root. A imagem consegue executar Alembic, mas migration/seed/worker/beat ainda precisam ser materializados no stack (Fase 2.5 tasks 10-11); migration não roda no boot da API.
+- Dados estáticos com seed reproduzível e auditável (`backend/scripts/seed_static_data.py`): revisão e checksums fixados, **12.062 itens** e **5.553 receitas**, reexecução idempotente e troca atômica do catálogo.
+- Suíte de testes com `testcontainers` (Postgres/Redis/RabbitMQ efêmeros) — **229 testes**, sobre fixtures compartilhadas e payloads reais capturados do jogo, sem limpeza manual entre testes.
+- `Dockerfile` multi-stage validado e não-root. A imagem executa Alembic e o seed; migration/seed/worker/beat ainda precisam ser materializados no stack (Fase 2.5 task 11), e migration não roda no boot da API.
 - Observabilidade: `structlog` (JSON, também no worker) + `/health`/`/ready`.
 
 **Nota de implementação**: a estrutura real ficou domain-driven (`backend/src/auth/`, `src/ingest/`, `src/prices/`, `src/recipes/`, `src/api_tokens/`, `src/items/`, `src/cache/`, cada um com `router.py`/`schemas.py`/`models.py`/`service.py`) em vez do esboço `app/main.py`/`app/models.py`/`app/routers/` descrito originalmente na seção "Fase 1" abaixo — aquela seção é o desenho inicial (mantido como registro histórico da decisão), a fonte de verdade do que foi de fato implementado é `docs/tasks/backend/` (36 arquivos de task, um por microetapa).
@@ -59,10 +59,12 @@ backend de verdade, com dado real confirmado no Postgres.
 > sobre o protocolo de craft. Racional em
 > [tasks/client/README.md](tasks/client/README.md#por-que-07-09-foram-descopadas-2026-08-23).
 
-**Fase 2.5 (estabilização) — 🔄 em andamento, 1/14 tasks.** A auditoria posterior ao fechamento da
+**Fase 2.5 (estabilização) — ✅ concluída, 14/14 tasks.** A auditoria posterior ao fechamento da
 Fase 2 encontrou bloqueadores que os testes verdes não cobrem: updater apontando para upstream,
-realms misturados, rollup de borda corruptível, falhas Celery confirmadas como sucesso, client sem
-retry/controle de concorrência e deploy sem seed reproduzível. Diagnóstico em
+realm, rollups, uploader concorrente, seed reproduzível e operação Celery já foram estabilizados;
+permanece o fechamento documental/E2E. A validação de boot agora bloqueia release sem destino,
+token inválido e realm desconhecido. A semântica/escala do livro já
+declara cobertura parcial e consulta apenas combinações observadas. Diagnóstico em
 [05-revisao-fases-0-a-2.md](05-revisao-fases-0-a-2.md), execução em
 [tasks/estabilizacao/](tasks/estabilizacao/README.md). **Bloqueia a Fase 3.**
 
@@ -159,7 +161,7 @@ Novo diretório `backend/`, com dois processos/serviços (API e worker), compart
 Mudanças mínimas em `albiondata-client/`:
 1. ✅ **`client/config.go`**: novo campo `ApiToken` + flag `-token` (ou lido do `config.yaml` via viper, junto dos campos de websocket que já existem) — evita expor o token em texto puro na linha de comando do usuário final. *(task 01)*
 2. ✅ **`client/uploader_http.go`**: anexar header `Authorization: Bearer <ApiToken>` na requisição POST (hoje ela só seta `Content-Type`, ver linhas ~25-57). *(task 02 — o header vai **só** pros destinos marcados com o pseudo-esquema `http+token://`, pra não vazar o token se o `-i` tiver mais de um destino)*
-3. ✅ **Default do `-i`**: trocado de `https+pow://albion-online-data.com` pra `http+token://localhost:8000` (constante `defaultPublicIngestBaseURL` em `client/config.go`). O client **deixou de contribuir com o Albion Data Project** — decisão explícita do usuário em 2026-08-23. Como ainda não há domínio de produção, o default aponta pro ambiente de dev e precisa ser trocado no deploy. *(task 03)*
+3. ✅ **Default do `-i`**: o client **deixou de contribuir com o Albion Data Project** — decisão explícita do usuário em 2026-08-23. `http+token://localhost:8000` existe somente no perfil de desenvolvimento; desde a Task 13, release sem URL oficial/config explícita inicia com upload bloqueado. *(tasks 03 e 13)*
 4. **`client/systray/*.go`**: novo item de menu "Abrir Calculadora" que abre a UI embutida (Fase 4) ou, na primeira versão mais simples, só abre o navegador padrão na URL do frontend (`os/exec` + `start`/`open` conforme o SO) — via mais rápida de entregar "interface no client" sem a complexidade de um webview nativo.
 
 ### Itens adicionados pela captura ao vivo de 2026-08-22
@@ -179,17 +181,17 @@ Descobertos rodando o client de verdade contra o jogo (ver
    **Usuários vão bater nisso direto.** Precisa de tratamento de produto: detectar o estado e
    avisar na bandeja/UI ("ande até outra zona pra ativar a coleta"), não deixar o usuário achar
    que está coletando quando não está.
-7. **Conceito de servidor (west/east/europe)**: o payload de ingest não identifica de qual
-   servidor o dado veio, e o `Id` do leilão provavelmente não é único entre eles. Enquanto
-   atendermos um servidor só, tudo bem — quando não for, a chave de dedup do `market_order`
-   precisa virar `(server_id, source_id)`. Ver task 27.
+7. **Conceito de servidor (west/east/europe) — resolvido na Fase 2.5 task 03**: o client envia
+   `X-Albion-Server` no canal autenticado e realm integra fatos, unicidades, rollups, cache,
+   pub/sub e leituras. `market_order` deduplica por `(server_id, source_id)`; as APIs exigem
+   `server` explicitamente. O legado teve origem West confirmada pelo proprietário.
 
 **Confirmado nesta captura**: a tabela de opcodes do fork **não derivou** em relação à build
 atual do jogo — 81 (`opAuctionGetOffers`), 82 (`opAuctionGetRequests`) e 95
 (`opAuctionGetItemAverageStats`) casaram com o tráfego real. Não há trabalho de re-mapeamento
 pendente.
 
-## Fase 2.5 — Estabilização e prontidão para escalar 🔄 1/14
+## Fase 2.5 — Estabilização e prontidão para escalar ✅ 14/14
 
 Fase transversal criada a partir da revisão de 2026-08-23. Corrige distribuição do fork,
 versionamento, isolamento West/East/Europe, integridade de rollups/escopo, semântica de falha,
@@ -199,7 +201,7 @@ saída estão em [tasks/estabilizacao/README.md](tasks/estabilizacao/README.md).
 Esta fase não implementa frontend. Ela estabiliza o contrato que as 19 tasks da Fase 3 vão
 consumir, evitando consolidar APIs enganosas ou chaves sem realm na SPA.
 
-## Fase 3 — Calculadora web (API de craft + React/Vite) ⏸ especificada, bloqueada pela Fase 2.5
+## Fase 3 — Calculadora web (API de craft + React/Vite) ▶ próxima fase
 
 O escopo detalhado e a ordem de implementação estão em
 [tasks/frontend/](tasks/frontend/README.md): **19 microtasks**, revisadas contra o código real em
@@ -248,7 +250,7 @@ Trocar o "abrir navegador" da Fase 2 por um webview nativo embutido (`github.com
 5. **Próximo passo:** Fase 2.5 — estabilização, 14 tasks em
    [tasks/estabilizacao/](tasks/estabilizacao/README.md).
 6. Fase 3 — API de craft + frontend completo, já especificada em
-   [tasks/frontend/](tasks/frontend/README.md), começa somente após o gate da Fase 2.5.
+   [tasks/frontend/](tasks/frontend/README.md), liberada após o gate automatizado da Fase 2.5.
 7. Deploy no Swarm é materializado dentro da Fase 2.5 (seed/filas/processos) e finalizado na Fase
    3 com o frontend/Traefik, usando o padrão real do usuário.
 8. (Depois) Fase 4 — webview embutido no client.

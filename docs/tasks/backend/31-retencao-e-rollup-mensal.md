@@ -2,6 +2,10 @@
 
 > Implementa as **decisões de produto nº 2 e nº 3** de
 > [../../04-revisao-fase-1.md](../../04-revisao-fase-1.md).
+>
+> **Contrato do objeto `livro` supersedido pela Fase 2.5/Task 12:** os nomes e metadados atuais
+> estão documentados no doc 03 §11; não usar o exemplo histórico com `varredura_em` abaixo para
+> gerar tipos novos.
 
 ## Objetivo
 Manter o histórico de 30 dias em resolução fina, agregar o que envelhece em séries mensais

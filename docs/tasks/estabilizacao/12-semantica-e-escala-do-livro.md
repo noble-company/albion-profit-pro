@@ -55,3 +55,20 @@ Comparar uma combinação com a tela do jogo em duas varreduras (incluindo ordem
 
 Operação controlada no mercado e decisão de produto sobre janela de frescor/terminologia exibida.
 
+## Resultado da implementação (2026-08-23)
+
+- As evidências existentes não provam snapshot completo; a política parcial e a justificativa
+  ficaram registradas no doc 03. Ausência em lote não remove ordem.
+- O contrato passou a expor melhor preço, unidades/ordens observadas, instante e idade por lado,
+  cobertura parcial e janela de frescor. O default de 6h foi centralizado em `prices.policy`.
+- A leitura deixou de montar localizações × qualidades × encantamentos globais. Ela pagina somente
+  combinações observadas, preserva as coberturas independentes de `scope=mine` e filtra cidades.
+- O cache ganhou namespace `livro:v2`; combinações órfãs não entram na resposta e combinações
+  comprovadamente vazias são invalidadas na recomputação.
+- `EXPLAIN (ANALYZE, BUFFERS)` com 3.000 ordens usou `ix_market_order_book`; nenhuma migration foi
+  adicionada sem evidência de necessidade.
+- Testes automatizados cobrem frescor/expiração, recorte parcial, escala de queries, paginação,
+  filtro, isolamento de realm/fonte e cache órfão/invalidação.
+
+Pendente de validação humana: comparar duas varreduras no jogo com uma ordem removida e confirmar
+com produto os termos exibidos e a janela default de 6h.

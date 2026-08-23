@@ -7,6 +7,7 @@ from src.config import get_settings
 settings = get_settings()
 
 _redis: Redis | None = None
+BOOK_CACHE_VERSION = "v2"
 
 
 def get_redis() -> Redis:
@@ -23,13 +24,17 @@ def new_redis_client() -> Redis:
 
 
 def _book_cache_key(
-    item_id: str, location_id: str, quality_level: int, enchantment_level: int
+    server_id: str, item_id: str, location_id: str, quality_level: int, enchantment_level: int
 ) -> str:
-    return f"livro:{item_id}:{location_id}:{quality_level}:{enchantment_level}"
+    return (
+        f"livro:{BOOK_CACHE_VERSION}:{server_id}:{item_id}:"
+        f"{location_id}:{quality_level}:{enchantment_level}"
+    )
 
 
 async def set_book_depth(
     redis: Redis,
+    server_id: str,
     item_id: str,
     location_id: str,
     quality_level: int,
@@ -37,23 +42,18 @@ async def set_book_depth(
     payload: dict,
     ttl_seconds: int = 300,
 ) -> None:
-    """Grava a profundidade do livro (compra/venda separados) + giro de 24h pra uma
-    combinação (item, local, qualidade, encantamento). Formato definido na task 29 —
-    substitui o `price:...` de preço solto por lado (achado C3: misturar os dois lados podia
-    fazer o preço cacheado virar 1 silver e a calculadora achar lucro infinito)."""
-    key = _book_cache_key(item_id, location_id, quality_level, enchantment_level)
+    """Grava compra/venda e giro de 24h sem misturar os lados do livro."""
+    key = _book_cache_key(server_id, item_id, location_id, quality_level, enchantment_level)
     await redis.set(key, json.dumps(payload), ex=ttl_seconds)
 
 
 async def mget_book_depths(
-    redis: Redis, item_id: str, combos: list[tuple[str, int, int]]
+    redis: Redis, server_id: str, item_id: str, combos: list[tuple[str, int, int]]
 ) -> dict[tuple[str, int, int], dict | None]:
-    """`combos` é uma lista de (location_id, quality_level, enchantment_level). Um único
-    MGET pra todas as chaves candidatas — é o que evita os até 80 round-trips por request
-    (achado M1)."""
+    """Busca as combinações em um único MGET para evitar um round-trip por chave."""
     if not combos:
         return {}
-    keys = [_book_cache_key(item_id, loc, q, e) for loc, q, e in combos]
+    keys = [_book_cache_key(server_id, item_id, loc, q, e) for loc, q, e in combos]
     raw_values = await redis.mget(keys)
     return {
         combo: (json.loads(raw) if raw else None)
@@ -61,6 +61,20 @@ async def mget_book_depths(
     }
 
 
-async def publish_price_update(redis: Redis, item_id: str, payload: dict) -> None:
+async def delete_book_depth(
+    redis: Redis,
+    server_id: str,
+    item_id: str,
+    location_id: str,
+    quality_level: int,
+    enchantment_level: int,
+) -> None:
+    """Remove uma combinação após uma recomputação confirmar que ela ficou vazia."""
+    await redis.delete(
+        _book_cache_key(server_id, item_id, location_id, quality_level, enchantment_level)
+    )
+
+
+async def publish_price_update(redis: Redis, server_id: str, item_id: str, payload: dict) -> None:
     """Canal pub/sub — o frontend com WebSocket aberto assina 'prices:<item_id>' e recebe em tempo real."""
-    await redis.publish(f"prices:{item_id}", json.dumps(payload))
+    await redis.publish(f"prices:{server_id}:{item_id}", json.dumps(payload))

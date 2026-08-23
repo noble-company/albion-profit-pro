@@ -8,7 +8,8 @@ O ranking é a decisão de produto mais valiosa, mas só é confiável se separa
 falta de dados e mostrar os elos da rota.
 
 ## O que implementar
-- `ComparativoCidades` e `RotasEncantamento` sobre `/craft/compare`.
+- `ComparativoCidades` e `RotasEncantamento` sobre `/craft/compare`, incluindo `server` do estado
+  global da task 09 no corpo.
 - Escolher qual dos quatro cenários ranqueia; exibir lucro, ROI, custo, receita, idade mais velha e
   avisos por cidade. Indisponíveis ficam numa seção separada com motivo.
 - Clique carrega a simulação completa da cidade preservando parâmetros.

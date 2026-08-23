@@ -51,3 +51,32 @@ fora dos artefatos declarados.
 
 Licença/fonte de distribuição e armazenamento do dataset no ambiente real.
 
+## Implementação — 2026-08-23
+
+- Os dumps continuam fora do Git e da imagem. O bootstrap usa download direto de uma revisão
+  imutável com checksum ou, alternativamente, um volume explícito somente leitura.
+- O manifesto `backend/datasets/albion-static-2026-08-23.json` fixa a revisão
+  `5cf2e8e9b7021f98683181fa5b0e3c64575978e4`, tamanhos, hashes e contagens esperadas.
+- `python -m scripts.seed_static_data` valida todo o dataset antes da escrita, serializa execuções
+  com advisory lock e troca itens, receitas e versão ativa em uma única transação.
+- `static_dataset_version` mantém o histórico de auditoria. Reexecutar o mesmo manifesto retorna
+  `unchanged`, sem alterar IDs observáveis.
+- `/ready` exige uma versão ativa, impedindo API e ingest operacional antes do catálogo.
+- A ordem documentada de produção é `migrate → seed → API/worker/beat`; a task 11 materializa os
+  processos e filas.
+
+### Validação executada
+
+- Dumps reais: 12.071 entradas, 12.062 itens importáveis, 9 nomes longos, 5.553 receitas, 3.219
+  alternativas puladas e 78 receitas sem item correspondente.
+- `uv run pytest tests/ -q`: **213 passed**, 1 aviso preexistente do Testcontainers.
+- Imagem `profitpro-backend:task10`: migration e seed executados contra PostgreSQL vazio, com
+  12.062 itens, 5.553 receitas e uma versão ativa; segunda execução retornou `unchanged`.
+- O download padrão da revisão fixada produziu exatamente 23.954.341 e 17.219.057 bytes.
+- Os containers e a rede temporários usados na validação foram removidos ao final.
+
+### Pendência operacional
+
+No stack real, o operador ainda deve escolher entre download direto e volume privado somente
+leitura. Essa escolha de infraestrutura não altera o contrato do seed e será materializada junto
+à operação da task 11.

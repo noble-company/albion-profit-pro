@@ -6,18 +6,24 @@ suíte antiga sem ninguém notar — o dict inventado "parecia" certo. Ver
 docs/03-contrato-ingest-real.md.
 """
 
+from copy import deepcopy
+
 from src.ingest.normalize import SILVER_SCALE, datetime_from_expires
 from src.ingest.schemas import MarketHistoriesUploadIn, MarketUploadIn
 
 
 def test_marketorders_fixture_validates_against_schema(payload_ordens_real):
+    original = deepcopy(payload_ordens_real)
     upload = MarketUploadIn.model_validate(payload_ordens_real)
     assert len(upload.orders) == len(payload_ordens_real["Orders"])
+    assert payload_ordens_real == original
 
 
 def test_markethistories_fixture_validates_against_schema(payload_historico_real):
+    original = deepcopy(payload_historico_real)
     upload = MarketHistoriesUploadIn.model_validate(payload_historico_real)
     assert len(upload.histories) == len(payload_historico_real["MarketHistories"])
+    assert payload_historico_real == original
 
 
 def test_marketorders_fixture_unit_price_silver_is_multiple_of_scale(payload_ordens_real):

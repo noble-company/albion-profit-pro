@@ -7,7 +7,7 @@ from src.rate_limit import rate_limit
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Por IP (default de `rate_limit`), não por token — login/registro acontecem antes de
-# qualquer token existir (task 33, achado A6). Mesmo bucket_key pras duas rotas: o path
+# qualquer token existir. Mesmo bucket_key pras duas rotas: o path
 # entra na chave, então elas não dividem o mesmo orçamento.
 _login_rate_limit = Depends(rate_limit("rl:auth", limit=10, seconds=60))
 

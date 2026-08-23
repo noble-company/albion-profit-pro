@@ -25,6 +25,10 @@ client.
   8%). Os defaults continuam editáveis e serão confirmados in-game na task 19.
 - Upgrade para `.N` é encadeado por nível (`.0 → .1 → ... → .N`), pois cada linha de receita
   descreve o recurso para subir do nível anterior.
+- `server` (`west`/`east`/`europe`) é obrigatório em todo endpoint de mercado desde a estabilização
+  task 03 e não tem default por usuário no backend. O frontend guarda a escolha como estado global
+  no shell (task 09) e a repassa em toda chamada de preço/demanda/craft — não é um campo de
+  formulário por tela.
 - “Demanda” significa unidades/ordens e volume vendido; o sistema não conhece compradores únicos.
 - Stack inicial: React 19, Vite 8, TypeScript 5.9, React Router 8, Tailwind CSS 4, shadcn/ui,
   TanStack Query 5, RHF/Zod, Vitest/RTL/MSW e Playwright. Versões exatas ficam travadas no
@@ -110,11 +114,14 @@ ETAPA 3 — fechamento
 - TypeScript `strict`, `noUncheckedIndexedAccess` e nenhum `any`. Tipos da borda vêm do OpenAPI.
 - Dinheiro viaja como string decimal. O frontend apenas formata, sem converter para `number` nem
   executar aritmética monetária.
-- Todo preço mostra `varredura_em`; `null` é “sem varredura”, nunca “agora”.
+- Todo lado com preço mostra `observado_em` e `idade_segundos`; `null` é “sem observação fresca”,
+  nunca “agora”. A UI deve declarar `cobertura: parcial` sem chamar os totais de profundidade total.
 - Teste unitário do frontend usa MSW; E2E usa API, PostgreSQL, Redis e RabbitMQ reais.
 - Uma task que altera OpenAPI também regenera e commita `frontend/src/api/schema.d.ts` se o
   frontend já existir.
 
 ## Achados da fase
 
-Nenhum ainda. `W1` fica reservado para o primeiro achado levantado durante implementação.
+| # | Achado | Corrigido em |
+|---|---|---|
+| `W1` | As specs 04/05/09/12-15 foram escritas antes da estabilização tasks 03 e 05 fecharem. `server` virou obrigatório em `/items/{id}/prices` e `/items/{id}/demand` sem nenhum default por usuário no backend, e `scope=mine` passou a ter cobertura independente entre livro e histórico. Revisado em 2026-08-23 contra o código real (`prices/router.py`, `prices/schemas.py`). | Tasks 04, 05, 09, 12, 13, 14, 15 (specs atualizadas) |

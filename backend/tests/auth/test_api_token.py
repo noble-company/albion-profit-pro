@@ -122,7 +122,7 @@ async def test_migration_backfills_hash_and_preserves_authentication():
         # command.downgrade/upgrade chamam asyncio.run() por dentro — não pode rodar direto
         # de um teste async já dentro de um loop (mesmo motivo documentado em
         # tests/ingest/test_tasks_lifecycle.py) — roda em thread separada via executor.
-        await loop.run_in_executor(None, command.downgrade, alembic_cfg, "-1")
+        await loop.run_in_executor(None, command.downgrade, alembic_cfg, "81de3361cd01")
 
         async with async_session_maker() as session:
             await session.execute(

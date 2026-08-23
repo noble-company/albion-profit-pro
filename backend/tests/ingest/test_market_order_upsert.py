@@ -12,6 +12,8 @@ fixture real duas vezes seguidas — é a versão com os dados que realmente tem
 que a seção "Testes manuais" da spec já descreve.
 """
 
+import uuid
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -33,8 +35,8 @@ async def test_resending_the_same_scan_does_not_duplicate(payload_ordens_real, d
     payload = _dump(payload_ordens_real)
     source_ids = [o["id"] for o in payload["orders"]]
 
-    await save_market_orders(async_session_maker, get_redis(), payload)
-    await save_market_orders(async_session_maker, get_redis(), payload)
+    await save_market_orders(async_session_maker, get_redis(), payload, "west")
+    await save_market_orders(async_session_maker, get_redis(), payload, "west")
 
     count = await db_session.scalar(
         select(func.count()).select_from(MarketOrder).where(MarketOrder.source_id.in_(source_ids))
@@ -75,11 +77,51 @@ async def test_upsert_updates_price_and_amount_for_same_source_id(db_session):
         ]
     }
 
-    await save_market_orders(async_session_maker, get_redis(), first)
-    await save_market_orders(async_session_maker, get_redis(), second)
+    await save_market_orders(async_session_maker, get_redis(), first, "west")
+    await save_market_orders(async_session_maker, get_redis(), second, "west")
 
     result = await db_session.execute(select(MarketOrder).where(MarketOrder.source_id == 424242))
     rows = result.scalars().all()
     assert len(rows) == 1  # não duplicou — atualizou a mesma linha
     assert rows[0].unit_price_silver == Decimal("50")
     assert rows[0].amount == 12
+
+
+async def test_partial_scan_does_not_delete_an_order_absent_from_next_batch(db_session):
+    """O payload observado não prova snapshot completo; ausência nunca significa remoção."""
+    base_id = uuid.uuid4().int % 1_000_000_000
+    expires = (datetime.now(timezone.utc) + timedelta(days=30)).replace(tzinfo=None).isoformat()
+
+    def order(source_id: int, price: int) -> dict:
+        return {
+            "id": source_id,
+            "item_id": "T2_PARTIAL_TEST",
+            "group_type_id": "",
+            "location_id": "1002",
+            "quality_level": 1,
+            "enchantment_level": 0,
+            "unit_price_silver": price * 10_000,
+            "amount": 1,
+            "auction_type": "offer",
+            "expires": expires,
+        }
+
+    await save_market_orders(
+        async_session_maker,
+        get_redis(),
+        {"orders": [order(base_id, 100), order(base_id + 1, 110)]},
+        "west",
+    )
+    await save_market_orders(
+        async_session_maker,
+        get_redis(),
+        {"orders": [order(base_id, 90)]},
+        "west",
+    )
+
+    rows = (
+        await db_session.scalars(
+            select(MarketOrder).where(MarketOrder.source_id.in_([base_id, base_id + 1]))
+        )
+    ).all()
+    assert {row.source_id for row in rows} == {base_id, base_id + 1}

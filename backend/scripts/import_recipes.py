@@ -3,7 +3,7 @@ Rodar como `python scripts/import_recipes.py` direto falha com `ModuleNotFoundEr
 module named 'src'` — o pacote `src` só entra no `sys.path` quando `backend/` é a raiz do
 módulo executado (`-m`), não quando o script roda solto.
 
-Reimportável (task 35, achado M4): `recipe`/`recipe_ingredient` são 100% derivados de
+Reimportável: `recipe`/`recipe_ingredient` são 100% derivados de
 `ITEM DUMP.json`/`items.json`, sem `id` estável entre execuções e sem nada de fora
 referenciando por FK — apagar tudo e reimportar dentro de uma transação é seguro e mais
 fácil de raciocinar que upsert por `output_item_unique_name`.
@@ -11,10 +11,12 @@ fácil de raciocinar que upsert por `output_item_unique_name`.
 
 import asyncio
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import structlog
 from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from scripts._dumps import as_list, iter_category_entries, load_item_dump_items, load_items_json
 from src.database import async_session_maker
@@ -27,6 +29,13 @@ log = structlog.get_logger()
 RAIZ_PROJETO = Path(__file__).resolve().parents[2]  # backend/scripts/x.py -> raiz do repo
 ITEM_DUMP_PATH = Path(os.getenv("ITEM_DUMP_PATH", RAIZ_PROJETO / "ITEM DUMP.json"))
 ITEMS_JSON_PATH = Path(os.getenv("ITEMS_JSON_PATH", RAIZ_PROJETO / "items.json"))
+
+
+@dataclass(frozen=True)
+class RecipeImportPlan:
+    recipes: list[Recipe]
+    not_found: list[str]
+    skipped_multi_recipe: list[str]
 
 
 def load_unique_name_to_id(items_json_path: Path) -> dict[str, int]:
@@ -106,75 +115,85 @@ def build_recipe(
     return recipe
 
 
-async def import_recipes() -> None:
-    dump_items = load_item_dump_items(ITEM_DUMP_PATH)
-    name_to_id = load_unique_name_to_id(ITEMS_JSON_PATH)
+def prepare_recipe_import(
+    item_dump_path: Path = ITEM_DUMP_PATH, items_json_path: Path = ITEMS_JSON_PATH
+) -> RecipeImportPlan:
+    dump_items = load_item_dump_items(item_dump_path)
+    name_to_id = load_unique_name_to_id(items_json_path)
 
     not_found: list[str] = []
     skipped_multi_recipe: list[str] = []
+    recipes: list[Recipe] = []
 
-    async with async_session_maker() as session:
-        # Apaga tudo e reimporta na mesma transação (task 35) — ver docstring do módulo.
-        await session.execute(delete(RecipeIngredient))
-        await session.execute(delete(Recipe))
+    for entry, requirements in iter_craftable_items(dump_items):
+        base_unique_name = entry["@uniquename"]
 
-        for entry, requirements in iter_craftable_items(dump_items):
-            base_unique_name = entry["@uniquename"]
+        base_recipe = build_recipe(
+            base_unique_name,
+            requirements,
+            enchantment_level=0,
+            upgrade_resource=None,
+            name_to_id=name_to_id,
+            not_found=not_found,
+            skipped_multi_recipe=skipped_multi_recipe,
+        )
+        if base_recipe is not None:
+            recipes.append(base_recipe)
 
-            base_recipe = build_recipe(
-                base_unique_name,
-                requirements,
-                enchantment_level=0,
-                upgrade_resource=None,  # nada a upgradar pro nível 0
+        enchantments = entry.get("enchantments")
+        if enchantments is None:
+            continue
+
+        for level_block in as_list(enchantments.get("enchantment")):
+            level = int(level_block["@enchantmentlevel"])
+            level_unique_name = f"{base_unique_name}@{level}"
+            level_requirements = level_block.get("craftingrequirements")
+            if level_requirements is None:
+                continue
+
+            upgrade_requirements = level_block.get("upgraderequirements")
+            upgrade_resource = (
+                upgrade_requirements.get("upgraderesource")
+                if upgrade_requirements is not None
+                else None
+            )
+
+            level_recipe = build_recipe(
+                level_unique_name,
+                level_requirements,
+                enchantment_level=level,
+                upgrade_resource=upgrade_resource,
                 name_to_id=name_to_id,
                 not_found=not_found,
                 skipped_multi_recipe=skipped_multi_recipe,
             )
-            if base_recipe is not None:
-                session.add(base_recipe)
+            if level_recipe is not None:
+                recipes.append(level_recipe)
 
-            # Variações encantadas (@1-@4) — craftar o item já encantado
-            # direto, com ingredientes pré-encantados (equipamento/arma) ou um
-            # ingrediente extra (consumível, ex: extrato de alquimia). Ver
-            # docs/02-dados-de-receita.md.
-            enchantments = entry.get("enchantments")
-            if enchantments is None:
-                continue
+    return RecipeImportPlan(recipes, not_found, skipped_multi_recipe)
 
-            for level_block in as_list(enchantments.get("enchantment")):
-                level = int(level_block["@enchantmentlevel"])
-                level_unique_name = f"{base_unique_name}@{level}"
-                level_requirements = level_block.get("craftingrequirements")
-                if level_requirements is None:
-                    continue  # não deveria acontecer (visto no dump real: sempre presente), mas não é motivo pra travar o import
 
-                upgrade_requirements = level_block.get("upgraderequirements")
-                upgrade_resource = (
-                    upgrade_requirements.get("upgraderesource")
-                    if upgrade_requirements is not None
-                    else None
-                )
+async def apply_recipe_import(session: AsyncSession, plan: RecipeImportPlan) -> None:
+    await session.execute(delete(RecipeIngredient))
+    await session.execute(delete(Recipe))
+    session.add_all(plan.recipes)
+    await session.flush()
 
-                level_recipe = build_recipe(
-                    level_unique_name,
-                    level_requirements,
-                    enchantment_level=level,
-                    upgrade_resource=upgrade_resource,
-                    name_to_id=name_to_id,
-                    not_found=not_found,
-                    skipped_multi_recipe=skipped_multi_recipe,
-                )
-                if level_recipe is not None:
-                    session.add(level_recipe)
 
+async def import_recipes() -> None:
+    plan = prepare_recipe_import(ITEM_DUMP_PATH, ITEMS_JSON_PATH)
+
+    async with async_session_maker() as session:
+        await apply_recipe_import(session, plan)
         await session.commit()
 
     log.info(
         "import_recipes.concluido",
-        nao_encontrados=len(not_found),
-        nao_encontrados_amostra=not_found[:20],
-        receitas_multiplas_puladas=len(skipped_multi_recipe),
-        receitas_multiplas_puladas_amostra=skipped_multi_recipe[:20],
+        receitas_importadas=len(plan.recipes),
+        nao_encontrados=len(plan.not_found),
+        nao_encontrados_amostra=plan.not_found[:20],
+        receitas_multiplas_puladas=len(plan.skipped_multi_recipe),
+        receitas_multiplas_puladas_amostra=plan.skipped_multi_recipe[:20],
     )
 
 

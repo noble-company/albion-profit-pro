@@ -1,4 +1,4 @@
-"""Carregamento/parse compartilhado dos dois JSONs de origem (task 35) — reaproveitado por
+"""Carregamento e parse compartilhados dos dois JSONs estáticos de origem — reaproveitados por
 `scripts/import_recipes.py` e `scripts/import_items.py`, que liam e normalizavam os mesmos
 dois arquivos de formas quase idênticas.
 

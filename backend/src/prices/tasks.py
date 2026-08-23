@@ -9,17 +9,18 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from src.celery_app import celery_app
 from src.database import create_worker_engine
-from src.ingest.tasks import RETRYABLE_EXCEPTIONS
 from src.prices.models import (
     MarketHistoryDaily,
     MarketHistoryEntry,
     MarketHistoryMonthly,
     MarketOrder,
 )
+from src.quarantine.task_base import QuarantinableTask
+from src.tasking import RETRYABLE_EXCEPTIONS
 
 log = structlog.get_logger()
 
-# Política de retenção (task 31, decisão de produto) — grãos mais finos ficam pouco tempo
+# Política de retenção: grãos mais finos ficam pouco tempo
 # porque o grão mais grosso já cobre o mesmo período (ver docs/tasks/backend/31-...).
 RETENCAO_BUCKET_1H = timedelta(hours=48)
 RETENCAO_BUCKET_6H = timedelta(days=90)
@@ -27,17 +28,12 @@ RETENCAO_DIARIO = timedelta(days=730)  # ~2 anos
 
 # Dias sem nenhuma varredura reafirmar uma ordem antes de considerá-la morta, mesmo com
 # `expires` no futuro — o jogo não manda evento de remoção quando um leilão é
-# cancelado/comprado antes de expirar. Número não veio especificado na spec da task 31;
-# default razoável, não uma decisão de produto validada com o usuário.
+# cancelado/comprado antes de expirar. A janela conservadora ainda precisa de validação de produto.
 MARKET_ORDER_STALE_AFTER = timedelta(days=7)
-
-# `rollup_diario` só recalcula essa janela a cada execução (roda de hora em hora) — pega
-# bucket de 6h que ainda está parcial/crescendo sem precisar reescanear a tabela inteira.
-ROLLUP_DIARIO_JANELA = timedelta(days=2)
 
 
 def _run_periodic(nome: str, fn) -> None:
-    """Mesmo padrão de `src.ingest.tasks._run_async` (task 23): engine/loop próprios por
+    """Mesmo padrão de `src.ingest.tasks._run_async`: engine/loop próprios por
     execução. Sem Redis aqui — rollup/poda só mexem no Postgres."""
 
     async def _wrapper() -> None:
@@ -51,7 +47,7 @@ def _run_periodic(nome: str, fn) -> None:
             raise
         except Exception:
             log.error("prices.erro_programacao", job=nome, exc_info=True)
-            return
+            raise
         else:
             duracao_ms = int((time.monotonic() - start) * 1000)
             log.info("prices.job_concluido", job=nome, duracao_ms=duracao_ms)
@@ -61,17 +57,55 @@ def _run_periodic(nome: str, fn) -> None:
     asyncio.run(_wrapper())
 
 
-async def _rollup_diario(sessionmaker) -> None:
+def _utc_now(now: datetime | None = None) -> datetime:
+    value = now or datetime.now(timezone.utc)
+    if value.tzinfo is None:
+        raise ValueError("now precisa ter timezone")
+    return value.astimezone(timezone.utc)
+
+
+def _utc_day_start(value: datetime) -> datetime:
+    return value.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _daily_repair_bounds(now: datetime | None = None) -> tuple[datetime, datetime, datetime]:
+    """Retorna (início a limpar, primeiro dia reconstruível, fim exclusivo).
+
+    A retenção de 90 dias é móvel e preserva hora/minuto. O dia que contém seu cutoff pode
+    já ter perdido buckets, portanto é removido dos derivados mas não reconstruído. O dia
+    corrente também é removido e fica fora do rollup até fechar em UTC.
+    """
+    current = _utc_now(now)
+    raw_cutoff = current - RETENCAO_BUCKET_6H
+    cleanup_start = _utc_day_start(raw_cutoff)
+    complete_start = cleanup_start
+    if raw_cutoff > cleanup_start:
+        complete_start += timedelta(days=1)
+    return cleanup_start, complete_start, _utc_day_start(current)
+
+
+async def _rollup_diario(sessionmaker, now: datetime | None = None) -> tuple[date, date]:
     """Agrega só os buckets de 6h (`bucket_seconds=21600`) por dia — os de 1h não entram
     aqui de propósito: são o mesmo giro real visto numa granularidade mais fina, e somar os
-    dois contaria a mesma transação duas vezes. `preco_medio` é média ponderada por volume
-    (sum(silver)/sum(amount)), nunca média das médias."""
-    cutoff = datetime.now(timezone.utc) - ROLLUP_DIARIO_JANELA
+    dois contaria a mesma transação duas vezes. Só reconstrói dias UTC completos cuja fonte
+    bruta ainda está integralmente retida; o dia corrente e o dia parcial na borda são
+    removidos dos derivados. `preco_medio` é média ponderada por volume."""
+    cleanup_start, complete_start, end = _daily_repair_bounds(now)
     dia_expr = cast(MarketHistoryEntry.bucket_start, Date)
 
     async with sessionmaker() as session:
+        # DELETE + rebuild dentro da mesma transação também corrige derivados que ficaram
+        # órfãos após reparos/remoções no bruto. O dia da borda e o corrente são apagados,
+        # mas apenas os dias comprovadamente completos voltam a ser inseridos.
+        await session.execute(
+            delete(MarketHistoryDaily).where(
+                MarketHistoryDaily.dia >= cleanup_start.date(),
+                MarketHistoryDaily.dia <= end.date(),
+            )
+        )
         stmt = (
             select(
+                MarketHistoryEntry.server_id,
                 MarketHistoryEntry.item_id,
                 MarketHistoryEntry.location_id,
                 MarketHistoryEntry.quality_level,
@@ -81,9 +115,11 @@ async def _rollup_diario(sessionmaker) -> None:
             )
             .where(
                 MarketHistoryEntry.bucket_seconds == 21600,
-                MarketHistoryEntry.bucket_start >= cutoff,
+                MarketHistoryEntry.bucket_start >= complete_start,
+                MarketHistoryEntry.bucket_start < end,
             )
             .group_by(
+                MarketHistoryEntry.server_id,
                 MarketHistoryEntry.item_id,
                 MarketHistoryEntry.location_id,
                 MarketHistoryEntry.quality_level,
@@ -91,50 +127,69 @@ async def _rollup_diario(sessionmaker) -> None:
             )
         )
         rows = (await session.execute(stmt)).all()
-        if not rows:
-            return
-
-        values = [
-            {
-                "item_id": r.item_id,
-                "location_id": r.location_id,
-                "quality_level": r.quality_level,
-                "dia": r.dia,
-                "item_amount": int(r.item_amount),
-                "silver_amount": r.silver_amount,
-                "preco_medio": (r.silver_amount / r.item_amount) if r.item_amount else 0,
-            }
-            for r in rows
-        ]
-        stmt = pg_insert(MarketHistoryDaily).values(values)
-        stmt = stmt.on_conflict_do_update(
-            constraint="uq_market_history_daily",
-            set_={
-                "item_amount": stmt.excluded.item_amount,
-                "silver_amount": stmt.excluded.silver_amount,
-                "preco_medio": stmt.excluded.preco_medio,
-            },
-        )
-        await session.execute(stmt)
+        if rows:
+            values = [
+                {
+                    "server_id": r.server_id,
+                    "item_id": r.item_id,
+                    "location_id": r.location_id,
+                    "quality_level": r.quality_level,
+                    "dia": r.dia,
+                    "item_amount": int(r.item_amount),
+                    "silver_amount": r.silver_amount,
+                    "preco_medio": (r.silver_amount / r.item_amount) if r.item_amount else 0,
+                }
+                for r in rows
+            ]
+            stmt = pg_insert(MarketHistoryDaily).values(values)
+            stmt = stmt.on_conflict_do_update(
+                constraint="uq_market_history_daily",
+                set_={
+                    "item_amount": stmt.excluded.item_amount,
+                    "silver_amount": stmt.excluded.silver_amount,
+                    "preco_medio": stmt.excluded.preco_medio,
+                },
+            )
+            await session.execute(stmt)
         await session.commit()
+    return cleanup_start.date(), end.date()
 
 
 def _primeiro_dia_do_mes(d: date) -> date:
     return d.replace(day=1)
 
 
-async def _rollup_mensal(sessionmaker) -> None:
-    """Agrega `market_history_daily` (não os buckets brutos) por mês — recalcula o mês
-    corrente e o anterior, pra absorver dias que o rollup diário ainda estava terminando de
-    fechar."""
-    hoje = datetime.now(timezone.utc).date()
-    mes_atual = _primeiro_dia_do_mes(hoje)
-    mes_anterior = _primeiro_dia_do_mes(mes_atual - timedelta(days=1))
+async def _rollup_mensal(
+    sessionmaker,
+    repair_start: date | None = None,
+    end: date | None = None,
+    now: datetime | None = None,
+) -> None:
+    """Reconstrói os meses afetados depois que os diários foram reparados.
+
+    O primeiro mês inclui diários anteriores à janela bruta que ainda estejam preservados;
+    assim uma janela de 90 dias começando no meio do mês não sobrescreve o mensal com apenas
+    o pedaço recente desse mês. `end` é exclusivo e normalmente representa hoje em UTC.
+    """
+    current = _utc_now(now)
+    if repair_start is None or end is None:
+        repair_start, _, repair_end = _daily_repair_bounds(current)
+        repair_start = repair_start.date()
+        end = repair_end.date()
+    month_start = _primeiro_dia_do_mes(repair_start)
+    last_month = _primeiro_dia_do_mes(end)
     mes_expr = cast(func.date_trunc("month", MarketHistoryDaily.dia), Date)
 
     async with sessionmaker() as session:
+        await session.execute(
+            delete(MarketHistoryMonthly).where(
+                MarketHistoryMonthly.mes >= month_start,
+                MarketHistoryMonthly.mes <= last_month,
+            )
+        )
         stmt = (
             select(
+                MarketHistoryDaily.server_id,
                 MarketHistoryDaily.item_id,
                 MarketHistoryDaily.location_id,
                 MarketHistoryDaily.quality_level,
@@ -142,8 +197,12 @@ async def _rollup_mensal(sessionmaker) -> None:
                 func.sum(MarketHistoryDaily.item_amount).label("item_amount"),
                 func.sum(MarketHistoryDaily.silver_amount).label("silver_amount"),
             )
-            .where(MarketHistoryDaily.dia >= mes_anterior)
+            .where(
+                MarketHistoryDaily.dia >= month_start,
+                MarketHistoryDaily.dia < end,
+            )
             .group_by(
+                MarketHistoryDaily.server_id,
                 MarketHistoryDaily.item_id,
                 MarketHistoryDaily.location_id,
                 MarketHistoryDaily.quality_level,
@@ -151,40 +210,47 @@ async def _rollup_mensal(sessionmaker) -> None:
             )
         )
         rows = (await session.execute(stmt)).all()
-        if not rows:
-            return
-
-        values = [
-            {
-                "item_id": r.item_id,
-                "location_id": r.location_id,
-                "quality_level": r.quality_level,
-                "mes": r.mes,
-                "item_amount": int(r.item_amount),
-                "silver_amount": r.silver_amount,
-                "preco_medio": (r.silver_amount / r.item_amount) if r.item_amount else 0,
-            }
-            for r in rows
-        ]
-        stmt = pg_insert(MarketHistoryMonthly).values(values)
-        stmt = stmt.on_conflict_do_update(
-            constraint="uq_market_history_monthly",
-            set_={
-                "item_amount": stmt.excluded.item_amount,
-                "silver_amount": stmt.excluded.silver_amount,
-                "preco_medio": stmt.excluded.preco_medio,
-            },
-        )
-        await session.execute(stmt)
+        if rows:
+            values = [
+                {
+                    "server_id": r.server_id,
+                    "item_id": r.item_id,
+                    "location_id": r.location_id,
+                    "quality_level": r.quality_level,
+                    "mes": r.mes,
+                    "item_amount": int(r.item_amount),
+                    "silver_amount": r.silver_amount,
+                    "preco_medio": (r.silver_amount / r.item_amount) if r.item_amount else 0,
+                }
+                for r in rows
+            ]
+            stmt = pg_insert(MarketHistoryMonthly).values(values)
+            stmt = stmt.on_conflict_do_update(
+                constraint="uq_market_history_monthly",
+                set_={
+                    "item_amount": stmt.excluded.item_amount,
+                    "silver_amount": stmt.excluded.silver_amount,
+                    "preco_medio": stmt.excluded.preco_medio,
+                },
+            )
+            await session.execute(stmt)
         await session.commit()
 
 
-async def _poda(sessionmaker) -> None:
+async def _repair_rollups(sessionmaker, now: datetime | None = None) -> None:
+    """Ordem obrigatória: diário autoritativo primeiro, mensal derivado depois."""
+    current = _utc_now(now)
+    repair_start, end = await _rollup_diario(sessionmaker, current)
+    await _rollup_mensal(sessionmaker, repair_start, end, current)
+
+
+async def _poda(sessionmaker, now: datetime | None = None) -> None:
     """Apaga o que já saiu da retenção: buckets de 1h/6h fora da janela, dia fora da janela
     de 2 anos, ordens expiradas e ordens que ninguém mais varre há
     `MARKET_ORDER_STALE_AFTER`. Mensal não é podado (retenção indefinida, é a base de
     previsão)."""
-    now = datetime.now(timezone.utc)
+    now = _utc_now(now)
+    raw_6h_cutoff, _, _ = _daily_repair_bounds(now)
     async with sessionmaker() as session:
         await session.execute(
             delete(MarketHistoryEntry).where(
@@ -195,7 +261,10 @@ async def _poda(sessionmaker) -> None:
         await session.execute(
             delete(MarketHistoryEntry).where(
                 MarketHistoryEntry.bucket_seconds == 21600,
-                MarketHistoryEntry.bucket_start < now - RETENCAO_BUCKET_6H,
+                # Retenção alinhada à meia-noite: nunca deixa o primeiro dia do recorte
+                # pela metade. Esse dia inteiro funciona como folga; o reparo começa no
+                # seguinte e a poda só o remove quando sair integralmente da janela.
+                MarketHistoryEntry.bucket_start < raw_6h_cutoff,
             )
         )
         await session.execute(
@@ -210,8 +279,16 @@ async def _poda(sessionmaker) -> None:
         await session.commit()
 
 
+async def _repair_then_prune(sessionmaker, now: datetime | None = None) -> None:
+    """Nunca remove bruto antes de confirmar que diário e mensal foram reconstruídos."""
+    current = _utc_now(now)
+    await _repair_rollups(sessionmaker, current)
+    await _poda(sessionmaker, current)
+
+
 @celery_app.task(
     name="prices.rollup_diario",
+    base=QuarantinableTask,
     bind=True,
     autoretry_for=RETRYABLE_EXCEPTIONS,
     retry_backoff=True,
@@ -220,11 +297,12 @@ async def _poda(sessionmaker) -> None:
     max_retries=5,
 )
 def rollup_diario(self) -> None:
-    _run_periodic("rollup_diario", _rollup_diario)
+    _run_periodic("rollup_diario", _repair_rollups)
 
 
 @celery_app.task(
     name="prices.rollup_mensal",
+    base=QuarantinableTask,
     bind=True,
     autoretry_for=RETRYABLE_EXCEPTIONS,
     retry_backoff=True,
@@ -233,11 +311,13 @@ def rollup_diario(self) -> None:
     max_retries=5,
 )
 def rollup_mensal(self) -> None:
-    _run_periodic("rollup_mensal", _rollup_mensal)
+    # Mantida para operação/replay de tarefas antigas, mas também repara o diário primeiro.
+    _run_periodic("rollup_mensal", _repair_rollups)
 
 
 @celery_app.task(
     name="prices.poda",
+    base=QuarantinableTask,
     bind=True,
     autoretry_for=RETRYABLE_EXCEPTIONS,
     retry_backoff=True,
@@ -246,4 +326,12 @@ def rollup_mensal(self) -> None:
     max_retries=5,
 )
 def poda(self) -> None:
-    _run_periodic("poda", _poda)
+    _run_periodic("poda", _repair_then_prune)
+
+
+rollup_diario.failure_kind = "maintenance"
+rollup_diario.failure_topic = "rollup_diario"
+rollup_mensal.failure_kind = "maintenance"
+rollup_mensal.failure_topic = "rollup_mensal"
+poda.failure_kind = "maintenance"
+poda.failure_topic = "poda"

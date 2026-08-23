@@ -1,42 +1,78 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, exists, func, select, tuple_
+from sqlalchemy import and_, exists, func, literal, select, tuple_
+from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.cache.redis_client import get_redis, mget_book_depths, publish_price_update, set_book_depth
-from src.config import get_settings
-from src.items.constants import ENCHANTMENT_LEVELS, QUALIDADES
+from src.cache.redis_client import (
+    delete_book_depth,
+    get_redis,
+    mget_book_depths,
+    publish_price_update,
+    set_book_depth,
+)
 from src.items.models import Item
-from src.items.service import list_location_ids
+from src.prices.constants import MarketScanSource
 from src.prices.models import MarketHistoryEntry, MarketOrder, MarketScan
-
-settings = get_settings()
-
-
-def _empty_lado() -> dict:
-    return {"preco": None, "total_unidades": 0, "qtd_ordens": 0}
+from src.prices.policy import MarketBookPolicy, get_market_book_policy
 
 
-def _build_book_payload(row: Row | None, turnover: dict | None) -> dict:
+def _observation_age_seconds(observed_at: datetime | None, now: datetime) -> int | None:
+    if observed_at is None:
+        return None
+    return max(0, int((now - observed_at).total_seconds()))
+
+
+def _build_side(
+    best_price,
+    observed_units,
+    observed_orders,
+    observed_at: datetime | None,
+    now: datetime,
+) -> dict:
+    return {
+        "melhor_preco": str(best_price) if best_price is not None else None,
+        "unidades_observadas": int(observed_units or 0),
+        "ordens_observadas": int(observed_orders or 0),
+        "observado_em": observed_at.isoformat() if observed_at is not None else None,
+        "idade_segundos": _observation_age_seconds(observed_at, now),
+    }
+
+
+def _empty_side(now: datetime) -> dict:
+    return _build_side(None, 0, 0, None, now)
+
+
+def _build_book_payload(
+    row: Row | None,
+    turnover: dict | None,
+    policy: MarketBookPolicy | None = None,
+    now: datetime | None = None,
+    sources: dict[str, bool] | None = None,
+) -> dict:
+    policy = policy or get_market_book_policy()
+    now = now or datetime.now(timezone.utc)
     if row is not None:
-        venda = {
-            "preco": str(row.menor_venda) if row.menor_venda is not None else None,
-            "total_unidades": int(row.venda_unidades or 0),
-            "qtd_ordens": int(row.venda_qtd or 0),
-        }
-        compra = {
-            "preco": str(row.maior_compra) if row.maior_compra is not None else None,
-            "total_unidades": int(row.compra_unidades or 0),
-            "qtd_ordens": int(row.compra_qtd or 0),
-        }
-        varredura_em = row.varredura_em.isoformat() if row.varredura_em is not None else None
+        venda = _build_side(
+            row.menor_venda,
+            row.venda_unidades,
+            row.venda_qtd,
+            row.venda_observada_em,
+            now,
+        )
+        compra = _build_side(
+            row.maior_compra,
+            row.compra_unidades,
+            row.compra_qtd,
+            row.compra_observada_em,
+            now,
+        )
     else:
-        venda = _empty_lado()
-        compra = _empty_lado()
-        varredura_em = None
+        venda = _empty_side(now)
+        compra = _empty_side(now)
 
     vendido_24h = None
     if turnover is not None:
@@ -51,46 +87,146 @@ def _build_book_payload(row: Row | None, turnover: dict | None) -> dict:
         "venda": venda,
         "compra": compra,
         "vendido_24h": vendido_24h,
-        "atualizado_em": datetime.now(timezone.utc).isoformat(),
-        "varredura_em": varredura_em,
+        "cobertura": policy.coverage,
+        "janela_frescor_segundos": policy.freshness_seconds,
+        "fontes": sources or {"livro": row is not None, "historico": turnover is not None},
+        "atualizado_em": now.isoformat(),
     }
 
 
-def _scan_exists_for_order(user_id: uuid.UUID):
+def _refresh_cached_ages(payload: dict, now: datetime) -> dict:
+    """Atualiza a idade derivada sem alterar o instante autoritativo observado no cache."""
+    for side_name in ("venda", "compra"):
+        side = payload[side_name]
+        observed_raw = side.get("observado_em")
+        observed_at = datetime.fromisoformat(observed_raw) if observed_raw else None
+        side["idade_segundos"] = _observation_age_seconds(observed_at, now)
+    return payload
+
+
+def _scan_exists_for_order(server_id: str, user_id: uuid.UUID):
     return exists(
         select(MarketScan.id).where(
             MarketScan.user_id == user_id,
+            MarketScan.server_id == server_id,
             MarketScan.item_key == MarketOrder.item_id,
             MarketScan.location_id == MarketOrder.location_id,
             MarketScan.quality_level == MarketOrder.quality_level,
+            MarketScan.fonte == MarketScanSource.BOOK,
         )
     )
 
 
-def _scan_exists_for_history(user_id: uuid.UUID):
+def _scan_exists_for_history(server_id: str, user_id: uuid.UUID):
     return exists(
         select(MarketScan.id).where(
             MarketScan.user_id == user_id,
+            MarketScan.server_id == server_id,
             MarketScan.item_key == Item.unique_name,
             MarketScan.location_id == MarketHistoryEntry.location_id,
             MarketScan.quality_level == MarketHistoryEntry.quality_level,
+            MarketScan.fonte == MarketScanSource.HISTORY,
         )
     )
+
+
+async def query_item_combinations(
+    session: AsyncSession,
+    server_id: str,
+    item_id: str,
+    user_id: uuid.UUID | None = None,
+    location_ids: list[str] | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[list[tuple[str, int, int, bool, bool]], int]:
+    """Lista somente combinações realmente observadas, com paginação no Postgres."""
+    book = select(
+        MarketOrder.location_id.label("location_id"),
+        MarketOrder.quality_level.label("quality_level"),
+        MarketOrder.enchantment_level.label("enchantment_level"),
+        literal(True).label("has_book"),
+        literal(False).label("has_history"),
+    ).where(MarketOrder.server_id == server_id, MarketOrder.item_id == item_id)
+    if user_id is not None:
+        book = book.where(_scan_exists_for_order(server_id, user_id))
+    if location_ids:
+        book = book.where(MarketOrder.location_id.in_(location_ids))
+
+    history = (
+        select(
+            MarketHistoryEntry.location_id.label("location_id"),
+            MarketHistoryEntry.quality_level.label("quality_level"),
+            Item.enchantment_level.label("enchantment_level"),
+            literal(False).label("has_book"),
+            literal(True).label("has_history"),
+        )
+        .select_from(MarketHistoryEntry)
+        .join(Item, Item.albion_id == MarketHistoryEntry.item_id)
+        .where(MarketHistoryEntry.server_id == server_id, Item.unique_name == item_id)
+    )
+    if user_id is not None:
+        history = history.where(_scan_exists_for_history(server_id, user_id))
+    if location_ids:
+        history = history.where(MarketHistoryEntry.location_id.in_(location_ids))
+
+    observations = book.union_all(history).cte("item_observations")
+    combinations = (
+        select(
+            observations.c.location_id,
+            observations.c.quality_level,
+            observations.c.enchantment_level,
+            func.bool_or(observations.c.has_book).label("has_book"),
+            func.bool_or(observations.c.has_history).label("has_history"),
+        )
+        .group_by(
+            observations.c.location_id,
+            observations.c.quality_level,
+            observations.c.enchantment_level,
+        )
+        .cte("item_combinations")
+    )
+    total = int((await session.scalar(select(func.count()).select_from(combinations))) or 0)
+    stmt = (
+        select(
+            combinations.c.location_id,
+            combinations.c.quality_level,
+            combinations.c.enchantment_level,
+            combinations.c.has_book,
+            combinations.c.has_history,
+        )
+        .order_by(
+            combinations.c.location_id,
+            combinations.c.quality_level,
+            combinations.c.enchantment_level,
+        )
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = await session.execute(stmt)
+    return [
+        (
+            r.location_id,
+            r.quality_level,
+            r.enchantment_level,
+            r.has_book,
+            r.has_history,
+        )
+        for r in rows
+    ], total
 
 
 async def query_book_depth(
     session: AsyncSession,
+    server_id: str,
     combos: list[tuple[str, str, int, int]],
     freshness_hours: int,
     user_id: uuid.UUID | None = None,
 ) -> dict[tuple[str, str, int, int], Row]:
-    """Uma query agregada para todas as combinações (item_id, location_id, quality_level,
-    enchantment_level) passadas. `venda`/`compra` só contam ordem dentro da janela de
-    frescor e não expirada; `varredura_em` (max(last_seen_at)) ignora esse filtro de
-    propósito — reflete a idade real do dado mesmo quando a profundidade zerou (task 29).
-    `user_id` (task 30): quando presente, restringe às combinações que esse usuário varreu
-    (`market_scan`) — os valores em si continuam vindo do acervo global, não de um recorte
-    de dados separado por usuário."""
+    """Agrega somente ordens frescas e não expiradas nas combinações solicitadas.
+
+    A observação é calculada por lado. `user_id` restringe as combinações às varreduras do
+    usuário; os valores continuam vindo do acervo global.
+    """
     if not combos:
         return {}
 
@@ -108,20 +244,38 @@ async def query_book_depth(
             func.min(MarketOrder.unit_price_silver).filter(is_fresh, is_offer).label("menor_venda"),
             func.sum(MarketOrder.amount).filter(is_fresh, is_offer).label("venda_unidades"),
             func.count().filter(is_fresh, is_offer).label("venda_qtd"),
+            func.array_agg(
+                aggregate_order_by(
+                    MarketOrder.last_seen_at,
+                    MarketOrder.unit_price_silver.asc(),
+                    MarketOrder.last_seen_at.desc(),
+                )
+            )
+            .filter(is_fresh, is_offer)[1]
+            .label("venda_observada_em"),
             func.max(MarketOrder.unit_price_silver)
             .filter(is_fresh, is_request)
             .label("maior_compra"),
             func.sum(MarketOrder.amount).filter(is_fresh, is_request).label("compra_unidades"),
             func.count().filter(is_fresh, is_request).label("compra_qtd"),
-            func.max(MarketOrder.last_seen_at).label("varredura_em"),
+            func.array_agg(
+                aggregate_order_by(
+                    MarketOrder.last_seen_at,
+                    MarketOrder.unit_price_silver.desc(),
+                    MarketOrder.last_seen_at.desc(),
+                )
+            )
+            .filter(is_fresh, is_request)[1]
+            .label("compra_observada_em"),
         )
         .where(
+            MarketOrder.server_id == server_id,
             tuple_(
                 MarketOrder.item_id,
                 MarketOrder.location_id,
                 MarketOrder.quality_level,
                 MarketOrder.enchantment_level,
-            ).in_(combos)
+            ).in_(combos),
         )
         .group_by(
             MarketOrder.item_id,
@@ -131,13 +285,14 @@ async def query_book_depth(
         )
     )
     if user_id is not None:
-        stmt = stmt.where(_scan_exists_for_order(user_id))
+        stmt = stmt.where(_scan_exists_for_order(server_id, user_id))
     result = await session.execute(stmt)
     return {(r.item_id, r.location_id, r.quality_level, r.enchantment_level): r for r in result}
 
 
 async def query_24h_turnover(
     session: AsyncSession,
+    server_id: str,
     combos: list[tuple[str, str, int]],
     user_id: uuid.UUID | None = None,
 ) -> dict[tuple[str, str, int], dict]:
@@ -145,7 +300,7 @@ async def query_24h_turnover(
     enchantment_level, porque o histórico não carrega isso separado (fica embutido no
     AlbionId, ver docs/03-contrato-ingest-real.md secao 6). Só olha buckets de 1h
     (Timescale=0) das últimas 24h — é o giro real transacionado, não o livro. `user_id`
-    (task 30): mesma semântica de `query_book_depth`."""
+    tem a mesma semântica de `query_book_depth`."""
     if not combos:
         return {}
 
@@ -161,6 +316,7 @@ async def query_24h_turnover(
         .select_from(MarketHistoryEntry)
         .join(Item, Item.albion_id == MarketHistoryEntry.item_id)
         .where(
+            MarketHistoryEntry.server_id == server_id,
             MarketHistoryEntry.bucket_seconds == 3600,
             MarketHistoryEntry.bucket_start > cutoff,
             tuple_(
@@ -172,7 +328,7 @@ async def query_24h_turnover(
         )
     )
     if user_id is not None:
-        stmt = stmt.where(_scan_exists_for_history(user_id))
+        stmt = stmt.where(_scan_exists_for_history(server_id, user_id))
     result = await session.execute(stmt)
     turnover = {}
     for r in result:
@@ -186,29 +342,34 @@ async def query_24h_turnover(
 
 
 async def recompute_and_cache_book(
-    session: AsyncSession, redis, combos: set[tuple[str, str, int, int]], freshness_hours: int
+    session: AsyncSession,
+    redis,
+    server_id: str,
+    combos: set[tuple[str, str, int, int]],
+    freshness_hours: int,
 ) -> None:
-    """Chamado pelo ingest (task 29) depois de gravar ordens ou histórico: recalcula a
-    profundidade do Postgres — nunca soma o lote (achado C4: um lote só tem o que aquele
-    jogador enxergou na tela) — e grava o resultado inteiro no cache."""
+    """Recalcula a profundidade do Postgres e grava o resultado inteiro no cache."""
     if not combos:
         return
 
-    depth_rows = await query_book_depth(session, list(combos), freshness_hours)
+    depth_rows = await query_book_depth(session, server_id, list(combos), freshness_hours)
     turnover_combos = {(item_id, loc, q) for item_id, loc, q, _ in combos}
-    turnover_rows = await query_24h_turnover(session, list(turnover_combos))
+    turnover_rows = await query_24h_turnover(session, server_id, list(turnover_combos))
 
     for item_id, loc, q, e in combos:
         row = depth_rows.get((item_id, loc, q, e))
         turnover = turnover_rows.get((item_id, loc, q))
         if row is None and turnover is None:
-            continue  # nunca visto em marketorders nem markethistories — nada a cachear
+            await delete_book_depth(redis, server_id, item_id, loc, q, e)
+            continue
         payload = _build_book_payload(row, turnover)
-        await set_book_depth(redis, item_id, loc, q, e, payload)
+        await set_book_depth(redis, server_id, item_id, loc, q, e, payload)
         await publish_price_update(
             redis,
+            server_id,
             item_id,
             {
+                "server": server_id,
                 "location_id": loc,
                 "quality_level": q,
                 "enchantment_level": e,
@@ -220,11 +381,12 @@ async def recompute_and_cache_book(
 
 async def record_scans(
     session: AsyncSession,
+    server_id: str,
     user_id: uuid.UUID,
-    fonte: str,
+    fonte: MarketScanSource,
     combos: set[tuple[str, str, int]],
 ) -> None:
-    """Upsert de procedência (task 30): uma linha por (usuário, item, local, qualidade,
+    """Uma linha de procedência por (usuário, item, local, qualidade,
     fonte), nunca uma por ordem/bucket — `n_varreduras` sobe a cada reenvio da mesma
     combinação, sem multiplicar a tabela-fato. combos: (item_key [unique_name], location_id,
     quality_level)."""
@@ -232,6 +394,7 @@ async def record_scans(
         return
     rows = [
         {
+            "server_id": server_id,
             "user_id": user_id,
             "item_key": item_key,
             "location_id": location_id,
@@ -250,6 +413,7 @@ async def record_scans(
 
 async def _turnover_window(
     session: AsyncSession,
+    server_id: str,
     item_id: str,
     location_id: str,
     quality_level: int,
@@ -257,7 +421,7 @@ async def _turnover_window(
     since: datetime,
 ) -> dict:
     """Giro somado numa janela/grão só, desde `since` — mesma média ponderada por volume de
-    `query_24h_turnover`, generalizada pras janelas do endpoint de demanda (task 31)."""
+    `query_24h_turnover`, generalizada para as janelas do endpoint de demanda."""
     stmt = (
         select(
             func.sum(MarketHistoryEntry.item_amount).label("unidades"),
@@ -266,6 +430,7 @@ async def _turnover_window(
         .select_from(MarketHistoryEntry)
         .join(Item, Item.albion_id == MarketHistoryEntry.item_id)
         .where(
+            MarketHistoryEntry.server_id == server_id,
             Item.unique_name == item_id,
             MarketHistoryEntry.location_id == location_id,
             MarketHistoryEntry.quality_level == quality_level,
@@ -280,7 +445,12 @@ async def _turnover_window(
 
 
 async def _serie_6h(
-    session: AsyncSession, item_id: str, location_id: str, quality_level: int, since: datetime
+    session: AsyncSession,
+    server_id: str,
+    item_id: str,
+    location_id: str,
+    quality_level: int,
+    since: datetime,
 ) -> list[dict]:
     stmt = (
         select(
@@ -291,6 +461,7 @@ async def _serie_6h(
         .select_from(MarketHistoryEntry)
         .join(Item, Item.albion_id == MarketHistoryEntry.item_id)
         .where(
+            MarketHistoryEntry.server_id == server_id,
             Item.unique_name == item_id,
             MarketHistoryEntry.location_id == location_id,
             MarketHistoryEntry.quality_level == quality_level,
@@ -312,58 +483,65 @@ async def _serie_6h(
 
 async def get_item_demand(
     session: AsyncSession,
+    server_id: str,
     item_id: str,
     location_id: str,
     quality_level: int,
     enchantment_level: int = 0,
 ) -> dict:
-    """Endpoint de demanda (task 31): profundidade do livro (o que está parado esperando) +
-    giro real transacionado em 3 janelas + série de 6h — o objeto que responde "quanta gente
+    """Combina profundidade do livro com giro real em três janelas e série de 6h.
+
+    O resultado responde "quanta gente
     está comprando isso agora". `ultimas_24h` vem dos buckets de 1h (mais fino, retenção de
     48h); `ultimos_7d`/`ultimos_30d`/`serie_6h` vêm dos buckets de 6h (retenção de 90 dias) —
     nunca somados entre si, senão a mesma transação contaria duas vezes em duas
     granularidades diferentes."""
     now = datetime.now(timezone.utc)
+    policy = get_market_book_policy()
     combo = (item_id, location_id, quality_level, enchantment_level)
-    depth_rows = await query_book_depth(session, [combo], settings.price_freshness_hours)
+    depth_rows = await query_book_depth(session, server_id, [combo], policy.freshness_hours)
     row = depth_rows.get(combo)
 
     if row is not None:
-        venda = {
-            "preco": row.menor_venda,
-            "total_unidades": int(row.venda_unidades or 0),
-            "qtd_ordens": int(row.venda_qtd or 0),
-        }
-        compra = {
-            "preco": row.maior_compra,
-            "total_unidades": int(row.compra_unidades or 0),
-            "qtd_ordens": int(row.compra_qtd or 0),
-        }
-        varredura_em = row.varredura_em
+        venda = _build_side(
+            row.menor_venda, row.venda_unidades, row.venda_qtd, row.venda_observada_em, now
+        )
+        compra = _build_side(
+            row.maior_compra,
+            row.compra_unidades,
+            row.compra_qtd,
+            row.compra_observada_em,
+            now,
+        )
     else:
-        venda = _empty_lado()
-        compra = _empty_lado()
-        varredura_em = None
+        venda = _empty_side(now)
+        compra = _empty_side(now)
 
     ultimas_24h = await _turnover_window(
-        session, item_id, location_id, quality_level, 3600, now - timedelta(hours=24)
+        session, server_id, item_id, location_id, quality_level, 3600, now - timedelta(hours=24)
     )
     ultimos_7d = await _turnover_window(
-        session, item_id, location_id, quality_level, 21600, now - timedelta(days=7)
+        session, server_id, item_id, location_id, quality_level, 21600, now - timedelta(days=7)
     )
     ultimos_30d = await _turnover_window(
-        session, item_id, location_id, quality_level, 21600, now - timedelta(days=30)
+        session, server_id, item_id, location_id, quality_level, 21600, now - timedelta(days=30)
     )
     serie_6h = await _serie_6h(
-        session, item_id, location_id, quality_level, now - timedelta(days=30)
+        session, server_id, item_id, location_id, quality_level, now - timedelta(days=30)
     )
 
     item_row = await session.scalar(select(Item).where(Item.unique_name == item_id))
 
     return {
+        "server": server_id,
         "item": {"unique_name": item_id, "nome": item_row.name_pt if item_row else None},
         "location_id": location_id,
-        "livro": {"venda": venda, "compra": compra, "varredura_em": varredura_em},
+        "livro": {
+            "venda": venda,
+            "compra": compra,
+            "cobertura": policy.coverage,
+            "janela_frescor_segundos": policy.freshness_seconds,
+        },
         "vendido": {
             "ultimas_24h": ultimas_24h,
             "ultimos_7d": ultimos_7d,
@@ -374,27 +552,53 @@ async def get_item_demand(
 
 
 async def get_item_prices(
-    session: AsyncSession, item_id: str, scope: str, user_id=None
-) -> list[dict]:
-    locations = await list_location_ids(session)
-    combos = [(loc, q, e) for loc in locations for q in QUALIDADES for e in ENCHANTMENT_LEVELS]
+    session: AsyncSession,
+    server_id: str,
+    item_id: str,
+    scope: str,
+    user_id=None,
+    location_ids: list[str] | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> dict:
+    policy = get_market_book_policy()
+    scan_user_id = user_id if scope == "mine" else None
+    observed_combos, total = await query_item_combinations(
+        session,
+        server_id,
+        item_id,
+        user_id=scan_user_id,
+        location_ids=location_ids,
+        limit=limit,
+        offset=offset,
+    )
+    combos = [(loc, q, e) for loc, q, e, _, _ in observed_combos]
+    sources = {
+        (loc, q, e): {"livro": has_book, "historico": has_history}
+        for loc, q, e, has_book, has_history in observed_combos
+    }
 
     cached: dict[tuple[str, int, int], dict | None] = {}
     if scope != "mine":
-        cached = await mget_book_depths(get_redis(), item_id, combos)
+        cached = await mget_book_depths(get_redis(), server_id, item_id, combos)
+        for combo, payload in cached.items():
+            if payload is not None and payload.get("fontes") != sources[combo]:
+                cached[combo] = None
 
     missing = [c for c in combos if cached.get(c) is None]
-
-    scan_user_id = user_id if scope == "mine" else None
 
     if missing:
         full_combos = {(item_id, loc, q, e) for loc, q, e in missing}
         depth_rows = await query_book_depth(
-            session, list(full_combos), settings.price_freshness_hours, user_id=scan_user_id
+            session,
+            server_id,
+            list(full_combos),
+            policy.freshness_hours,
+            user_id=scan_user_id,
         )
         turnover_combos = {(item_id, loc, q) for loc, q, _ in missing}
         turnover_rows = await query_24h_turnover(
-            session, list(turnover_combos), user_id=scan_user_id
+            session, server_id, list(turnover_combos), user_id=scan_user_id
         )
 
         redis = get_redis() if scope != "mine" else None
@@ -404,16 +608,20 @@ async def get_item_prices(
             if row is None and turnover is None:
                 cached[(loc, q, e)] = None
                 continue
-            payload = _build_book_payload(row, turnover)
+            payload = _build_book_payload(
+                row, turnover, policy=policy, sources=sources[(loc, q, e)]
+            )
             cached[(loc, q, e)] = payload
             if redis is not None:
-                await set_book_depth(redis, item_id, loc, q, e, payload)
+                await set_book_depth(redis, server_id, item_id, loc, q, e, payload)
 
     results = []
+    response_now = datetime.now(timezone.utc)
     for loc, q, e in combos:
         payload = cached.get((loc, q, e))
         if payload is None:
             continue
+        payload = _refresh_cached_ages(payload, response_now)
         results.append(
             {
                 "location_id": loc,
@@ -422,7 +630,8 @@ async def get_item_prices(
                 "venda": payload["venda"],
                 "compra": payload["compra"],
                 "vendido_24h": payload["vendido_24h"],
-                "varredura_em": payload["varredura_em"],
+                "cobertura": payload["cobertura"],
+                "janela_frescor_segundos": payload["janela_frescor_segundos"],
             }
         )
-    return results
+    return {"prices": results, "total": total, "limit": limit, "offset": offset}

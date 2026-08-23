@@ -3,37 +3,30 @@ import time
 from collections.abc import Awaitable, Callable
 
 import structlog
-from redis.exceptions import ConnectionError as RedisConnectionError
-from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from src.cache.redis_client import new_redis_client
 from src.celery_app import celery_app
 from src.database import create_worker_engine
 from src.ingest.service import save_market_history, save_market_orders
+from src.quarantine.task_base import QuarantinableTask
+from src.tasking import RETRYABLE_EXCEPTIONS
 
 log = structlog.get_logger()
-
-RETRYABLE_EXCEPTIONS = (
-    OperationalError,
-    InterfaceError,
-    RedisConnectionError,
-    ConnectionError,  # builtin: conexão recusada/resetada no connect() cru, antes do asyncpg
-    # embrulhar em OperationalError (medido ao derrubar o Postgres de propósito, task 24)
-)
 
 
 def _run_async(
     topico: str,
     user_id: str,
+    server_id: str,
     n_itens: int,
     fn: Callable[[async_sessionmaker, object], Awaitable[None]],
 ) -> None:
-    """Executa a logica async da task num loop proprio, criando e destruindo engine/Redis
-    dentro dele (task 23). Loga inicio/fim/falha da task — erro transitorio de Postgres/Redis
-    sobe pro autoretry_for do Celery (task 24); erro de programacao (payload mal-formado,
-    bug) e logado e descartado sem retry, porque retentar nao conserta, so multiplica o log
-    (ver docs/04-revisao-fase-1.md, achado A5)."""
+    """Executa o ingest num loop próprio e descarta todos os recursos no mesmo loop.
+
+    Falhas transitórias sobem para o retry do Celery; as demais terminam em FAILURE e seguem para
+    a quarentena durável.
+    """
 
     async def _wrapper() -> None:
         engine = create_worker_engine()
@@ -43,17 +36,30 @@ def _run_async(
         try:
             await fn(sessionmaker, redis)
         except RETRYABLE_EXCEPTIONS:
-            log.warning("ingest.erro_transitorio", topico=topico, user_id=user_id, exc_info=True)
+            log.warning(
+                "ingest.erro_transitorio",
+                topico=topico,
+                user_id=user_id,
+                server_id=server_id,
+                exc_info=True,
+            )
             raise
         except Exception:
-            log.error("ingest.erro_programacao", topico=topico, user_id=user_id, exc_info=True)
-            return
+            log.error(
+                "ingest.erro_programacao",
+                topico=topico,
+                user_id=user_id,
+                server_id=server_id,
+                exc_info=True,
+            )
+            raise
         else:
             duracao_ms = int((time.monotonic() - start) * 1000)
             log.info(
                 "ingest.gravado",
                 topico=topico,
                 user_id=user_id,
+                server_id=server_id,
                 n_itens=n_itens,
                 duracao_ms=duracao_ms,
             )
@@ -66,6 +72,7 @@ def _run_async(
 
 @celery_app.task(
     name="ingest.process_market_orders",
+    base=QuarantinableTask,
     bind=True,
     autoretry_for=RETRYABLE_EXCEPTIONS,
     retry_backoff=True,
@@ -73,17 +80,27 @@ def _run_async(
     retry_jitter=True,
     max_retries=5,
 )
-def process_market_orders(self, payload: dict, user_id: str) -> None:
+def process_market_orders(
+    self,
+    payload: dict,
+    user_id: str,
+    realm: str,
+    api_token_id: str | None = None,
+) -> None:
     _run_async(
         "marketorders",
         user_id,
+        realm,
         len(payload["orders"]),
-        lambda sessionmaker, redis: save_market_orders(sessionmaker, redis, payload, user_id),
+        lambda sessionmaker, redis: save_market_orders(
+            sessionmaker, redis, payload, realm, user_id
+        ),
     )
 
 
 @celery_app.task(
     name="ingest.process_market_history",
+    base=QuarantinableTask,
     bind=True,
     autoretry_for=RETRYABLE_EXCEPTIONS,
     retry_backoff=True,
@@ -91,25 +108,49 @@ def process_market_orders(self, payload: dict, user_id: str) -> None:
     retry_jitter=True,
     max_retries=5,
 )
-def process_market_history(self, payload: dict, user_id: str) -> None:
+def process_market_history(
+    self,
+    payload: dict,
+    user_id: str,
+    realm: str,
+    api_token_id: str | None = None,
+) -> None:
     _run_async(
         "markethistories",
         user_id,
+        realm,
         len(payload["histories"]),
-        lambda sessionmaker, redis: save_market_history(sessionmaker, redis, payload, user_id),
+        lambda sessionmaker, redis: save_market_history(
+            sessionmaker, redis, payload, realm, user_id
+        ),
     )
 
 
-@celery_app.task(name="ingest.process_gold_prices")
-def process_gold_prices(payload: dict, user_id: str) -> None:
+@celery_app.task(name="ingest.process_gold_prices", base=QuarantinableTask, bind=True)
+def process_gold_prices(
+    self,
+    payload: dict,
+    user_id: str,
+    realm: str,
+    api_token_id: str | None = None,
+) -> None:
     """Gold price fica fora de escopo até ser priorizado (decisão do usuário, 2026-08-22) —
     implementação completa depende de criar o Modelo GoldPrice (mesma forma de
     MarketHistoryEntry). Até lá, o client recebe 200 (não é erro dele), mas o descarte fica
-    registrado — não é mais silencioso (ver docs/04-revisao-fase-1.md, achado C6)."""
+    registrado para manter o descarte observável."""
     log.warning(
         "ingest.descartado",
         topico="goldprices",
         user_id=user_id,
+        server_id=realm,
         motivo="fora de escopo",
         n_pontos=len(payload["prices"]),
     )
+
+
+process_market_orders.failure_kind = "ingest"
+process_market_orders.failure_topic = "marketorders"
+process_market_history.failure_kind = "ingest"
+process_market_history.failure_topic = "markethistories"
+process_gold_prices.failure_kind = "ingest"
+process_gold_prices.failure_topic = "goldprices"
