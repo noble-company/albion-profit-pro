@@ -1,0 +1,48 @@
+# Go (albiondata-client)
+albiondata-client/albiondata-client.exe
+albiondata-client/albiondata-client.log
+albiondata-client/*.gob
+albiondata-client/bin/
+
+# Python (backend)
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/.mypy_cache/
+backend/.coverage
+backend/.coverage.*
+backend/htmlcov/
+
+# Node (frontend)
+frontend/node_modules/
+frontend/dist/
+
+# Env/secrets
+.env
+*.env.local
+albiondata-client/config.yaml
+albiondata-client/.secrets
+
+# Dados estáticos do jogo
+# Redistribuição não autorizada enquanto a origem não publicar uma licença explícita.
+/items.json
+/ITEM DUMP.json
+
+# Artefatos locais e temporários
+*.tmp
+*.bak
+*.swp
+*.pcap
+*.pcapng
+*.gob
+*.log
+*.log.*
+!docs/capturas/*.log
+
+# OS/IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

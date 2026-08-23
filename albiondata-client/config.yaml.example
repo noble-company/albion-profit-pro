@@ -1,0 +1,11 @@
+# Copie este arquivo para "config.yaml" (na mesma pasta do executavel ou no diretorio
+# de onde voce roda o client) e descomente o que for usar.
+# "config.yaml" esta no .gitignore -- seu token nao corre risco de ser commitado.
+
+# Token de API do Albion Profit Pro. Gere em /auth/tokens e cole aqui.
+# Preferir este arquivo a flag -token: flag aparece na lista de processos.
+# ApiToken: apk_troque-por-um-token-de-verdade
+
+# EnableWebsockets: False
+# AllowedWebsocketHosts:
+#   - www.example.com

@@ -1,0 +1,50 @@
+[project]
+name = "albion-profit-pro-backend"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "alembic>=1.19.1",
+    "asyncpg>=0.31.0",
+    "celery>=5.6.3",
+    "fastapi>=0.141.1",
+    "fastapi-users[sqlalchemy]>=15.0.5",
+    "pydantic-settings>=2.15.0",
+    "redis>=8.1.0",
+    "sqlalchemy[asyncio]>=2.0.52",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+# B008: FastAPI usa Depends(...) como valor default de argumento de propósito
+# (é assim que a injeção de dependência funciona) — não é o "function call in
+# default" perigoso que o bugbear normalmente pega em código não-FastAPI.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# loop único pra sessão inteira (não um por teste): src/database.py,
+# src/celery_app.py etc. criam engine/app-Celery como singletons de módulo,
+# amarrados à primeira event loop que os usar — um loop por teste quebraria
+# esses singletons no 2º teste em diante ("Event loop is closed").
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.4",
+    "testcontainers[postgres,rabbitmq,redis]>=4.15.0",
+]

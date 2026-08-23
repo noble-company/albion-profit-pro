@@ -1,0 +1,79 @@
+# Captura de craft/refino -- 2026-08-23 (task 06)
+# Personagem: Chiroechi / fe54a799-7138-4c3b-8108-4a8df6a55b4f
+# Flags: -events "10,29,49,71,94" -operations "2,47,48" -debug -d
+# Sessao NAO controlada: cidade lotada (544 personagens em cena, 14 atores craftando).
+# Serve para o achado (a) -- isolamento do ator local -- e (b) craft vs refino.
+# NAO serve para o campo 4: eventos do inicio do lote foram perdidos.
+
+09:09:27 [94]evRegenerationCraftingChanged - 0:172086 1:6523598 2:30000 3:30000 5:0.11574074 6:639230837681520128 252:94 
+09:10:32 [94]evRegenerationCraftingChanged - 0:61170 1:6588699 2:30000 3:30000 5:0.11574074 6:639230838332536637 252:94 
+09:12:04 [94]evRegenerationCraftingChanged - 0:113761 1:6681259 2:30000 3:30000 5:0.11574074 6:639230839258133790 252:94 
+09:12:04 [71]evCraftItemFinished - 0:110490 1:1413 2:[112972] 3:[1022] 4:[]byte(len=1) 01 252:71 
+09:12:05 [71]evCraftItemFinished - 0:110490 1:1413 2:[112972] 3:[1022] 4:[]byte(len=1) 01 252:71 
+09:12:38 [49]evCraftBuildingInfo - 0:1391 1:4400000 2:4950000 3:639230797560957760 4:712800 6:[]byte{} 7:[]byte{} 252:49 
+09:13:39 [49]evCraftBuildingInfo - 0:1346 1:4500000 2:9500000 4:1469430000 6:[]byte{} 7:[]byte{} 252:49 
+09:13:44 [10]evCraftingFocusUpdate - 0:113761 1:6781510 3:28604 252:10 
+09:13:44 [71]evCraftItemFinished - 0:113761 1:1346 2:[116328] 3:[1135] 4:[]byte(len=1) 05 252:71 
+09:13:44 [49]evCraftBuildingInfo - 0:1346 1:4500000 2:9500000 4:1469430000 6:[]byte{} 7:[]byte{} 252:49 
+09:13:52 [71]evCraftItemFinished - 0:113108 1:1455 2:[116456] 3:[]byte{} 4:[]byte{} 252:71 
+09:14:16 [94]evRegenerationCraftingChanged - 0:64198 1:6813141 2:30000 3:30000 5:0.11574074 6:639230840576955732 252:94 
+09:14:36 [94]evRegenerationCraftingChanged - 0:117239 1:6833507 2:30000 3:30000 5:0.11574074 6:639230840780609712 252:94 
+09:14:39 [71]evCraftItemFinished - 0:116353 1:1454 2:[116367] 3:[]byte{} 4:[]byte{} 252:71 
+09:14:49 [49]evCraftBuildingInfo - 0:1413 1:4500000 2:9990000 4:34211269350 6:[]byte{} 7:[]byte{} 252:49 
+09:14:51 [10]evCraftingFocusUpdate - 0:117239 1:6848207 3:28612 252:10 
+09:14:51 [71]evCraftItemFinished - 0:117239 1:1413 2:[117242] 3:[1020] 4:[]byte(len=1) 04 252:71 
+09:14:51 [49]evCraftBuildingInfo - 0:1413 1:4500000 2:9990000 4:34211269350 6:[]byte{} 7:[]byte{} 252:49 
+09:14:52 [10]evCraftingFocusUpdate - 0:117239 1:6848759 3:28612 252:10 
+09:14:52 [71]evCraftItemFinished - 0:117239 1:1413 2:[117242] 3:[1020] 4:[]byte(len=1) 01 252:71 
+09:14:52 [49]evCraftBuildingInfo - 0:1413 1:4500000 2:9990000 4:34211269350 6:[]byte{} 7:[]byte{} 252:49 
+09:14:52 [10]evCraftingFocusUpdate - 0:117239 1:6849197 3:28612 252:10 
+09:14:52 [71]evCraftItemFinished - 0:117239 1:1413 2:[117242] 3:[1020] 4:[]byte(len=1) 01 252:71 
+09:14:52 [49]evCraftBuildingInfo - 0:1413 1:4500000 2:9990000 4:34211269350 6:[]byte{} 7:[]byte{} 252:49 
+09:14:53 [10]evCraftingFocusUpdate - 0:117239 1:6849786 3:28612 252:10 
+09:14:53 [71]evCraftItemFinished - 0:117239 1:1413 2:[117242] 3:[1020] 4:[]byte(len=1) 01 252:71 
+09:14:53 [49]evCraftBuildingInfo - 0:1413 1:4500000 2:9990000 4:34211269350 6:[]byte{} 7:[]byte{} 252:49 
+09:14:53 [10]evCraftingFocusUpdate - 0:117239 1:6850172 3:28612 252:10 
+09:14:53 [71]evCraftItemFinished - 0:117239 1:1413 2:[117242] 3:[]byte{} 4:[]byte{} 252:71 
+09:14:53 [49]evCraftBuildingInfo - 0:1413 1:4500000 2:9990000 4:34211269350 6:[]byte{} 7:[]byte{} 252:49 
+09:14:56 [71]evCraftItemFinished - 0:116316 1:1410 2:[117265] 3:[1082 1109] 4:[]byte(len=2) 0202 252:71 
+09:16:38 [71]evCraftItemFinished - 0:118271 1:1454 2:[118293] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:39 [71]evCraftItemFinished - 0:118271 1:1454 2:[118293] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:39 [71]evCraftItemFinished - 0:118271 1:1454 2:[118293] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:40 [71]evCraftItemFinished - 0:118271 1:1454 2:[118293] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:40 [71]evCraftItemFinished - 0:118271 1:1454 2:[118293] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:40 [71]evCraftItemFinished - 0:118271 1:1454 2:[118293] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:41 [71]evCraftItemFinished - 0:118271 1:1454 2:[118293] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:41 [71]evCraftItemFinished - 0:118271 1:1454 2:[118293] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:44 [71]evCraftItemFinished - 0:119500 1:1454 2:[119511] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:47 [71]evCraftItemFinished - 0:119577 1:1455 2:[120285] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:50 [71]evCraftItemFinished - 0:119500 1:1454 2:[120402] 3:[]byte{} 4:[]byte{} 252:71 
+09:16:57 [71]evCraftItemFinished - 0:119500 1:1454 2:[119512] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:02 [71]evCraftItemFinished - 0:119500 1:1454 2:[120689] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:03 [71]evCraftItemFinished - 0:119500 1:1454 2:[120689] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:03 [71]evCraftItemFinished - 0:119500 1:1454 2:[120689] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:10 [71]evCraftItemFinished - 0:120631 1:1455 2:[120641] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:12 [71]evCraftItemFinished - 0:119500 1:1454 2:[121092] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:23 [71]evCraftItemFinished - 0:119500 1:1454 2:[121514] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:40 [71]evCraftItemFinished - 0:119500 1:1454 2:[119511] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:44 [71]evCraftItemFinished - 0:119500 1:1454 2:[121977] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:47 [71]evCraftItemFinished - 0:119500 1:1454 2:[122117] 3:[]byte{} 4:[]byte{} 252:71 
+09:17:49 [71]evCraftItemFinished - 0:119500 1:1454 2:[121514] 3:[]byte{} 4:[]byte{} 252:71 
+09:18:03 [71]evCraftItemFinished - 0:122017 1:1454 2:[122025] 3:[]byte{} 4:[]byte{} 252:71 
+09:18:06 [71]evCraftItemFinished - 0:122017 1:1454 2:[122026] 3:[]byte{} 4:[]byte{} 252:71 
+09:18:08 [71]evCraftItemFinished - 0:122017 1:1454 2:[122019] 3:[]byte{} 4:[]byte{} 252:71 
+09:18:12 [71]evCraftItemFinished - 0:122017 1:1454 2:[122734] 3:[]byte{} 4:[]byte{} 252:71 
+09:18:13 [71]evCraftItemFinished - 0:121864 1:1455 2:[122741] 3:[]byte{} 4:[]byte{} 252:71 
+09:18:35 [71]evCraftItemFinished - 0:122540 1:1455 2:[123338] 3:[]byte{} 4:[]byte{} 252:71 
+09:18:43 [71]evCraftItemFinished - 0:123182 1:1455 2:[123511] 3:[]byte{} 4:[]byte{} 252:71 
+09:19:00 [71]evCraftItemFinished - 0:123623 1:1454 2:[123807] 3:[]byte{} 4:[]byte{} 252:71 
+09:19:11 [71]evCraftItemFinished - 0:123623 1:1454 2:[124082] 3:[]byte{} 4:[]byte{} 252:71 
+09:19:11 [71]evCraftItemFinished - 0:123623 1:1454 2:[124082] 3:[]byte{} 4:[]byte{} 252:71 
+09:19:12 [71]evCraftItemFinished - 0:123623 1:1454 2:[124082] 3:[]byte{} 4:[]byte{} 252:71 
+09:19:12 [71]evCraftItemFinished - 0:123623 1:1454 2:[124082] 3:[]byte{} 4:[]byte{} 252:71 
+09:19:12 [71]evCraftItemFinished - 0:123623 1:1454 2:[124082] 3:[]byte{} 4:[]byte{} 252:71 
+09:19:17 [71]evCraftItemFinished - 0:123623 1:1454 2:[123807] 3:[]byte{} 4:[]byte{} 252:71 
+09:19:53 [71]evCraftItemFinished - 0:121984 1:1455 2:[124987] 3:[]byte{} 4:[]byte{} 252:71 
+09:21:35 [71]evCraftItemFinished - 0:126803 1:1455 2:[127287] 3:[]byte{} 4:[]byte{} 252:71 
+09:21:40 [71]evCraftItemFinished - 0:126916 1:1455 2:[127444] 3:[]byte{} 4:[]byte{} 252:71 
+09:21:44 [71]evCraftItemFinished - 0:127126 1:1455 2:[127569] 3:[]byte{} 4:[]byte{} 252:71 
+09:21:52 [71]evCraftItemFinished - 0:126705 1:1455 2:[127883] 3:[]byte{} 4:[]byte{} 252:71 
