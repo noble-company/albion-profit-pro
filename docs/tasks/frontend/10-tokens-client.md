@@ -29,3 +29,13 @@ Gerar, copiar, configurar o client, observar último uso e revogar.
 ## Testes automatizados
 Segredo uma vez e fora de storage/cache, clipboard, estados vazio/erro, revogação 204/404 e
 formatação aproximada.
+
+## Implementação concluída (2026-08-23)
+
+- `TokensPage`, hooks e service conectados ao OpenAPI real em `src/tokens/`.
+- O segredo aparece somente no modal de criação, exige cópia antes de fechar e não é gravado em
+  storage ou Query cache.
+- Revogação trata `204` e `404` como estado final e invalida a listagem.
+- Instruções de `config.yaml`, `-token`, aviso de não compartilhar e travessia de zona foram
+  incluídas na tela.
+- Testes cobrem segredo único, ausência em storage e revogação ausente.

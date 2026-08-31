@@ -40,3 +40,14 @@ Navegar desktop/mobile, teclado, tema e zoom de 200%.
 Rotas públicas/protegidas, formatadores sem perda em número grande, idade nula/velha, smoke de
 acessibilidade dos componentes centrais, seletor de servidor persistindo em `localStorage` e
 bloqueando navegação às telas de mercado sem escolha prévia.
+
+## Implementação concluída (2026-08-23)
+
+- AppShell responsivo com navegação, skip link, foco nativo visível, seleção de realm e tema.
+- Contextos de realm e tema persistidos em `localStorage`; telas de mercado/craft bloqueiam sem
+  servidor selecionado.
+- Estados acessíveis (`Carregando`, `EstadoVazio`, `EstadoErro`) e toast com `aria-live`.
+- Formatadores de silver sem conversão numérica, idade com janela central de 6 horas e percentual
+  pt-BR.
+- Rotas públicas/protegidas e placeholders das telas futuras integrados ao shell.
+- Router 7.18.2 foi mantido por decisão de compatibilidade do scaffold com Node 22.15 (W7).

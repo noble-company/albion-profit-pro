@@ -27,3 +27,11 @@ Trocar cidade/qualidade e comparar tendência com o histórico disponível no jo
 ## Testes automatizados
 Query condicional (inclui `server` nas dependências do hook), janelas separadas, série vazia, troca
 de filtros, tabela alternativa e labels sem “pessoas”.
+
+## Implementação concluída (2026-08-23)
+
+- `DemandaItem` integrado ao detalhe do item e ao endpoint de demanda.
+- Cards separados para livro atual, 24h, 7d e 30d, usando unidades/ordens e volume agregado.
+- Gráfico Recharts da série de 6h com tooltip e tabela textual alternativa em horário local.
+- Estados condicionais para servidor, cidade, qualidade, série vazia e falha de API.
+- Texto explícito evita interpretar unidades/ordens como compradores únicos.

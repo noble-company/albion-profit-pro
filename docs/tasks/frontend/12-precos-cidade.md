@@ -37,3 +37,12 @@ Comparar offer/request e timestamp com mercado aberto.
 C3 visual, dimensão/filtros, combinação ausente, dado velho/nulo, toggle mine, fallback de local,
 polling suspenso em aba oculta, `server` sempre presente na query e livro/histórico renderizados com
 estados vazios independentes.
+
+## Implementação concluída (2026-08-23)
+
+- Detalhe `/item/:uniqueName` conectado a `/items/{unique_name}/prices`.
+- Filtros de escopo, qualidade, encantamento e paginação preservados na URL.
+- Venda, compra e histórico de 24h renderizados em colunas independentes, com idade e cobertura.
+- Seleção global de servidor é obrigatória e nunca é redigitada na tela.
+- Cidades carregadas por `/locations`, com fallback para `location_id`.
+- Polling de 30 segundos é ativado somente quando a aba está visível.

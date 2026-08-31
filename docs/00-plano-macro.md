@@ -26,8 +26,8 @@
 - Semântica do dado corrigida contra o contrato real medido no jogo ([03-contrato-ingest-real.md](03-contrato-ingest-real.md)): prata ÷10⁴, ticks .NET → `TIMESTAMPTZ`, `market_order`/`market_history_entry` remodelados (estado atual do livro / bucket global idempotente), tabela `item`+`location` (ponte `Index ↔ UniqueName`, locais dinâmicos).
 - Leitura de preços cache-first, por lado do livro e profundidade, com cobertura por usuário (`GET /items/{id}/prices?scope=all|mine`), retenção + rollup diário/mensal e `GET /items/{id}/demand`.
 - Hardening HTTP (CORS, `/ready`, rate limit, limites de payload) e migrations validadas em produção (imagem roda como não-root).
-- Dados estáticos com seed reproduzível e auditável (`backend/scripts/seed_static_data.py`): revisão e checksums fixados, **12.062 itens** e **5.553 receitas**, reexecução idempotente e troca atômica do catálogo.
-- Suíte de testes com `testcontainers` (Postgres/Redis/RabbitMQ efêmeros) — **229 testes**, sobre fixtures compartilhadas e payloads reais capturados do jogo, sem limpeza manual entre testes.
+- Dados estáticos com seed reproduzível e auditável (`backend/scripts/seed_static_data.py`): revisão e checksums fixados, **12.062 itens** e **5.633 receitas**, reexecução idempotente e troca atômica do catálogo.
+- Suíte de testes com `testcontainers` (Postgres/Redis/RabbitMQ efêmeros) — **281 testes**, sobre fixtures compartilhadas e payloads reais capturados do jogo, sem limpeza manual entre testes.
 - `Dockerfile` multi-stage validado e não-root. A imagem executa Alembic e o seed; migration/seed/worker/beat ainda precisam ser materializados no stack (Fase 2.5 task 11), e migration não roda no boot da API.
 - Observabilidade: `structlog` (JSON, também no worker) + `/health`/`/ready`.
 
@@ -59,16 +59,15 @@ backend de verdade, com dado real confirmado no Postgres.
 > sobre o protocolo de craft. Racional em
 > [tasks/client/README.md](tasks/client/README.md#por-que-07-09-foram-descopadas-2026-08-23).
 
-**Fase 2.5 (estabilização) — ✅ concluída, 14/14 tasks.** A auditoria posterior ao fechamento da
-Fase 2 encontrou bloqueadores que os testes verdes não cobrem: updater apontando para upstream,
-realm, rollups, uploader concorrente, seed reproduzível e operação Celery já foram estabilizados;
-permanece o fechamento documental/E2E. A validação de boot agora bloqueia release sem destino,
-token inválido e realm desconhecido. A semântica/escala do livro já
-declara cobertura parcial e consulta apenas combinações observadas. Diagnóstico em
-[05-revisao-fases-0-a-2.md](05-revisao-fases-0-a-2.md), execução em
-[tasks/estabilizacao/](tasks/estabilizacao/README.md). **Bloqueia a Fase 3.**
+**Fase 2.5 (estabilização) — ✅ concluída, 14/14 tasks.** Updater, realm, rollups, uploader
+concorrente, seed reproduzível, operação Celery, documentação e gate automatizado foram
+estabilizados. A validação de boot bloqueia release sem destino, token inválido e realm
+desconhecido. A semântica/escala do livro declara cobertura parcial e consulta apenas combinações
+observadas. Diagnóstico em [05-revisao-fases-0-a-2.md](05-revisao-fases-0-a-2.md), execução em
+[tasks/estabilizacao/](tasks/estabilizacao/README.md). O ensaio integrado Windows/jogo/Swarm foi
+transferido para a Task 19 da Fase 3.
 
-**Fase 3 — especificada (0/19), aguardando a Fase 2.5. Fase 4 — não começou.**
+**Fase 3 — ▶ em andamento (17/19). O produto foi reorganizado para rankings de Market Flip, Refino e Craft; Fase 4 — não começou.**
 
 ## Contexto
 
@@ -201,7 +200,7 @@ saída estão em [tasks/estabilizacao/README.md](tasks/estabilizacao/README.md).
 Esta fase não implementa frontend. Ela estabiliza o contrato que as 19 tasks da Fase 3 vão
 consumir, evitando consolidar APIs enganosas ou chaves sem realm na SPA.
 
-## Fase 3 — Calculadora web (API de craft + React/Vite) ▶ próxima fase
+## Fase 3 — Calculadora web (API de craft + React/Vite) ▶ em andamento
 
 O escopo detalhado e a ordem de implementação estão em
 [tasks/frontend/](tasks/frontend/README.md): **19 microtasks**, revisadas contra o código real em
@@ -247,10 +246,10 @@ Trocar o "abrir navegador" da Fase 2 por um webview nativo embutido (`github.com
 3. ~~Client — header de auth, token configurável e validação real~~ ✅ **Completo** (Fase 2,
    [tasks/client/](tasks/client/README.md)).
 4. ~~Recipes: decidir onde `ITEM DUMP.json` mora no repo, escrever o import pra `Recipe`/`RecipeIngredient`~~ ✅ **Completo** (Fase 1b, task 19) — falta só torná-lo reexecutável (task 35).
-5. **Próximo passo:** Fase 2.5 — estabilização, 14 tasks em
+5. ~~Fase 2.5 — estabilização~~ ✅ **Completa, 14/14 tasks**, ver
    [tasks/estabilizacao/](tasks/estabilizacao/README.md).
-6. Fase 3 — API de craft + frontend completo, já especificada em
-   [tasks/frontend/](tasks/frontend/README.md), liberada após o gate automatizado da Fase 2.5.
+6. **Próximo passo:** Fase 3 — API de craft + frontend completo, já especificada em
+   [tasks/frontend/](tasks/frontend/README.md).
 7. Deploy no Swarm é materializado dentro da Fase 2.5 (seed/filas/processos) e finalizado na Fase
    3 com o frontend/Traefik, usando o padrão real do usuário.
 8. (Depois) Fase 4 — webview embutido no client.

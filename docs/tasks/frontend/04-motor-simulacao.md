@@ -39,3 +39,28 @@ POST de T2_CLOTH e comparação com conta à mão, incluindo um lote que atraves
 Fórmula sem/com retorno; `amount_crafted > 1`; slippage; quatro combinações; setup apenas em ordens;
 imposto na venda; profundidade parcial; preço ausente propagando `null`; `scope=mine`; foco;
 overrides; 401/404/422. Contar queries e impedir crescimento por ingrediente.
+
+## Implementação concluída em 2026-08-23
+
+- `POST /craft/simulate` foi publicado com JWT, `server` obrigatório, receita canônica e os quatro
+  cenários `immediate|buy_order × immediate|sell_order`.
+- `prices.service.query_executable_book_levels` agrega todos os níveis solicitados em uma única
+  query. Compra imediata consome offers crescentes; venda imediata consome requests decrescentes.
+  Cobertura também é resolvida em lote e `scope=mine` libera o livro global somente para
+  combinações coletadas pelo próprio usuário.
+- Preços manuais usam os lados reais do livro: `offer` para compra imediata/sell order e `request`
+  para buy order/venda imediata. Sugestões de ordem e preços manuais são explicitamente não
+  garantidos.
+- Fill parcial permanece visível na cotação, mas custo, lucro e ROI dependentes ficam `null`.
+  Dados velhos, ausência de preço/cobertura e ordem não garantida usam os cinco avisos estáveis da
+  spec.
+- Qualidade e elegibilidade de retorno são overrides explícitos por ingrediente; nenhum nome de
+  item recebe regra especial implícita.
+- A conta HTTP controlada de 8 `T2_CLOTH` atravessou offers de 100 e 110 silver: custo dos
+  ingredientes 830, custo total 854, receita líquida imediata 1.152 e lucro 298. O cenário com
+  ambas as ordens resultou em custo 762, receita líquida 1.196 e lucro 434.
+- Foram adicionados 16 testes do endpoint; `tests/craft` tem 29 testes. A suíte completa passou com
+  276 testes, e Ruff/lint/formatação passaram globalmente. O teste com 12 ingredientes manteve no
+  máximo 5 SELECTs.
+- O contrato está disponível em `/openapi.json`; `frontend/src/api/schema.d.ts` foi gerado na
+  Task 07 depois da API da Task 05.

@@ -16,10 +16,16 @@
 | [08-quarentena-e-falhas-celery.md](08-quarentena-e-falhas-celery.md) | Política de falhas Celery: ACK/retry/redelivery, quarentena durável no PostgreSQL, sanitização e reprocessamento auditado. |
 | [09-operacao-celery-e-swarm.md](09-operacao-celery-e-swarm.md) | Filas dedicadas, resultados, time limits, observabilidade, readiness e stack Swarm de referência. |
 | [10-gate-final-fase-2-5.md](10-gate-final-fase-2-5.md) | Runbook e evidências automatizadas/humanas do gate que encerra a Fase 2.5. |
+| [11-formulas-de-craft.md](11-formulas-de-craft.md) | Contrato numérico da calculadora: produção, retorno, foco, taxas, quatro cenários, resultado financeiro e cadeia de upgrades. |
+| [12-revisao-fase-3.md](12-revisao-fase-3.md) | **Auditoria da Fase 3** — frontend, motor de oportunidades e arquitetura de cálculo. Achados com ID estável (`A01`-`A03`, `B01`-`B11`, `F01`-`F12`, `S01`-`S06`) referenciados pelas tasks da Fase 3.5, e as decisões de arquitetura tomadas em 2026-08-30 (divisão do cálculo, reconstrução do frontend, antifraude adiada). |
 | [tasks/backend/](tasks/backend/README.md) | Microetapas do backend. **Fase 1 (01-22) ✅ completa** e **Fase 1.5 (23-36) ✅ completa** (correções e remodelagem derivadas dos documentos 03 e 04). Uma task por arquivo, com objetivo, racional, o que implementar, dependências e testes. Os checklists de status são a fonte de verdade do que está pronto. |
 | [tasks/client/](tasks/client/README.md) | Microetapas da **Fase 2 (client Go) ✅ completa** — autenticação/destino de ingest, UX de localização e validação com o jogo real. |
 | [tasks/estabilizacao/](tasks/estabilizacao/README.md) | Microetapas da **Fase 2.5 ✅ completa, 14/14** — estabilização transversal concluída. |
-| [tasks/frontend/](tasks/frontend/README.md) | Microetapas da **Fase 3 ▶ próxima fase** — completa a API de craft e entrega a SPA React/Vite em 19 tasks. |
+| [tasks/frontend/](tasks/frontend/README.md) | Microetapas da **Fase 3 — 17/19** — entrega o scanner de oportunidades Market Flip, Refino e Craft. A task 18 foi absorvida pela Fase 3.5; a 19 é o gate final, executado depois dela. |
+| [tasks/refatoracao/](tasks/refatoracao/README.md) | Microetapas da **Fase 3.5 ▶ em andamento, 0/29** — refatoração derivada do documento `12`: corrige os motores de oportunidade, instala o design system que nunca foi instalado e move a camada "e se" para o cliente. |
+
+> A extensão transversal [20 — snapshots e preços atuais](tasks/frontend/20-snapshot-precos-atuais.md)
+> adiciona 11 tasks à Fase 3 para garantir que todas as telas usem somente a coleta mais recente.
 
 ## Convenção
 

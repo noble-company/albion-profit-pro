@@ -59,7 +59,8 @@ substituem o ensaio do binário com tráfego real do jogo.
 
 Por decisão do proprietário em 2026-08-23, estes testes não bloqueiam mais a Fase 2.5. Eles serão
 executados juntos após o frontend estar completo, permitindo validar a jornada inteira sem repetir
-o ensaio operacional agora e novamente ao final da Fase 3.
+o ensaio operacional agora e novamente ao final da Fase 3. A execução e as evidências são o escopo
+da [Task 19 da Fase 3](tasks/frontend/19-build-validacao.md).
 
 - [ ] Clonar/instalar em pasta limpa seguindo somente os READMEs.
 - [ ] Definir a URL oficial de release e validar boot, token e todos os estados do systray no

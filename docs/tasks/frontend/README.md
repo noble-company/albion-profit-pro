@@ -1,17 +1,15 @@
 # Tasks — Fase 3 (calculadora web)
 
-> ⏸ **Bloqueada pela Fase 2.5.** As specs abaixo continuam válidas, mas nenhuma deve ser
-> implementada antes do gate de saída de
-> [../estabilizacao/README.md](../estabilizacao/README.md). A Fase 2.5 altera contratos estruturais
-> que o frontend consumirá, especialmente realm e semântica/cobertura do livro.
+> ▶ **Próxima fase.** A Fase 2.5 foi concluída em 14/14; estas specs já incorporam seus contratos
+> finais, especialmente realm, seed reproduzível e semântica/cobertura do livro.
 
 Microetapas da **Fase 3**, derivadas do [plano macro](../../00-plano-macro.md) e revisadas
 contra o backend real em 2026-08-23. A pasta se chama `frontend` porque a entrega da fase é a
 aplicação web, mas as tasks 01-05 completam primeiro a API que essa aplicação precisa.
 
-**Objetivo da fase:** entregar o fluxo autenticado `buscar item → consultar mercado → simular
-craft/refino → comparar cidades e rotas`, reutilizando a mesma regra de negócio numa futura UI do
-client.
+**Objetivo da fase:** entregar um scanner autenticado de oportunidades: `Market Flip → Refino →
+Craft`, com rankings rápidos e análise detalhada opcional. Busca, preços, demanda e calculadora
+formam a fundação usada ao abrir uma oportunidade.
 
 ## Decisões revisadas
 
@@ -22,7 +20,8 @@ client.
   apenas uma estimativa e não pode ser apresentado como custo executável.
 - A simulação devolve quatro cenários: insumo imediato ou buy order × venda imediata ou sell order.
 - Setup fee default é 2,5% tanto com quanto sem Premium; Premium altera o imposto de venda (4% vs.
-  8%). Os defaults continuam editáveis e serão confirmados in-game na task 19.
+  8%). Os defaults foram confirmados pelo responsável do produto em 2026-08-23 e continuam
+  editáveis; retorno e estação são inputs do jogador.
 - Upgrade para `.N` é encadeado por nível (`.0 → .1 → ... → .N`), pois cada linha de receita
   descreve o recurso para subir do nível anterior.
 - `server` (`west`/`east`/`europe`) é obrigatório em todo endpoint de mercado desde a estabilização
@@ -30,7 +29,7 @@ client.
   no shell (task 09) e a repassa em toda chamada de preço/demanda/craft — não é um campo de
   formulário por tela.
 - “Demanda” significa unidades/ordens e volume vendido; o sistema não conhece compradores únicos.
-- Stack inicial: React 19, Vite 8, TypeScript 5.9, React Router 8, Tailwind CSS 4, shadcn/ui,
+- Stack inicial: React 19, Vite 8, TypeScript 6, React Router 8, Tailwind CSS 4, shadcn/ui,
   TanStack Query 5, RHF/Zod, Vitest/RTL/MSW e Playwright. Versões exatas ficam travadas no
   `package-lock.json` e são revalidadas na task 06.
 
@@ -50,14 +49,18 @@ ETAPA 1 — fundação web
        └─ 08 Autenticação
             └─ 09 Shell e design system
 
-ETAPA 2 — produto
+ETAPA 2 — fundação de detalhe
 09 ─┬─ 10 Tokens
     ├─ 11 Busca ── 12 Preços ── 13 Demanda
-    └─ 14 Calculadora ── 15 Comparativo
-                         └─ 16 Estados de borda
+    └─ 14 Calculadora (análise detalhada)
 
-ETAPA 3 — fechamento
-17 E2E ── 18 Build/serving ── 19 Validação in-game
+ETAPA 3 — produto principal
+15 Motor agregado de oportunidades
+    ├─ 16 Dashboard Market Flip
+    └─ 17 Rankings Refino + Craft
+
+ETAPA 4 — fechamento
+18 Resiliência + E2E ── 19 Build, serving e validação real
 ```
 
 ## Lista
@@ -78,33 +81,66 @@ ETAPA 3 — fechamento
 | [12](12-precos-cidade.md) | Preços por cidade | frontend | Livro por lado, qualidade e cobertura |
 | [13](13-demanda-historico.md) | Demanda e histórico | frontend | Métricas e série de 6 h |
 | [14](14-calculadora.md) | Calculadora | frontend | Formulário e breakdown de cenários |
-| [15](15-comparativo.md) | Comparativo | frontend | Ranking e rotas encantadas |
-| [16](16-estados-borda.md) | Resiliência | frontend | Estados esperados e indisponibilidade |
-| [17](17-e2e-playwright.md) | E2E | integração | Fluxos reais contra datastore real |
-| [18](18-build-producao.md) | Build de produção | frontend/backend | SPA na imagem da API |
-| [19](19-validacao-ponta-a-ponta.md) | Fechamento | manual | Jogo → client → UI + conta à mão |
+| [15](15-motor-oportunidades.md) | Motor de oportunidades | backend | Rankings agregados de flip, refino e craft |
+| [16](16-dashboard-market-flip.md) | Dashboard Market Flip | frontend | Filtros, KPIs e tabela de arbitragem |
+| [17](17-rankings-refino-craft.md) | Rankings Refino + Craft | frontend | Abas de refino e fabricação lucrativa |
+| [18](18-resiliencia-e2e.md) | Resiliência e E2E | integração | Estados de produto e fluxos Playwright |
+| [19](19-build-validacao.md) | Build e validação final | frontend/backend/manual | Serving, jogo real e fechamento |
 
 ## Status — Fase 3
 
-- [ ] 01 — Catálogo de itens e localizações
-- [ ] 02 — API de receitas
-- [ ] 03 — Contrato e fórmulas de cálculo
-- [ ] 04 — Motor de simulação
-- [ ] 05 — Comparação de cidades e rotas de encantamento
-- [ ] 06 — Scaffold do frontend
-- [ ] 07 — Camada de API tipada
-- [ ] 08 — Autenticação no frontend
-- [ ] 09 — Shell e design system
-- [ ] 10 — Tokens do client Go
-- [ ] 11 — Busca de itens
-- [ ] 12 — Preços por cidade
-- [ ] 13 — Demanda e histórico
-- [ ] 14 — Calculadora
-- [ ] 15 — Comparativo de cidades e encantamento
-- [ ] 16 — Estados de borda e resiliência
-- [ ] 17 — Suíte E2E Playwright
-- [ ] 18 — Build de produção e serving
-- [ ] 19 — Validação ponta a ponta e fechamento
+- [x] 01 — Catálogo de itens e localizações
+- [x] 02 — API de receitas
+- [x] 03 — Contrato e fórmulas de cálculo
+- [x] 04 — Motor de simulação
+- [x] 05 — Comparação de cidades e rotas de encantamento
+- [x] 06 — Scaffold do frontend
+- [x] 07 — Camada de API tipada
+- [x] 08 — Autenticação no frontend
+- [x] 09 — Shell e design system
+- [x] 10 — Tokens do client Go
+- [x] 11 — Busca de itens
+- [x] 12 — Preços por cidade
+- [x] 13 — Demanda e histórico
+- [x] 14 — Calculadora
+- [x] 15 — Motor agregado de oportunidades
+- [x] 16 — Dashboard Market Flip
+- [x] 17 — Rankings Refino + Craft
+- [ ] 18 — Resiliência e E2E — **absorvida** pela [Fase 3.5, task 27](../refatoracao/27-e2e-playwright.md)
+- [ ] 19 — Build e validação final — **executada depois da Fase 3.5**, como gate conjunto
+
+> ⚠️ **Fase 3 pausada em 2026-08-30.** A auditoria em
+> [12-revisao-fase-3.md](../../12-revisao-fase-3.md) encontrou defeitos de correção e de
+> fundação que tornariam o fechamento da fase inútil: o ranking de refino/craft está truncado
+> nas 200 primeiras receitas em ordem alfabética (`B02`), o flip cota ordens expiradas (`B03`),
+> a biblioteca de componentes decidida na task 09 nunca foi instalada (`F01`) e recarregar a
+> página desloga o usuário (`F07`). A [Fase 3.5](../refatoracao/README.md) corrige isso antes
+> de 18 e 19 serem executadas.
+
+### Extensão transversal 3.1 — snapshots e preços atuais
+
+O plano está documentado em [20 — snapshots e preços atuais](20-snapshot-precos-atuais.md).
+Estas tasks entram na Fase 3 e devem ser executadas antes da validação final da fase, pois
+alteram o contrato de preço consumido por Market Flip, Refino, Craft e Calculadora.
+
+- [x] 20.1 — Contrato de snapshot
+- [x] 20.2 — Client Go e envio de snapshots
+- [x] 20.3 — Projeção da última observação por combinação
+
+> As tasks 20.4-20.11 foram **adiadas para depois da Fase 3.5**, conforme
+> [task 28](../refatoracao/28-retomada-dos-snapshots.md): 20.5 é a mesma camada de "preço
+> atual" que a Fase 3.5 adota como arquitetura, 20.6 depende da decisão de pub/sub, e 20.8/20.9
+> incidiriam sobre telas e motores que a Fase 3.5 reescreve. Executá-las antes seria trabalho
+> perdido; as specs devem ser revalidadas contra o código novo.
+
+- [ ] 20.4 — Reconciliação do estado atual
+- [ ] 20.5 — Serviço único de preço atual
+- [ ] 20.6 — Invalidação de cache e pub/sub
+- [ ] 20.7 — Política de frescor
+- [ ] 20.8 — Estados do frontend
+- [ ] 20.9 — Migração dos motores de cálculo
+- [ ] 20.10 — Testes automatizados
+- [ ] 20.11 — Validação real no jogo
 
 ## Convenções específicas desta fase
 
@@ -117,11 +153,17 @@ ETAPA 3 — fechamento
 - Todo lado com preço mostra `observado_em` e `idade_segundos`; `null` é “sem observação fresca”,
   nunca “agora”. A UI deve declarar `cobertura: parcial` sem chamar os totais de profundidade total.
 - Teste unitário do frontend usa MSW; E2E usa API, PostgreSQL, Redis e RabbitMQ reais.
-- Uma task que altera OpenAPI também regenera e commita `frontend/src/api/schema.d.ts` se o
-  frontend já existir.
+- A geração inicial de `frontend/src/api/schema.d.ts` pertence à Task 07, depois das APIs 01–05.
+  Após esse arquivo existir, toda task que alterar OpenAPI também o regenera.
 
 ## Achados da fase
 
 | # | Achado | Corrigido em |
 |---|---|---|
 | `W1` | As specs 04/05/09/12-15 foram escritas antes da estabilização tasks 03 e 05 fecharem. `server` virou obrigatório em `/items/{id}/prices` e `/items/{id}/demand` sem nenhum default por usuário no backend, e `scope=mine` passou a ter cobertura independente entre livro e histórico. Revisado em 2026-08-23 contra o código real (`prices/router.py`, `prices/schemas.py`). | Tasks 04, 05, 09, 12, 13, 14, 15 (specs atualizadas) |
+| `W2` | O seed estático considera o checksum do manifesto para decidir `unchanged`; mudar apenas importadores deixaria instalações existentes sem novas colunas derivadas/ordens. | Tasks 01 e 02 exigem revisão da identidade da transformação e teste de upgrade já semeado |
+| `W3` | O nome planejado `docs/05-formulas-de-craft.md` colidia com a auditoria existente e o gate humano adiado na Fase 2.5 ainda não estava integralmente na Task 19. | Documento renumerado para `11`; gate consolidado na Task 19 |
+| `W4` | Recursos encantados usam `_LEVELN` no `ITEM DUMP.json`, mas `_LEVELN@N` no catálogo e no mercado; o import anterior deixava 39 outputs canônicos e ingredientes encantados sem ID. | Task 02 normaliza somente candidatos comprovados em `items.json`; 39 outputs sem correspondência real permanecem documentados |
+| `W5` | As cotações executáveis da Task 04 carregavam o instante internamente, mas não o publicavam, impedindo o comparativo/UI de mostrar idade real por nível consumido. | Task 05 acrescenta `observed_at`, `oldest_observed_at` e `age_seconds` sem alterar fórmulas ou cenários |
+| `W6` | `openapi-typescript@7.13.0` declara peer de TypeScript 5, enquanto o scaffold validado usa TypeScript 6. | Task 07 mantém TypeScript 6 e instala o gerador com compatibilidade explícita; geração, typecheck e build passaram |
+| `W7` | A especificação cita React Router 8, mas o scaffold mantém Router 7.18.2 por compatibilidade validada com Node 22.15. | Task 09 preserva a decisão da Task 06; API usada é compatível com as rotas implementadas |

@@ -28,3 +28,13 @@ Buscar algodão/cotton/T4_CLOTH, operar só com teclado e testar mobile.
 
 ## Testes automatizados
 Debounce/cancelamento, filtros, zero resultado, selo, teclado e URL de item encantado.
+
+## Implementação concluída (2026-08-23)
+
+- `BuscaItem`, `useBuscaItens` e service conectados a `/items/search`.
+- Debounce de 300 ms, cancelamento via `AbortController` e nenhuma consulta com menos de dois
+  caracteres.
+- Filtros de tier, encantamento, categoria e somente craftáveis, com selo de item sem receita.
+- Combobox com roles WAI-ARIA, teclado, foco, estados loading/vazio/erro e navegação codificada
+  para `unique_name`.
+- Teste automatizado cobre filtros e identificador encantado.

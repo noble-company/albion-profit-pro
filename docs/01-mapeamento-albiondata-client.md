@@ -463,3 +463,44 @@ cd albiondata-client
   compatível e o client abriu as interfaces normalmente com usuário comum.
 - Depois de subir o client, **atravessar uma passagem de zona** antes de abrir o mercado
   (ver 9.1).
+
+## 10. Investigação de transações pessoais de mercado (2026-08-24)
+
+Foi feita uma captura controlada no West, abrindo o mercado de Caerleon, comprando um
+item e vendendo-o diretamente no Mercado Negro. A captura confirmou que o Npcap e as duas
+interfaces Photon (`UDP/5056`) funcionam normalmente.
+
+### 10.1. Códigos confirmados
+
+| Ação | Opcode | Evidência observada |
+|---|---:|---|
+| Abrir/consultar mercado | `81` / `82` | `opAuctionGetOffers` e `opAuctionGetRequests` |
+| Compra imediata | `83` | `opAuctionBuyOffer`, com resposta `true` e atualização de saldo |
+| Venda direta (Mercado Negro) | `315` | `opAuctionSellSpecificItemRequest` |
+
+Na requisição `315`, os parâmetros observados foram:
+
+```text
+0:832  1:22188643143  2:4708  4:1  253:315
+```
+
+O campo `0` identifica o prédio `BLACKMARKET`, o campo `1` é o ID do pedido, o campo `2`
+é o ID numérico do item e o campo `4` é a quantidade. O ID `4708` foi cruzado com
+`items.json` e corresponde a `T4_ARMOR_CLOTH_SET2` / **Robe de Clérigo do Adepto**.
+
+### 10.2. Alterações feitas no client
+
+- Criado o probe temporário `client/operation_market_transaction_probe.go`.
+- A captura foi movida para a requisição original, preservando item, quantidade e pedido;
+  respostas vazias não sobrescrevem mais a requisição.
+- `evUpdateMoney` passou a ser decodificado e correlacionado com a transação pendente.
+- O valor bruto do evento é expresso em milésimos de silver; a normalização de exibição
+  divide por `1000`.
+- `go test ./client` passou e o probe foi recompilado.
+
+### 10.3. Limitação deliberadamente deixada em espera
+
+O delta de `evUpdateMoney` pode incluir outra alteração de prata ocorrida na mesma janela;
+por isso ele não deve ser tratado ainda como preço definitivo da venda. A correlação robusta
+do valor com a ordem específica fica pausada por decisão de produto. A captura de item,
+quantidade, pedido, prédio e horário está validada.

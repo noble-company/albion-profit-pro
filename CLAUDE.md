@@ -11,8 +11,8 @@ This is a monorepo with four parts, at different stages of completion:
 | Path | Status | What it is |
 |---|---|---|
 | `albiondata-client/` | **Fase 2 complete; Fase 2.5 client stabilized** | Authenticated fork validated with the real game. Bounded queues, safe retry and boot-time `/client/me` validation are implemented; releases without a destination fail closed. Windows systray UX remains a manual check. Keep `PATCH LOCAL`, public channel `-i`, and never run `gofmt -w` because upstream is CRLF. |
-| `backend/` | **Fase 1 + 1.5 complete; Fase 2.5 pending** | FastAPI/Celery/PostgreSQL/Redis with 229 tests and live-client validation. Realm, rollups, ingest validation, partial-book semantics, static seed and isolated Celery operation are enforced. |
-| `frontend/` | **Not created — Fase 3 is next** | 0/19 tasks; Fase 2.5 is complete. Specs remain in `docs/tasks/frontend/README.md`. |
+| `backend/` | **Fase 1 + 1.5 and Fase 2.5 complete; Fase 3 active** | FastAPI/Celery/PostgreSQL/Redis with 281 tests and live-client validation. Realm, rollups, ingest validation, partial-book semantics, static seed and isolated Celery operation are enforced. |
+| `frontend/` | **Fase 3 active** | 16/19 tasks complete; scanner de oportunidades e checklist em `docs/tasks/frontend/README.md`. |
 | `docs/` | **Fase 2.5 complete, 14/14 tasks** | Integrated Windows/game/Swarm validation is deferred until the frontend is complete. |
 
 Root also has two large reference data files: `items.json` (official Albion item name/ID localization dump) and `ITEM DUMP.json` (official `items.xml` dump — crafting/refining recipes). Both are read-only reference data, not something to edit.

@@ -85,7 +85,19 @@ Itens com versões encantadas (.1, .2, .3) têm um bloco `enchantments.enchantme
 
 ### Como isso vira `Recipe` (task 19, revisado)
 
-Cada nível de encantamento vira sua própria linha em `recipe`, com `output_item_unique_name = "{base}@{nivel}"` (segue a convenção do próprio jogo — `items.json` já tem `"T4_HEAD_CLOTH_SET1@1"` como `UniqueName` própria, com seu `Index`; não é uma convenção inventada aqui) e `enchantment_level = {nivel}` (0 pra receita base). Os ingredientes (`craftresource`) desse bloco viram `RecipeIngredient` normalmente — pra equipamento/arma são os mesmos ingredientes da base só que com sufixo `_LEVELN`; pra consumível, os mesmos ingredientes da base **mais** um extra (ex: `T1_ALCHEMY_EXTRACT_LEVELN`). Nenhum tratamento especial precisou ser feito pra essa diferença — a mesma função que já lia `craftresource` (objeto único ou array) cobre os dois casos.
+Cada nível de encantamento vira sua própria linha em `recipe`. Equipamentos usam
+`output_item_unique_name = "{base}@{nivel}"` (por exemplo `T4_OFF_SHIELD@1`). Há, porém, uma
+segunda convenção medida nos dumps: certos recursos aparecem no `ITEM DUMP.json` como
+`T4_CLOTH_LEVEL1`, enquanto a chave canônica em `items.json` e no mercado é
+`T4_CLOTH_LEVEL1@1`. O importador acrescenta `@N` em outputs e ingredientes **somente quando essa
+chave candidata existe em `items.json`**; assim ele não inventa IDs. Essa correção resolveu 39 das
+78 receitas que antes ficavam sem `output_item_id`; as 39 restantes realmente não têm item
+correspondente na revisão fixada.
+
+Os ingredientes (`craftresource`) preservam sua ordem original em
+`RecipeIngredient.position` (base zero). Para equipamento/arma encantado, os recursos com sufixo
+`_LEVELN` também são convertidos para a chave canônica de mercado `_LEVELN@N`; para consumíveis,
+os ingredientes adicionais seguem a mesma regra de resolução por existência em `items.json`.
 
 `upgraderequirements.upgraderesource` (sempre um objeto único, nunca lista — confirmado nos ~4300 níveis de encantamento do dump real) fica em 3 colunas direto na linha do `Recipe` daquele nível: `upgrade_resource_unique_name`/`upgrade_resource_item_id`/`upgrade_resource_count`. É `NULL` pra `enchantment_level=0` (nada a upgradar pro nível 0) e pra níveis sem essa rota documentada (ex: nível 4 de alguns itens — provavelmente porque upgrade pra top-tier passa por outro sistema, tipo "Avalonian", não coberto pelo dump).
 
@@ -104,7 +116,18 @@ Numa minoria dos itens craftáveis (**799 de 3088 receitas base**, ~26%, nas 4 c
 ]
 ```
 
-**Não é modelável no schema atual** — `Recipe.output_item_unique_name` é `UNIQUE` (task 12), então não dá pra ter N receitas pro mesmo item de output (ou pro mesmo `output@nivel`) sem uma modelagem diferente (tabela de variantes, por exemplo). O script de import (`backend/scripts/import_recipes.py`, task 19) **pula** esses itens/níveis e os reporta separadamente no log (`skipped_multi_recipe`, distinto de `not_found` — aqui a receita existe, só não é representável ainda). A verificação é feita por item **e** por nível de encantamento independentemente — se a receita base for lista mas um nível específico de encantamento for um objeto único, esse nível ainda é importado normalmente (e vice-versa). Registrado como pendência abaixo.
+**Não é modelável genericamente no schema atual** — `Recipe.output_item_unique_name` é `UNIQUE`
+(task 12), então não dá pra ter N receitas pro mesmo item de output sem uma tabela de variantes.
+O importador continua pulando alternativas ambíguas, com uma exceção de produto validada em
+2026-08-26: recursos refinados encantados oferecem uma rota normal e uma rota que substitui uma
+unidade da matéria-prima por token de facção. Para o ranking de Refino, o importador seleciona
+deterministicamente a única rota sem `_FACTION_..._TOKEN_`; a rota de facção permanece fora do
+escopo. Isso recuperou 80 receitas normais (5.633 importadas e 3.139 alternativas ainda puladas),
+incluindo `T6_CLOTH_LEVEL3@3 = 4× T6_FIBER_LEVEL3@3 + 1× T5_CLOTH_LEVEL3@3`.
+
+Na API, esses itens continuam respondendo `receita_indisponivel`; escolher silenciosamente a
+primeira alternativa alteraria o custo e produziria um cálculo incorreto. Suporte a múltiplas
+receitas exige uma modelagem própria futura.
 
 ## Chave de junção com `items.json` — atenção
 
@@ -153,5 +176,7 @@ Vale a pena o script de import (`backend/scripts/import_recipes.py`) já popular
 - Confirmar unidade exata de `@time` (parece ser um multiplicador relativo, não segundos/horas direto).
 - ~~Escrever `backend/scripts/import_recipes.py`~~ — feito na task 19.
 - ~~Modelar `enchantments`/`upgraderequirements` (receitas encantadas + custo de upgrade)~~ — feito (revisão da task 12/19, 2026-08-21): `Recipe` ganhou `enchantment_level` + `upgrade_resource_*`, ver seção "Como isso vira Recipe" acima.
-- Decidir o que fazer com os ~3200 itens/níveis de "receita múltipla" (`craftingrequirements` como lista, ver seção acima) — hoje ficam de fora da tabela `recipe` inteiramente. Se algum deles for relevante pra calculadora (ex: `T1_FISHCHOPS` se refino de comida entrar no escopo), vai precisar de uma modelagem diferente pra suportar múltiplas receitas pro mesmo item de output.
+- Decidir o que fazer com as 3.139 alternativas ainda ambíguas (`craftingrequirements` como lista,
+  ver seção acima). As 80 rotas normais de recursos refinados já são importadas; itens como
+  `T1_FISHCHOPS` ainda exigem uma modelagem própria de variantes.
 - A rota de upgrade (`upgrade_resource_*`) não tem um custo em prata documentado no dump (`@silver` nunca aparece em `upgraderequirements` — confirmado nos ~4300 casos reais) — se a estação de upgrade cobrar taxa em prata de verdade no jogo, esse custo não está capturado aqui e precisaria vir de outra fonte.
