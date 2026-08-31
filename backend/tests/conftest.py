@@ -202,6 +202,7 @@ async def _limpa_tabelas_apos_teste():
     from src.cache.redis_client import get_redis
 
     redis = get_redis()
-    keys = [key async for key in redis.scan_iter(match="rl:*")]
-    if keys:
-        await redis.delete(*keys)
+    for pattern in ("rl:*", "opportunities:v2:*", "livro:*"):
+        keys = [key async for key in redis.scan_iter(match=pattern)]
+        if keys:
+            await redis.delete(*keys)

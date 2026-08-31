@@ -5,14 +5,8 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.craft.constants import (
-    DEFAULT_NON_PREMIUM_SALES_TAX_RATE,
-    DEFAULT_PREMIUM_SALES_TAX_RATE,
-    DEFAULT_SETUP_FEE_RATE,
-    AcquisitionMode,
-    CraftWarning,
-    SaleMode,
-)
+from src.craft import constants
+from src.craft.constants import AcquisitionMode, CraftWarning, SaleMode
 from src.craft.formulas import (
     calculate_acquisition_cost,
     calculate_financial_result,
@@ -21,14 +15,9 @@ from src.craft.formulas import (
     calculate_production,
     calculate_sale_revenue,
 )
+from src.craft.quotes import QuoteResult, manual_side, ordered_warnings, quote
 from src.craft.schemas import CraftCompareRequest
-from src.craft.service import (
-    InvalidOverrideError,
-    QuoteResult,
-    _manual_side,
-    _ordered_warnings,
-    _quote,
-)
+from src.craft.service import InvalidOverrideError
 from src.items.service import list_eligible_craft_locations
 from src.prices.policy import get_market_book_policy
 from src.prices.service import (
@@ -53,13 +42,13 @@ def _rates(request: CraftCompareRequest) -> tuple[Decimal, Decimal]:
     sales_tax_rate = request.sales_tax_rate
     if sales_tax_rate is None:
         sales_tax_rate = (
-            DEFAULT_PREMIUM_SALES_TAX_RATE
+            constants.DEFAULT_PREMIUM_SALES_TAX_RATE
             if request.premium
-            else DEFAULT_NON_PREMIUM_SALES_TAX_RATE
+            else constants.DEFAULT_NON_PREMIUM_SALES_TAX_RATE
         )
     setup_fee_rate = request.setup_fee_rate
     if setup_fee_rate is None:
-        setup_fee_rate = DEFAULT_SETUP_FEE_RATE
+        setup_fee_rate = constants.DEFAULT_SETUP_FEE_RATE
     return sales_tax_rate, setup_fee_rate
 
 
@@ -111,11 +100,11 @@ def _quote_for_mode(
     coverage: set[tuple[str, str, int, int]],
 ) -> QuoteResult:
     immediate = request.acquisition_mode is AcquisitionMode.IMMEDIATE
-    return _quote(
+    return quote(
         need.quantity,
         "offer" if immediate else "request",
         levels_by_combo.get(combo, []),
-        _manual_side(request, need.item_id, "offer" if immediate else "request"),
+        manual_side(request.manual_prices, need.item_id, "offer" if immediate else "request"),
         covered=combo in coverage,
         order=not immediate,
     )
@@ -129,18 +118,20 @@ def _sale_quote(
     coverage: set[tuple[str, str, int, int]],
 ) -> QuoteResult:
     immediate = request.sale_mode is SaleMode.IMMEDIATE
-    return _quote(
+    return quote(
         quantity,
         "request" if immediate else "offer",
         levels_by_combo.get(combo, []),
-        _manual_side(request, request.output_item, "request" if immediate else "offer"),
+        manual_side(
+            request.manual_prices, request.output_item, "request" if immediate else "offer"
+        ),
         covered=combo in coverage,
         order=not immediate,
     )
 
 
 def _reason(quotes: list[QuoteResult], sale_quote: QuoteResult) -> str | None:
-    warnings = _ordered_warnings(*(quote.warnings for quote in quotes), sale_quote.warnings)
+    warnings = ordered_warnings(*(quote.warnings for quote in quotes), sale_quote.warnings)
     return ",".join(warning.value for warning in warnings) if warnings else None
 
 
@@ -230,7 +221,7 @@ def _build_route(
         request.acquisition_mode is AcquisitionMode.BUY_ORDER
         and any(need.quantity > 0 for need in needs)
     )
-    warnings = _ordered_warnings(
+    warnings = ordered_warnings(
         *(quote.warnings for quote in quote_results),
         sale_quote.warnings,
         [CraftWarning.ORDER_NOT_GUARANTEED] if creates_order else [],

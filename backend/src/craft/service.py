@@ -1,18 +1,10 @@
 import uuid
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.craft.constants import (
-    DEFAULT_NON_PREMIUM_SALES_TAX_RATE,
-    DEFAULT_PREMIUM_SALES_TAX_RATE,
-    DEFAULT_SETUP_FEE_RATE,
-    AcquisitionMode,
-    CraftWarning,
-    SaleMode,
-)
+from src.craft import constants
+from src.craft.constants import AcquisitionMode, CraftWarning, SaleMode
 from src.craft.formulas import (
     calculate_acquisition_cost,
     calculate_financial_result,
@@ -21,6 +13,7 @@ from src.craft.formulas import (
     calculate_production,
     calculate_sale_revenue,
 )
+from src.craft.quotes import QuoteResult, manual_side, ordered_warnings, quote
 from src.craft.schemas import CraftSimulationRequest
 from src.prices.policy import get_market_book_policy
 from src.prices.service import (
@@ -33,256 +26,6 @@ from src.recipes.service import get_recipe_detail
 
 class InvalidOverrideError(ValueError):
     pass
-
-
-@dataclass(frozen=True, slots=True)
-class QuoteResult:
-    payload: dict
-    complete: bool
-    warnings: tuple[CraftWarning, ...]
-
-
-_WARNING_ORDER = {
-    warning: index
-    for index, warning in enumerate(
-        (
-            CraftWarning.NO_COVERAGE,
-            CraftWarning.STALE_DATA,
-            CraftWarning.NO_PRICE,
-            CraftWarning.INSUFFICIENT_DEPTH,
-            CraftWarning.ORDER_NOT_GUARANTEED,
-        )
-    )
-}
-
-
-def _ordered_warnings(*groups: tuple[CraftWarning, ...] | list[CraftWarning]) -> list[CraftWarning]:
-    warnings = {warning for group in groups for warning in group}
-    return sorted(warnings, key=_WARNING_ORDER.__getitem__)
-
-
-def _empty_quote(
-    quantity: int,
-    warning: CraftWarning,
-    *,
-    guaranteed: bool,
-) -> QuoteResult:
-    return QuoteResult(
-        payload={
-            "requested_quantity": quantity,
-            "priced_quantity": 0,
-            "unit_price": None,
-            "total": None,
-            "complete": False,
-            "guaranteed": guaranteed,
-            "source": None,
-            "levels": [],
-            "warnings": [warning],
-            "oldest_observed_at": None,
-            "age_seconds": None,
-        },
-        complete=False,
-        warnings=(warning,),
-    )
-
-
-def _manual_quote(quantity: int, unit_price: Decimal, *, guaranteed: bool) -> QuoteResult:
-    total = unit_price * quantity
-    return QuoteResult(
-        payload={
-            "requested_quantity": quantity,
-            "priced_quantity": quantity,
-            "unit_price": unit_price,
-            "total": total,
-            "complete": True,
-            "guaranteed": guaranteed,
-            "source": "manual",
-            "levels": [{"unit_price": unit_price, "quantity": quantity, "subtotal": total}],
-            "warnings": [],
-            "oldest_observed_at": None,
-            "age_seconds": None,
-        },
-        complete=True,
-        warnings=(),
-    )
-
-
-def _zero_quote(*, guaranteed: bool) -> QuoteResult:
-    return QuoteResult(
-        payload={
-            "requested_quantity": 0,
-            "priced_quantity": 0,
-            "unit_price": None,
-            "total": Decimal("0"),
-            "complete": True,
-            "guaranteed": guaranteed,
-            "source": None,
-            "levels": [],
-            "warnings": [],
-            "oldest_observed_at": None,
-            "age_seconds": None,
-        },
-        complete=True,
-        warnings=(),
-    )
-
-
-def _sorted_fresh_levels(
-    levels: list[ExecutableBookLevel],
-    auction_type: str,
-) -> list[ExecutableBookLevel]:
-    fresh = [level for level in levels if level.auction_type == auction_type and level.amount > 0]
-    return sorted(
-        fresh,
-        key=lambda level: level.unit_price,
-        reverse=auction_type == "request",
-    )
-
-
-def _has_stale_side(levels: list[ExecutableBookLevel], auction_type: str) -> bool:
-    return any(level.auction_type == auction_type and level.amount == 0 for level in levels)
-
-
-def _immediate_book_quote(
-    quantity: int,
-    auction_type: str,
-    levels: list[ExecutableBookLevel],
-    *,
-    covered: bool,
-) -> QuoteResult:
-    if not covered:
-        return _empty_quote(quantity, CraftWarning.NO_COVERAGE, guaranteed=True)
-
-    fresh_levels = _sorted_fresh_levels(levels, auction_type)
-    stale_side = _has_stale_side(levels, auction_type)
-    if not fresh_levels:
-        warning = CraftWarning.STALE_DATA if stale_side else CraftWarning.NO_PRICE
-        return _empty_quote(quantity, warning, guaranteed=True)
-
-    remaining = quantity
-    filled = 0
-    total = Decimal("0")
-    consumed_levels = []
-    observed_at_values = []
-    for level in fresh_levels:
-        if remaining == 0:
-            break
-        consumed = min(remaining, level.amount)
-        subtotal = level.unit_price * consumed
-        consumed_levels.append(
-            {
-                "unit_price": level.unit_price,
-                "quantity": consumed,
-                "subtotal": subtotal,
-                "observed_at": level.latest_seen_at,
-            }
-        )
-        observed_at_values.append(level.latest_seen_at)
-        total += subtotal
-        filled += consumed
-        remaining -= consumed
-
-    complete = remaining == 0
-    warnings = []
-    if not complete:
-        warnings.append(CraftWarning.INSUFFICIENT_DEPTH)
-        if stale_side:
-            warnings.append(CraftWarning.STALE_DATA)
-    ordered = _ordered_warnings(warnings)
-    oldest_observed_at = min(observed_at_values) if observed_at_values else None
-    return QuoteResult(
-        payload={
-            "requested_quantity": quantity,
-            "priced_quantity": filled,
-            "unit_price": total / filled if filled else None,
-            "total": total if filled else None,
-            "complete": complete,
-            "guaranteed": True,
-            "source": "book",
-            "levels": consumed_levels,
-            "warnings": ordered,
-            "oldest_observed_at": oldest_observed_at,
-            "age_seconds": _quote_age_seconds(oldest_observed_at),
-        },
-        complete=complete,
-        warnings=tuple(ordered),
-    )
-
-
-def _order_quote(
-    quantity: int,
-    auction_type: str,
-    levels: list[ExecutableBookLevel],
-    *,
-    covered: bool,
-) -> QuoteResult:
-    if not covered:
-        return _empty_quote(quantity, CraftWarning.NO_COVERAGE, guaranteed=False)
-
-    fresh_levels = _sorted_fresh_levels(levels, auction_type)
-    if not fresh_levels:
-        warning = (
-            CraftWarning.STALE_DATA
-            if _has_stale_side(levels, auction_type)
-            else CraftWarning.NO_PRICE
-        )
-        return _empty_quote(quantity, warning, guaranteed=False)
-
-    best = fresh_levels[0]
-    total = best.unit_price * quantity
-    return QuoteResult(
-        payload={
-            "requested_quantity": quantity,
-            "priced_quantity": quantity,
-            "unit_price": best.unit_price,
-            "total": total,
-            "complete": True,
-            "guaranteed": False,
-            "source": "book_suggestion",
-            "levels": [
-                {
-                    "unit_price": best.unit_price,
-                    "quantity": quantity,
-                    "subtotal": total,
-                    "observed_at": best.latest_seen_at,
-                }
-            ],
-            "warnings": [],
-            "oldest_observed_at": best.latest_seen_at,
-            "age_seconds": _quote_age_seconds(best.latest_seen_at),
-        },
-        complete=True,
-        warnings=(),
-    )
-
-
-def _quote_age_seconds(observed_at: datetime | None) -> int | None:
-    if observed_at is None:
-        return None
-    return max(0, int((datetime.now(timezone.utc) - observed_at).total_seconds()))
-
-
-def _quote(
-    quantity: int,
-    auction_type: str,
-    levels: list[ExecutableBookLevel],
-    manual_price: Decimal | None,
-    *,
-    covered: bool,
-    order: bool,
-) -> QuoteResult:
-    if quantity == 0:
-        return _zero_quote(guaranteed=True)
-    if manual_price is not None:
-        return _manual_quote(quantity, manual_price, guaranteed=False)
-    if order:
-        return _order_quote(quantity, auction_type, levels, covered=covered)
-    return _immediate_book_quote(quantity, auction_type, levels, covered=covered)
-
-
-def _manual_side(request: CraftSimulationRequest, item_id: str, side: str) -> Decimal | None:
-    override = request.manual_prices.get(item_id)
-    return getattr(override, side) if override is not None else None
 
 
 def _build_scenario(
@@ -349,7 +92,7 @@ def _build_scenario(
         acquisition_mode is AcquisitionMode.BUY_ORDER
         and any(quote.payload["requested_quantity"] > 0 for quote in acquisition_quotes)
     )
-    scenario_warnings = _ordered_warnings(
+    scenario_warnings = ordered_warnings(
         *(quote.warnings for quote in acquisition_quotes),
         output_quote.warnings,
         [CraftWarning.ORDER_NOT_GUARANTEED] if creates_order else [],
@@ -394,13 +137,15 @@ async def simulate_craft(
         request.sales_tax_rate
         if request.sales_tax_rate is not None
         else (
-            DEFAULT_PREMIUM_SALES_TAX_RATE
+            constants.DEFAULT_PREMIUM_SALES_TAX_RATE
             if request.premium
-            else DEFAULT_NON_PREMIUM_SALES_TAX_RATE
+            else constants.DEFAULT_NON_PREMIUM_SALES_TAX_RATE
         )
     )
     setup_fee_rate = (
-        request.setup_fee_rate if request.setup_fee_rate is not None else DEFAULT_SETUP_FEE_RATE
+        request.setup_fee_rate
+        if request.setup_fee_rate is not None
+        else constants.DEFAULT_SETUP_FEE_RATE
     )
 
     ingredient_rows = []
@@ -475,19 +220,19 @@ async def simulate_craft(
         requirement = row["requirement"]
         combo = row["combo"]
         combo_levels = levels_by_combo.get(combo, [])
-        immediate_quote = _quote(
+        immediate_quote = quote(
             requirement.purchase_quantity,
             "offer",
             combo_levels,
-            _manual_side(request, ingredient["unique_name"], "offer"),
+            manual_side(request.manual_prices, ingredient["unique_name"], "offer"),
             covered=combo in coverage,
             order=False,
         )
-        order_quote = _quote(
+        order_quote = quote(
             requirement.purchase_quantity,
             "request",
             combo_levels,
-            _manual_side(request, ingredient["unique_name"], "request"),
+            manual_side(request.manual_prices, ingredient["unique_name"], "request"),
             covered=combo in coverage,
             order=True,
         )
@@ -510,19 +255,19 @@ async def simulate_craft(
         )
 
     output_levels = levels_by_combo.get(output_combo, [])
-    immediate_sale = _quote(
+    immediate_sale = quote(
         production.produced_quantity,
         "request",
         output_levels,
-        _manual_side(request, request.output_item, "request"),
+        manual_side(request.manual_prices, request.output_item, "request"),
         covered=output_combo in coverage,
         order=False,
     )
-    sell_order = _quote(
+    sell_order = quote(
         production.produced_quantity,
         "offer",
         output_levels,
-        _manual_side(request, request.output_item, "offer"),
+        manual_side(request.manual_prices, request.output_item, "offer"),
         covered=output_combo in coverage,
         order=True,
     )

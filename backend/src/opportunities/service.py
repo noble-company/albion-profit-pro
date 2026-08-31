@@ -4,11 +4,7 @@ from decimal import Decimal
 from sqlalchemy import Interval, and_, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.craft.constants import (
-    DEFAULT_NON_PREMIUM_SALES_TAX_RATE,
-    DEFAULT_PREMIUM_SALES_TAX_RATE,
-    DEFAULT_SETUP_FEE_RATE,
-)
+from src.craft import constants
 from src.craft.schemas import CraftSimulationRequest
 from src.craft.service import simulate_craft
 from src.items.models import Item, Location
@@ -96,9 +92,11 @@ async def flip_opportunities(
     """
     policy = get_market_book_policy()
     sales_tax_rate = (
-        DEFAULT_PREMIUM_SALES_TAX_RATE if premium else DEFAULT_NON_PREMIUM_SALES_TAX_RATE
+        constants.DEFAULT_PREMIUM_SALES_TAX_RATE
+        if premium
+        else constants.DEFAULT_NON_PREMIUM_SALES_TAX_RATE
     )
-    setup_fee_rate = DEFAULT_SETUP_FEE_RATE
+    setup_fee_rate = constants.DEFAULT_SETUP_FEE_RATE
     tolerance = literal(LATEST_OBSERVATION_TOLERANCE, Interval())
     item_filters = _flip_item_filters(
         item_id, category, subcategory, subcategory2, subcategory3, tier
