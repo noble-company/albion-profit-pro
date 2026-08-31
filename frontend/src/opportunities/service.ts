@@ -1,0 +1,115 @@
+import { apiClient, safeApiCall } from '@/api'
+import type { components } from '@/api/schema'
+
+export type Opportunity = components['schemas']['OpportunityOut']
+export type OpportunityPage = components['schemas']['OpportunityPage']
+export type Category = components['schemas']['CategoryOut']
+export type OpportunityQuery = {
+  item?: string
+  category?: string
+  subcategory?: string
+  subcategory2?: string
+  subcategory3?: string
+  locations?: string[]
+  tier?: number
+  enchantment?: number
+  quality?: number
+  maxAgeHours?: number
+  requireComplete?: boolean
+  limit: number
+  offset: number
+  minProfit?: string
+  minRoi?: string
+  profitOnly?: boolean
+  premium?: boolean
+  buyOrder?: boolean
+  sellOrder?: boolean
+  returnRate?: string
+  stationCostPerExecution?: string
+  useFocus?: boolean
+}
+
+export type ProductionKind = 'refining' | 'crafting'
+
+export async function getFlipOpportunities(
+  server: components['schemas']['AlbionServer'],
+  query: OpportunityQuery,
+  signal: AbortSignal,
+) {
+  const response = await safeApiCall(() =>
+    apiClient.GET('/opportunities/flips', {
+      params: {
+        query: {
+          server,
+          item_id: query.item,
+          category: query.category,
+          subcategory: query.subcategory,
+          subcategory2: query.subcategory2,
+          subcategory3: query.subcategory3,
+          location_id: query.locations?.length ? query.locations : undefined,
+          tier: query.tier,
+          enchantment_level: query.enchantment,
+          quality_level: query.quality,
+          max_age_hours: query.maxAgeHours,
+          require_complete: query.requireComplete,
+          limit: query.limit,
+          offset: query.offset,
+          // The checkbox supplies the zero floor; preserve a stricter user threshold.
+          min_profit: query.profitOnly
+            ? query.minProfit || '0'
+            : query.minProfit,
+          min_roi: query.minRoi,
+          premium: query.premium,
+          buy_order: query.buyOrder,
+          sell_order: query.sellOrder,
+        },
+      },
+      signal,
+    }),
+  )
+  return response.data
+}
+
+export async function getCategories(signal: AbortSignal) {
+  const response = await safeApiCall(() =>
+    apiClient.GET('/items/categories', { signal }),
+  )
+  return response.data ?? []
+}
+
+export async function getProductionOpportunities(
+  kind: ProductionKind,
+  server: components['schemas']['AlbionServer'],
+  query: OpportunityQuery,
+  signal: AbortSignal,
+) {
+  const params = {
+    server,
+    location_id: query.locations?.length ? query.locations : undefined,
+    tier: query.tier,
+    enchantment_level: query.enchantment,
+    quality_level: query.quality,
+    max_age_hours: query.maxAgeHours,
+    require_complete: query.requireComplete,
+    limit: query.limit,
+    offset: query.offset,
+    min_profit: query.profitOnly ? query.minProfit || '0' : query.minProfit,
+    min_roi: query.minRoi,
+    return_rate: query.returnRate || '0',
+    station_cost_per_execution: query.stationCostPerExecution || '0',
+    use_focus: query.useFocus ?? false,
+    premium: query.premium ?? true,
+  }
+  const response = await safeApiCall(() =>
+    kind === 'refining'
+      ? apiClient.GET('/opportunities/refining', {
+          params: { query: params },
+          signal,
+        })
+      : apiClient.GET('/opportunities/crafting', {
+          params: { query: params },
+          signal,
+        }),
+  )
+  return response.data
+}

@@ -1,0 +1,147 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  font-family: var(--font-sans);
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.opportunity-filters .filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: #a8a29e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.opportunity-filters .filter-field input:not([type='checkbox']),
+.opportunity-filters .filter-field select {
+  min-height: 2.75rem;
+  border: 1px solid #44403c;
+  border-radius: 0.7rem;
+  background: rgb(12 10 9 / 75%);
+  padding: 0.6rem 0.75rem;
+  color: #fafaf9;
+  outline: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.opportunity-filters .filter-field input:not([type='checkbox']):hover,
+.opportunity-filters .filter-field select:hover {
+  border-color: #57534e;
+  background: #0c0a09;
+}
+
+.opportunity-filters .filter-field input:not([type='checkbox']):focus,
+.opportunity-filters .filter-field select:focus {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 2px rgb(251 191 36 / 20%);
+}
+
+.filter-toggle {
+  display: flex;
+  min-height: 4.5rem;
+  cursor: pointer;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid #292524;
+  border-radius: 0.8rem;
+  background: rgb(12 10 9 / 55%);
+  padding: 0.8rem;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.filter-toggle:hover {
+  border-color: #57534e;
+  background: rgb(28 25 23 / 85%);
+}
+
+.filter-toggle-active {
+  border-color: rgb(251 191 36 / 45%);
+  background: rgb(251 191 36 / 6%);
+}
+
+.filter-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.toggle-track {
+  position: relative;
+  width: 2.4rem;
+  height: 1.35rem;
+  flex: none;
+  border-radius: 999px;
+  background: #44403c;
+  transition: background-color 150ms ease;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  background: #d6d3d1;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 50%);
+  transition:
+    transform 150ms ease,
+    background-color 150ms ease;
+}
+
+.filter-toggle input:focus-visible + .toggle-track {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+}
+
+.filter-toggle input:checked + .toggle-track {
+  background: #fbbf24;
+}
+
+.filter-toggle input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(1.05rem);
+  background: #1c1917;
+}
+
+.button {
+  border: 1px solid #44403c;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.8rem;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
