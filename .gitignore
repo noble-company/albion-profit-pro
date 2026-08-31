@@ -4,6 +4,7 @@ albiondata-client/albiondata-client.log
 albiondata-client/*.gob
 albiondata-client/bin/
 albiondata-client/.cache/
+albiondata-client/.gocache/
 # PATCH LOCAL (Albion Profit Pro): generated client release artifacts.
 albiondata-client/update-*.gz
 albiondata-client/update-*.sha256
@@ -19,9 +20,15 @@ backend/**/*.pyc
 backend/.pytest_cache/
 backend/.ruff_cache/
 backend/.mypy_cache/
+backend/.uv-cache/
 backend/.coverage
 backend/.coverage.*
 backend/htmlcov/
+backend/runtime-logs/
+
+# Caches de ferramentas na raiz
+.uv-cache*/
+.cache/
 
 # Node (frontend)
 frontend/node_modules/
@@ -35,13 +42,16 @@ albiondata-client/.secrets
 
 # Dados estáticos do jogo
 # Redistribuição não autorizada enquanto a origem não publicar uma licença explícita.
+# São refetchados na revisão fixada por backend/datasets/albion-static-*.json (SHA-256 verificado).
 /items.json
 /ITEM DUMP.json
+/world.json
 
 # Artefatos locais e temporários
 *.tmp
 *.bak
 *.swp
+*.exe~
 *.pcap
 *.pcapng
 *.gob
