@@ -88,9 +88,9 @@ async def test_order_outside_freshness_window_has_no_observation_metadata(
 async def test_side_observation_timestamp_belongs_to_best_price(db_session):
     item_id = _unique_item_id()
     now = datetime.now(timezone.utc)
-    best_seen_at = now - timedelta(hours=2)
+    older_price_seen_at = now - timedelta(hours=2)
     newest_seen_at = now - timedelta(minutes=5)
-    for price, seen_at in ((Decimal("39"), best_seen_at), (Decimal("45"), newest_seen_at)):
+    for price, seen_at in ((Decimal("39"), older_price_seen_at), (Decimal("45"), newest_seen_at)):
         db_session.add(
             MarketOrder(
                 server_id="west",
@@ -113,8 +113,54 @@ async def test_side_observation_timestamp_belongs_to_best_price(db_session):
         db_session, "west", [(item_id, "1002", 1, 0)], freshness_hours=FRESHNESS_HOURS
     )
     row = rows[(item_id, "1002", 1, 0)]
-    assert row.menor_venda == Decimal("39")
-    assert row.venda_observada_em == best_seen_at
+    assert row.menor_venda == Decimal("45")
+    assert row.venda_observada_em == newest_seen_at
+
+
+async def test_book_depth_does_not_mix_orders_from_older_observation(db_session):
+    item_id = _unique_item_id()
+    now = datetime.now(timezone.utc)
+    db_session.add_all(
+        [
+            MarketOrder(
+                server_id="west",
+                source_id=_unique_source_id(),
+                item_id=item_id,
+                group_type_id="",
+                location_id="1002",
+                quality_level=1,
+                enchantment_level=0,
+                unit_price_silver=Decimal("1000"),
+                amount=1,
+                auction_type="request",
+                expires=now + timedelta(days=30),
+                last_seen_at=now - timedelta(minutes=5),
+            ),
+            MarketOrder(
+                server_id="west",
+                source_id=_unique_source_id(),
+                item_id=item_id,
+                group_type_id="",
+                location_id="1002",
+                quality_level=1,
+                enchantment_level=0,
+                unit_price_silver=Decimal("900"),
+                amount=1,
+                auction_type="request",
+                expires=now + timedelta(days=30),
+                last_seen_at=now,
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    rows = await query_book_depth(
+        db_session, "west", [(item_id, "1002", 1, 0)], freshness_hours=FRESHNESS_HOURS
+    )
+    row = rows[(item_id, "1002", 1, 0)]
+    assert row.maior_compra == Decimal("900")
+    assert row.compra_unidades == 1
+    assert row.compra_observada_em == now
 
 
 async def test_get_item_prices_query_count_does_not_grow_with_location_count(db_session):
@@ -217,4 +263,8 @@ async def test_representative_book_query_plan_uses_existing_index(db_session):
         ),
         {"item_id": target_item},
     )
-    assert "ix_market_order_book" in str(plan)
+    plan_text = str(plan)
+    assert any(
+        index_name in plan_text
+        for index_name in ("ix_market_order_book", "ix_market_order_latest_observation")
+    )

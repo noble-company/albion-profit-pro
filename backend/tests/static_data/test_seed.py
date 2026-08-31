@@ -11,8 +11,9 @@ import scripts.seed_static_data as seed_module
 from alembic import command
 from scripts.seed_static_data import DatasetValidationError, seed_static_data
 from src.database import async_session_maker
-from src.items.models import Item
+from src.items.models import Item, Location
 from src.recipes.models import Recipe, RecipeIngredient
+from src.static_data.constants import STATIC_TRANSFORM_REVISION
 from src.static_data.models import StaticDatasetVersion
 
 
@@ -25,11 +26,13 @@ def _write_dataset(tmp_path: Path, *, expected_overrides: dict | None = None):
     dataset_dir.mkdir()
     items_path = dataset_dir / "items.json"
     dump_path = dataset_dir / "ITEM DUMP.json"
+    world_path = dataset_dir / "world.json"
 
     items_path.write_text(
         json.dumps(
             [
                 {"UniqueName": "ZZSEED_FIBER", "Index": "910001"},
+                {"UniqueName": "ZZSEED_CATALYST", "Index": "910003"},
                 {"UniqueName": "ZZSEED_CLOTH", "Index": "910002"},
             ]
         ),
@@ -41,15 +44,16 @@ def _write_dataset(tmp_path: Path, *, expected_overrides: dict | None = None):
                 "items": {
                     "simpleitem": [
                         {"@uniquename": "ZZSEED_FIBER", "@tier": "2"},
+                        {"@uniquename": "ZZSEED_CATALYST", "@tier": "2"},
                         {
                             "@uniquename": "ZZSEED_CLOTH",
                             "@tier": "2",
                             "craftingrequirements": {
                                 "@amountcrafted": "1",
-                                "craftresource": {
-                                    "@uniquename": "ZZSEED_FIBER",
-                                    "@count": "1",
-                                },
+                                "craftresource": [
+                                    {"@uniquename": "ZZSEED_FIBER", "@count": "1"},
+                                    {"@uniquename": "ZZSEED_CATALYST", "@count": "2"},
+                                ],
                             },
                         },
                     ]
@@ -58,20 +62,36 @@ def _write_dataset(tmp_path: Path, *, expected_overrides: dict | None = None):
         ),
         encoding="utf-8",
     )
+    world_path.write_text(
+        json.dumps(
+            [
+                {"Index": "3005", "UniqueName": "Caerleon Market"},
+                {"Index": "2004", "UniqueName": "Bridgewatch Market"},
+                {"Index": "4002", "UniqueName": "Fort Sterling Market"},
+                {"Index": "1002", "UniqueName": "Lymhurst Market"},
+                {"Index": "3008", "UniqueName": "Martlock Market"},
+                {"Index": "0007", "UniqueName": "Thetford Market"},
+                {"Index": "5003", "UniqueName": "Brecilien Market"},
+            ]
+        ),
+        encoding="utf-8",
+    )
 
     expected = {
-        "source_items": 2,
-        "imported_items": 2,
+        "source_items": 3,
+        "imported_items": 3,
         "skipped_long_item_names": 0,
         "recipes": 1,
         "skipped_multiple_recipes": 0,
         "recipes_without_item_id": 0,
+        "curated_locations": 8,
     }
     expected.update(expected_overrides or {})
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "dataset_name": "test-static-data",
         "version": "fixture-v1",
+        "transform_revision": STATIC_TRANSFORM_REVISION,
         "source": {
             "repository": "https://example.com/source",
             "revision": "a" * 40,
@@ -89,6 +109,25 @@ def _write_dataset(tmp_path: Path, *, expected_overrides: dict | None = None):
                 "size": dump_path.stat().st_size,
                 "sha256": _sha256(dump_path),
             },
+            "world": {
+                "filename": world_path.name,
+                "url": "https://example.com/world.json",
+                "size": world_path.stat().st_size,
+                "sha256": _sha256(world_path),
+            },
+        },
+        "locations": {
+            "confirmed_market_ids": [
+                "3005",
+                "2004",
+                "4002",
+                "1002",
+                "3008",
+                "0007",
+                "5003",
+                "3003",
+            ],
+            "royal_city_ids": ["3005", "2004", "4002", "1002", "3008", "0007"],
         },
         "expected": expected,
     }
@@ -101,7 +140,12 @@ async def _add_old_catalog(db_session):
     db_session.add(Item(unique_name="ZZOLD_ITEM", albion_id=919999))
     recipe = Recipe(output_item_unique_name="ZZOLD_RECIPE", output_item_id=919999)
     recipe.ingredients.append(
-        RecipeIngredient(ingredient_unique_name="ZZOLD_ITEM", ingredient_item_id=919999, count=1)
+        RecipeIngredient(
+            ingredient_unique_name="ZZOLD_ITEM",
+            ingredient_item_id=919999,
+            count=1,
+            position=0,
+        )
     )
     db_session.add(recipe)
     await db_session.commit()
@@ -148,15 +192,70 @@ async def test_banco_vazio_recebe_dataset_e_versao_ativa(tmp_path, db_session):
     result = await seed_static_data(manifest_path, dataset_dir)
 
     assert result.status == "applied"
-    assert await db_session.scalar(select(func.count()).select_from(Item)) == 2
+    assert await db_session.scalar(select(func.count()).select_from(Item)) == 3
     assert await db_session.scalar(select(func.count()).select_from(Recipe)) == 1
     version = await db_session.scalar(
         select(StaticDatasetVersion).where(StaticDatasetVersion.active.is_(True))
     )
     assert version is not None
     assert version.version == "fixture-v1"
-    assert version.item_count == 2
+    assert version.item_count == 3
     assert version.recipe_count == 1
+    ingredients = (
+        await db_session.scalars(select(RecipeIngredient).order_by(RecipeIngredient.position))
+    ).all()
+    assert [(row.ingredient_unique_name, row.position) for row in ingredients] == [
+        ("ZZSEED_FIBER", 0),
+        ("ZZSEED_CATALYST", 1),
+    ]
+    locations = {row.location_id: row for row in (await db_session.scalars(select(Location))).all()}
+    assert locations["1002"].name == "Lymhurst"
+    assert locations["1002"].is_royal_city is True
+    assert locations["5003"].name == "Brecilien"
+    assert locations["5003"].is_royal_city is False
+
+
+async def test_nova_revisao_de_transformacao_reaplica_dataset(tmp_path, db_session):
+    manifest_path, dataset_dir = _write_dataset(tmp_path)
+    db_session.add(
+        StaticDatasetVersion(
+            dataset_name="test-static-data",
+            version="fixture-anterior",
+            source_revision="b" * 40,
+            manifest_sha256="b" * 64,
+            items_sha256="c" * 64,
+            item_dump_sha256="d" * 64,
+            item_count=1,
+            recipe_count=0,
+            skipped_recipe_count=0,
+            active=True,
+        )
+    )
+    await db_session.commit()
+
+    second = await seed_static_data(manifest_path, dataset_dir)
+    third = await seed_static_data(manifest_path, dataset_dir)
+
+    assert second.status == "applied"
+    assert third.status == "unchanged"
+    assert await db_session.scalar(select(func.count()).select_from(StaticDatasetVersion)) == 2
+    ingredients = (
+        await db_session.scalars(select(RecipeIngredient).order_by(RecipeIngredient.position))
+    ).all()
+    assert [row.ingredient_unique_name for row in ingredients] == [
+        "ZZSEED_FIBER",
+        "ZZSEED_CATALYST",
+    ]
+
+
+async def test_seed_rejeita_revisao_de_transformacao_desconhecida(tmp_path):
+    manifest_path, dataset_dir = _write_dataset(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["transform_revision"] = "transformacao-inexistente"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(DatasetValidationError, match="Revisão de transformação incompatível"):
+        await seed_static_data(manifest_path, dataset_dir)
 
 
 async def test_segunda_execucao_preserva_ids_e_nao_rele_dumps(tmp_path, db_session):

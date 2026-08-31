@@ -82,6 +82,7 @@ async def test_import_items_resolves_index_and_dump_metadata(tmp_path, db_sessio
     assert base.tier == 2
     assert base.shop_category == "crafting"
     assert base.shop_subcategory == "resources"
+    assert base.busca_normalizada == "zzfiber_t2 algodao cotton"
 
     enchanted = items["ZZFIBER_T2@1"]
     assert enchanted.albion_id == 900002

@@ -20,6 +20,8 @@ FIXTURE_NAMES = [
     "ZZFIXTURE_CLOTH_T2@1",
     "ZZFIXTURE_CLOTH_T2@2",
     "ZZFIXTURE_CLOTH_T3",
+    "ZZFIXTURE_REFINED_LEVEL2@2",
+    "ZZFIXTURE_REFINED_LEVEL3@3",
     "ZZFIXTURE_LOOT_ONLY",
     "ZZFIXTURE_MULTI_RECIPE",
 ]
@@ -112,6 +114,57 @@ ITEM_DUMP_FIXTURE = {
                 },
             },
             {
+                # Recursos encantados usam `_LEVELN` no dump, mas a chave de
+                # item/mercado inclui também `@N`.
+                "@uniquename": "ZZFIXTURE_REFINED_LEVEL2",
+                "craftingrequirements": {
+                    "craftresource": {
+                        "@uniquename": "ZZFIXTURE_FIBER_T2_LEVEL1",
+                        "@count": "3",
+                        "@enchantmentlevel": "1",
+                    }
+                },
+            },
+            {
+                # Recursos refinados podem oferecer a rota normal e uma rota de
+                # facção. O ranking usa a normal; a variante com token fica fora.
+                "@uniquename": "ZZFIXTURE_REFINED_LEVEL3",
+                "@shopsubcategory1": "refinedresources",
+                "craftingrequirements": [
+                    {
+                        "@amountcrafted": "1",
+                        "craftresource": [
+                            {
+                                "@uniquename": "ZZFIXTURE_FIBER_T3_LEVEL3",
+                                "@count": "4",
+                                "@enchantmentlevel": "3",
+                            },
+                            {
+                                "@uniquename": "ZZFIXTURE_REFINED_T2_LEVEL3",
+                                "@count": "1",
+                                "@enchantmentlevel": "3",
+                            },
+                        ],
+                    },
+                    {
+                        "@amountcrafted": "1",
+                        "craftresource": [
+                            {
+                                "@uniquename": "ZZFIXTURE_FIBER_T3_LEVEL3",
+                                "@count": "3",
+                                "@enchantmentlevel": "3",
+                            },
+                            {"@uniquename": "T1_FACTION_SWAMP_TOKEN_1", "@count": "1"},
+                            {
+                                "@uniquename": "ZZFIXTURE_REFINED_T2_LEVEL3",
+                                "@count": "1",
+                                "@enchantmentlevel": "3",
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
                 # item sem craftingrequirements (ex: loot-only) — não deve virar Recipe
                 "@uniquename": "ZZFIXTURE_LOOT_ONLY",
             },
@@ -145,7 +198,11 @@ ITEMS_JSON_FIXTURE = [
     {"UniqueName": "ZZFIXTURE_FIBER_T3", "Index": "900002"},
     {"UniqueName": "ZZFIXTURE_CLOTH_T2", "Index": "900003"},
     {"UniqueName": "ZZFIXTURE_CLOTH_T2@1", "Index": "900004"},
-    {"UniqueName": "ZZFIXTURE_FIBER_T2_LEVEL1", "Index": "900005"},
+    {"UniqueName": "ZZFIXTURE_FIBER_T2_LEVEL1@1", "Index": "900005"},
+    {"UniqueName": "ZZFIXTURE_REFINED_LEVEL2@2", "Index": "900006"},
+    {"UniqueName": "ZZFIXTURE_REFINED_LEVEL3@3", "Index": "900007"},
+    {"UniqueName": "ZZFIXTURE_FIBER_T3_LEVEL3@3", "Index": "900008"},
+    {"UniqueName": "ZZFIXTURE_REFINED_T2_LEVEL3@3", "Index": "900009"},
 ]
 
 
@@ -201,6 +258,7 @@ async def test_import_recipes_resolves_ids_and_handles_missing_correspondence(tm
     assert t2_ingredients[0].ingredient_unique_name == "ZZFIXTURE_FIBER_T2"
     assert t2_ingredients[0].ingredient_item_id == 900001
     assert t2_ingredients[0].count == 1
+    assert t2_ingredients[0].position == 0
 
     t3_ingredients = {
         i.ingredient_unique_name: i for i in ingredients if i.recipe_id == cloth_t3.id
@@ -208,7 +266,9 @@ async def test_import_recipes_resolves_ids_and_handles_missing_correspondence(tm
     assert set(t3_ingredients.keys()) == {"ZZFIXTURE_FIBER_T3", "ZZFIXTURE_CLOTH_T2"}
     assert t3_ingredients["ZZFIXTURE_FIBER_T3"].ingredient_item_id == 900002
     assert t3_ingredients["ZZFIXTURE_FIBER_T3"].count == 2
+    assert t3_ingredients["ZZFIXTURE_FIBER_T3"].position == 0
     assert t3_ingredients["ZZFIXTURE_CLOTH_T2"].ingredient_item_id == 900003  # resolvido
+    assert t3_ingredients["ZZFIXTURE_CLOTH_T2"].position == 1
 
 
 async def test_import_recipes_skips_items_without_craftingrequirements(tmp_path, db_session):
@@ -256,7 +316,7 @@ async def test_import_recipes_handles_enchantment_levels_and_upgrade_cost(tmp_pa
 
     # custo de craftar já encantado: ingrediente pré-encantado (equipamento/arma)
     assert len(ingredients) == 1
-    assert ingredients[0].ingredient_unique_name == "ZZFIXTURE_FIBER_T2_LEVEL1"
+    assert ingredients[0].ingredient_unique_name == "ZZFIXTURE_FIBER_T2_LEVEL1@1"
     assert ingredients[0].ingredient_item_id == 900005
     assert ingredients[0].enchantment_level == 1
 
@@ -266,6 +326,32 @@ async def test_import_recipes_handles_enchantment_levels_and_upgrade_cost(tmp_pa
     assert (
         recipe.upgrade_resource_item_id is None
     )  # ZZFIXTURE_RUNE não está no fixture de items.json
+
+    resource_recipe = await db_session.scalar(
+        select(Recipe).where(Recipe.output_item_unique_name == "ZZFIXTURE_REFINED_LEVEL2@2")
+    )
+    assert resource_recipe is not None
+    assert resource_recipe.output_item_id == 900006
+    assert resource_recipe.enchantment_level == 2
+
+    standard_refining_recipe = await db_session.scalar(
+        select(Recipe).where(Recipe.output_item_unique_name == "ZZFIXTURE_REFINED_LEVEL3@3")
+    )
+    assert standard_refining_recipe is not None
+    assert standard_refining_recipe.enchantment_level == 3
+    standard_ingredients = (
+        await db_session.scalars(
+            select(RecipeIngredient)
+            .where(RecipeIngredient.recipe_id == standard_refining_recipe.id)
+            .order_by(RecipeIngredient.position)
+        )
+    ).all()
+    assert [
+        (ingredient.ingredient_unique_name, ingredient.count) for ingredient in standard_ingredients
+    ] == [
+        ("ZZFIXTURE_FIBER_T3_LEVEL3@3", 4),
+        ("ZZFIXTURE_REFINED_T2_LEVEL3@3", 1),
+    ]
 
 
 async def test_import_recipes_twice_is_idempotent(tmp_path, db_session):

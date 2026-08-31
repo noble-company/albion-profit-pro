@@ -24,10 +24,20 @@ async def test_recipe_with_ingredients_relationship():
             craft_time=0.03125,
         )
         recipe.ingredients.append(
-            RecipeIngredient(ingredient_unique_name="T3_FIBER", count=2, enchantment_level=0)
+            RecipeIngredient(
+                ingredient_unique_name="T3_FIBER",
+                count=2,
+                enchantment_level=0,
+                position=1,
+            )
         )
         recipe.ingredients.append(
-            RecipeIngredient(ingredient_unique_name="T2_CLOTH", count=1, enchantment_level=0)
+            RecipeIngredient(
+                ingredient_unique_name="T2_CLOTH",
+                count=1,
+                enchantment_level=0,
+                position=0,
+            )
         )
         session.add(recipe)
         await session.commit()
@@ -38,8 +48,10 @@ async def test_recipe_with_ingredients_relationship():
         loaded = result.scalar_one()
         await session.refresh(loaded, attribute_names=["ingredients"])
         assert len(loaded.ingredients) == 2
-        ingredient_names = {i.ingredient_unique_name for i in loaded.ingredients}
-        assert ingredient_names == {"T3_FIBER", "T2_CLOTH"}
+        assert [i.ingredient_unique_name for i in loaded.ingredients] == [
+            "T2_CLOTH",
+            "T3_FIBER",
+        ]
 
         # session.delete(obj) (ORM), não um DELETE em massa via Core — só o
         # primeiro aciona o cascade="all, delete-orphan" pros ingredientes.
@@ -53,7 +65,12 @@ async def test_delete_recipe_cascades_to_ingredients():
     async with async_session_maker() as session:
         recipe = Recipe(output_item_unique_name=output_name)
         recipe.ingredients.append(
-            RecipeIngredient(ingredient_unique_name="T2_FIBER", count=1, enchantment_level=0)
+            RecipeIngredient(
+                ingredient_unique_name="T2_FIBER",
+                count=1,
+                enchantment_level=0,
+                position=0,
+            )
         )
         session.add(recipe)
         await session.commit()
