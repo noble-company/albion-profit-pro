@@ -30,14 +30,28 @@ class OpportunityOut(BaseModel):
     roi: Decimal | None = None
     acquisition_mode: Literal["immediate", "buy_order"] | None = None
     sale_mode: Literal["immediate", "sell_order"] | None = None
-    # Flip cota o topo do livro: melhor oferta/procura por cidade, quantidade limitada ao que
-    # esses níveis realmente têm. Não caminha a profundidade como o motor de craft.
-    price_model: Literal["top_of_book"] | None = None
+    # - "top_of_book": flip cota a melhor oferta/procura por cidade, quantidade limitada ao que
+    #   esses níveis têm; não caminha a profundidade.
+    # - "neutral_ranking": refino/craft vêm do ranking materializado em parâmetros neutros;
+    #   premium, retorno, estação e imposto são projeção sobre a página. O detalhe exato é
+    #   POST /craft/simulate.
+    price_model: Literal["top_of_book", "neutral_ranking"] | None = None
     ingredients: list[OpportunityIngredientOut] = Field(default_factory=list)
     station_cost: Decimal | None = None
     focus_consumed: int | None = None
     oldest_observed_at: str | None = None
     warnings: list[str] = Field(default_factory=list)
+
+
+class RankingCoverage(BaseModel):
+    """Cobertura da última reconstrução do ranking materializado, para a UI nunca esconder
+    truncamento (``B02``)."""
+
+    evaluated_recipes: int
+    priced_recipes: int
+    total_recipes: int
+    computed_at: str | None = None
+    stale: bool
 
 
 class OpportunityPage(BaseModel):
@@ -47,3 +61,5 @@ class OpportunityPage(BaseModel):
     total: int
     limit: int
     offset: int
+    # Presente só nas telas de produção (refino/craft), que leem o ranking materializado.
+    coverage: RankingCoverage | None = None

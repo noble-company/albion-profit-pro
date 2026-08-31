@@ -26,6 +26,7 @@ celery_app = Celery(
     include=[
         "src.ingest.tasks",  # escrita do caminho quente
         "src.prices.tasks",  # rollups e retenção
+        "src.opportunities.tasks",  # ranking de produção materializado
         "src.quarantine.tasks",  # falhas definitivas persistidas
         "src.operations.tasks",  # observabilidade das filas
     ],
@@ -47,6 +48,7 @@ celery_app.conf.update(
     task_routes={
         "ingest.*": {"queue": INGEST_QUEUE, "routing_key": INGEST_QUEUE},
         "prices.*": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
+        "opportunities.*": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
         "quarantine.*": {"queue": QUARANTINE_QUEUE, "routing_key": QUARANTINE_QUEUE},
         "operations.*": {"queue": QUARANTINE_QUEUE, "routing_key": QUARANTINE_QUEUE},
     },
@@ -77,6 +79,7 @@ celery_app.conf.update(
         "prices.rollup_diario": {"soft_time_limit": 1800, "time_limit": 1860},
         "prices.rollup_mensal": {"soft_time_limit": 1800, "time_limit": 1860},
         "prices.poda": {"soft_time_limit": 1800, "time_limit": 1860},
+        "opportunities.rebuild_recipe_ranking": {"soft_time_limit": 540, "time_limit": 600},
     },
 )
 
@@ -94,6 +97,12 @@ celery_app.conf.beat_schedule = {
         # A própria task repete o reparo diário→mensal antes de podar. O offset também evita
         # competir com o rollup horário disparado no minuto zero.
         "schedule": crontab(hour=2, minute=30),  # diário
+        "options": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
+    },
+    "ranking-de-producao": {
+        "task": "opportunities.rebuild_recipe_ranking",
+        # A cada 10 min. A janela aceitável de obsolescência é 15 min (payload marca `stale`).
+        "schedule": crontab(minute="*/10"),
         "options": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
     },
     "metricas-das-filas": {

@@ -5,36 +5,14 @@ from sqlalchemy import Interval, and_, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.craft import constants
-from src.craft.schemas import CraftSimulationRequest
-from src.craft.service import simulate_craft
-from src.items.models import Item, Location
+from src.items.models import Item
 from src.items.normalization import normalize_item_search
-from src.opportunities.schemas import OpportunityOut
+from src.opportunities.ranking_service import read_recipe_ranking
+from src.opportunities.schemas import OpportunityOut, RankingCoverage
 from src.prices.constants import AlbionServer
 from src.prices.models import MarketOrder
 from src.prices.policy import get_market_book_policy
-from src.prices.service import LATEST_OBSERVATION_TOLERANCE, latest_order_observation_filter
-from src.recipes.models import Recipe, RecipeIngredient
-
-
-def _is_refining_item(item: Item) -> bool:
-    category = " ".join(
-        value.lower() for value in (item.shop_category, item.shop_subcategory) if value
-    )
-    return any(token in category for token in ("resource", "refin", "material"))
-
-
-def _refining_item_filter():
-    """SQL equivalent of ``_is_refining_item`` used before the candidate cap."""
-    category = func.coalesce(Item.shop_category, "")
-    subcategory = func.coalesce(Item.shop_subcategory, "")
-    return or_(
-        *(
-            column.ilike(f"%{token}%")
-            for column in (category, subcategory)
-            for token in ("resource", "refin", "material")
-        )
-    )
+from src.prices.service import LATEST_OBSERVATION_TOLERANCE
 
 
 def _flip_item_filters(item_id, category, subcategory, subcategory2, subcategory3, tier):
@@ -282,7 +260,6 @@ async def flip_opportunities(
 async def recipe_opportunities(
     session: AsyncSession,
     server: AlbionServer,
-    user_id,
     *,
     kind: str,
     locations: list[str],
@@ -299,189 +276,31 @@ async def recipe_opportunities(
     station_cost_per_execution: Decimal = Decimal("0"),
     use_focus: bool = False,
     premium: bool = True,
-) -> tuple[list[OpportunityOut], int]:
-    """Rank recipes using the same quote/formula engine as the detail calculator.
+    item_id: str | None = None,
+) -> tuple[list[OpportunityOut], int, RankingCoverage]:
+    """Serve /opportunities/refining and /crafting from the materialized ranking (B02).
 
-    This is deliberately an in-process batch: it does not make HTTP calls per item and keeps
-    the money calculation in ``src.craft``. The candidate cap protects the API while the
-    dedicated cache/ranking materialization remains a later optimization.
+    Filtering, ordering and pagination run in PostgreSQL over ``recipe_ranking``; premium, tax,
+    return and station are a cheap projection over the page. The exact per-item recompute stays
+    in ``POST /craft/simulate``. The ranking is rebuilt by ``opportunities.rebuild_recipe_ranking``.
     """
-    refining_filter = _refining_item_filter()
-    statement = select(Recipe.output_item_unique_name, Item).join(
-        Item, Item.unique_name == Recipe.output_item_unique_name
+    return await read_recipe_ranking(
+        session,
+        server.value,
+        kind=kind,
+        locations=locations,
+        tier=tier,
+        enchantment=enchantment,
+        limit=limit,
+        offset=offset,
+        min_profit=min_profit,
+        min_roi=min_roi,
+        quality=quality,
+        max_age_hours=max_age_hours,
+        require_complete=require_complete,
+        return_rate=return_rate,
+        station_cost_per_execution=station_cost_per_execution,
+        use_focus=use_focus,
+        premium=premium,
+        item_id=item_id,
     )
-    if tier is not None:
-        statement = statement.where(Item.tier == tier)
-    if enchantment is not None:
-        statement = statement.where(Item.enchantment_level == enchantment)
-    statement = statement.where(refining_filter if kind == "refining" else ~refining_filter)
-    statement = statement.order_by(Recipe.output_item_unique_name).limit(200)
-    rows = (await session.execute(statement)).all()
-    candidates = []
-    for output_item, item in rows:
-        is_refining = _is_refining_item(item)
-        if (kind == "refining") != is_refining:
-            continue
-        candidates.append((output_item, item))
-
-    ingredient_names = {
-        unique_name: name_pt or name_en
-        for unique_name, name_pt, name_en in (
-            await session.execute(
-                select(
-                    RecipeIngredient.ingredient_unique_name,
-                    Item.name_pt,
-                    Item.name_en,
-                )
-                .join(Recipe, Recipe.id == RecipeIngredient.recipe_id)
-                .outerjoin(Item, Item.unique_name == RecipeIngredient.ingredient_unique_name)
-                .where(
-                    Recipe.output_item_unique_name.in_(
-                        [output_item for output_item, _item in candidates]
-                    )
-                )
-            )
-        ).all()
-    }
-
-    city_ids = locations or [
-        row[0]
-        for row in (
-            await session.execute(
-                select(Location.location_id)
-                .where(Location.kind == "city")
-                .order_by(Location.location_id)
-            )
-        ).all()
-    ]
-    quality_statement = select(
-        MarketOrder.item_id,
-        MarketOrder.location_id,
-        MarketOrder.quality_level,
-    ).where(
-        MarketOrder.server_id == server.value,
-        MarketOrder.item_id.in_([output_item for output_item, _item in candidates]),
-        MarketOrder.location_id.in_(city_ids),
-        MarketOrder.auction_type.in_(["offer", "request"]),
-        latest_order_observation_filter(),
-    )
-    if quality is not None:
-        quality_statement = quality_statement.where(MarketOrder.quality_level == quality)
-    observed_qualities: dict[tuple[str, str], set[int]] = {}
-    for output_item, location_id, quality_level in (
-        await session.execute(quality_statement.distinct())
-    ).all():
-        observed_qualities.setdefault((output_item, location_id), set()).add(quality_level)
-
-    results: list[OpportunityOut] = []
-    for output_item, item in candidates:
-        for location_id in city_ids:
-            for output_quality in sorted(observed_qualities.get((output_item, location_id), set())):
-                try:
-                    simulation = await simulate_craft(
-                        session,
-                        CraftSimulationRequest(
-                            server=server,
-                            output_item=output_item,
-                            location_id=location_id,
-                            quantity=1,
-                            output_quality=output_quality,
-                            return_rate=return_rate,
-                            station_cost_per_execution=station_cost_per_execution,
-                            use_focus=use_focus,
-                            premium=premium,
-                        ),
-                        user_id,
-                        freshness_hours=max_age_hours,
-                    )
-                except (LookupError, ValueError):
-                    continue
-                scenarios = [
-                    scenario
-                    for scenario in simulation["scenarios"]
-                    if scenario["profit"] is not None
-                ]
-                if not scenarios:
-                    continue
-                scenario = max(scenarios, key=lambda row: row["profit"])
-                profit = scenario["profit"]
-                roi = scenario["roi"]
-                if min_profit is not None and (profit is None or profit < min_profit):
-                    continue
-                if min_roi is not None and (roi is None or roi < min_roi):
-                    continue
-                costs = scenario["costs"]
-                revenue = scenario["revenue"]
-                warnings = sorted({str(warning) for warning in scenario["warnings"]})
-                acquisition_quote_key = (
-                    "immediate_purchase"
-                    if scenario["acquisition_mode"] == "immediate"
-                    else "buy_order"
-                )
-                sale_quote_key = (
-                    "immediate_sale" if scenario["sale_mode"] == "immediate" else "sell_order"
-                )
-                observed_at = [
-                    ingredient[acquisition_quote_key]["oldest_observed_at"]
-                    for ingredient in simulation["ingredients"]
-                    if ingredient[acquisition_quote_key]["oldest_observed_at"] is not None
-                ]
-                output_observed_at = simulation["output_quotes"][sale_quote_key][
-                    "oldest_observed_at"
-                ]
-                if output_observed_at is not None:
-                    observed_at.append(output_observed_at)
-                oldest_observed_at = min(observed_at) if observed_at else None
-                if (
-                    max_age_hours is not None
-                    and oldest_observed_at is not None
-                    and datetime.now(timezone.utc) - oldest_observed_at
-                    > timedelta(hours=max_age_hours)
-                ):
-                    continue
-                if require_complete and warnings:
-                    continue
-                results.append(
-                    OpportunityOut(
-                        kind=kind,
-                        item=output_item,
-                        item_name=item.name_pt or item.name_en,
-                        quality_level=output_quality,
-                        buy_location=location_id,
-                        sell_location=location_id,
-                        buy_price=(costs["total_cost"] / simulation["produced_quantity"])
-                        if costs["total_cost"] is not None
-                        else None,
-                        sell_price=(revenue["gross_revenue"] / simulation["produced_quantity"])
-                        if revenue["gross_revenue"] is not None
-                        else None,
-                        quantity=simulation["produced_quantity"],
-                        total_cost=costs["total_cost"],
-                        gross_revenue=revenue["gross_revenue"],
-                        profit=profit,
-                        roi=roi,
-                        acquisition_mode=scenario["acquisition_mode"],
-                        sale_mode=scenario["sale_mode"],
-                        ingredients=[
-                            {
-                                "item": ingredient["unique_name"],
-                                "item_name": ingredient_names.get(ingredient["unique_name"]),
-                                "gross_quantity": ingredient["gross_quantity"],
-                                "expected_return_quantity": ingredient["expected_return_quantity"],
-                                "purchase_quantity": ingredient["purchase_quantity"],
-                            }
-                            for ingredient in simulation["ingredients"]
-                        ],
-                        station_cost=costs["station_cost"],
-                        focus_consumed=simulation["focus_consumed"],
-                        oldest_observed_at=(
-                            oldest_observed_at.isoformat()
-                            if oldest_observed_at is not None
-                            else None
-                        ),
-                        warnings=warnings,
-                    )
-                )
-    results.sort(key=lambda row: row.profit or Decimal("-1"), reverse=True)
-    total = len(results)
-    return results[offset : offset + limit], total

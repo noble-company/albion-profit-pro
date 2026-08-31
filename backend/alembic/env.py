@@ -21,6 +21,7 @@ from src.auth import models as auth_models  # noqa: F401,E402
 from src.config import get_settings  # noqa: E402
 from src.database import Base  # noqa: E402
 from src.items import models as items_models  # noqa: F401,E402
+from src.opportunities import models as opportunities_models  # noqa: F401,E402
 from src.prices import models as prices_models  # noqa: F401,E402
 from src.quarantine import models as quarantine_models  # noqa: F401,E402
 from src.recipes import models as recipes_models  # noqa: F401,E402

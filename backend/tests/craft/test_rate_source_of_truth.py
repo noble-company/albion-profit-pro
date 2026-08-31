@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from src.craft import constants
 from src.items.models import Item, Location
+from src.opportunities.ranking_service import rebuild_ranking
 from src.prices.models import MarketOrder
 from src.prices.policy import MarketBookPolicy
 from src.recipes.models import Recipe, RecipeIngredient
@@ -76,6 +77,9 @@ async def _seed(db_session, *, seen=None):
         ]
     )
     await db_session.commit()
+    # The recipe ranking is materialized; refino/craft read it. Neutral rebuild — independent
+    # of the tax constant under test, which the read projection applies afterwards.
+    await rebuild_ranking(db_session, "west")
     return output
 
 

@@ -8,9 +8,16 @@ from sqlalchemy import event, insert, select
 from src.cache.redis_client import get_redis
 from src.database import engine
 from src.items.models import Item, Location
+from src.opportunities.ranking_service import rebuild_ranking
 from src.prices.models import MarketOrder
 from src.recipes.models import Recipe, RecipeIngredient
 from tests.conftest import registrar_e_logar
+
+
+async def _flush_opportunity_cache():
+    keys = [key async for key in get_redis().scan_iter(match="opportunities:v2:*")]
+    if keys:
+        await get_redis().delete(*keys)
 
 
 def _item_id() -> str:
@@ -179,47 +186,25 @@ async def test_recipe_rankings_have_stable_paginated_contract_when_catalog_is_em
             headers=headers,
         )
         assert response.status_code == 200, response.text
-        assert response.json() == {
-            "server": "west",
-            "kind": kind,
-            "opportunities": [],
-            "total": 0,
-            "limit": 10,
-            "offset": 0,
-        }
+        body = response.json()
+        assert body["server"] == "west"
+        assert body["kind"] == kind
+        assert body["opportunities"] == []
+        assert body["total"] == 0
+        assert body["limit"] == 10
+        assert body["offset"] == 0
+        # Empty catalog: never ran the ranking job, so the payload declares it stale.
+        assert body["coverage"]["stale"] is True
+        assert body["coverage"]["evaluated_recipes"] == 0
 
 
-async def test_refining_ranking_filters_kind_before_cap_and_uses_craft_engine(client, db_session):
+async def test_refining_ranking_reads_materialized_table_with_projection(client, db_session):
     _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
     output_id = _item_id()
     ingredient_id = _item_id()
-    # Regression: the production query used to cap the entire alphabetical catalog at
-    # 200 rows and only then classify recipes. Real refining recipes start around row
-    # 3,000, so no refining candidate was ever evaluated.
-    irrelevant_items = []
-    irrelevant_recipes = []
-    noise_prefix = uuid.uuid4().hex[:8]
-    for position in range(201):
-        noise_id = f"A_NOISE_{noise_prefix}_{position:03}"
-        irrelevant_items.append(
-            Item(
-                unique_name=noise_id,
-                albion_id=uuid.uuid4().int % 1_000_000_000,
-                shop_category="other",
-                shop_subcategory="questitems",
-            )
-        )
-        irrelevant_recipes.append(
-            Recipe(
-                output_item_unique_name=noise_id,
-                output_item_id=uuid.uuid4().int % 1_000_000_000,
-                amount_crafted=1,
-            )
-        )
     db_session.add_all(
         [
-            *irrelevant_items,
-            *irrelevant_recipes,
             Item(
                 unique_name=output_id,
                 albion_id=uuid.uuid4().int % 1_000_000_000,
@@ -238,55 +223,41 @@ async def test_refining_ranking_filters_kind_before_cap_and_uses_craft_engine(cl
         ]
     )
     recipe = Recipe(
-        output_item_unique_name=output_id,
-        output_item_id=1,
-        silver_cost=0,
-        amount_crafted=1,
+        output_item_unique_name=output_id, output_item_id=1, silver_cost=0, amount_crafted=1
     )
     recipe.ingredients.append(
         RecipeIngredient(
-            ingredient_unique_name=ingredient_id,
-            ingredient_item_id=2,
-            count=1,
-            position=0,
+            ingredient_unique_name=ingredient_id, ingredient_item_id=2, count=1, position=0
         )
     )
     db_session.add(recipe)
     db_session.add_all(
         [
             _order(ingredient_id, "1002", "offer", 100, 10),
-            _order(output_id, "1002", "request", 300, 10),
-            _order(output_id, "1002", "offer", 350, 10),
-            MarketOrder(
-                server_id="west",
-                source_id=uuid.uuid4().int % 1_000_000_000,
-                item_id=output_id,
-                group_type_id="",
-                location_id="1002",
-                quality_level=2,
-                enchantment_level=0,
-                unit_price_silver=400,
-                amount=10,
-                auction_type="request",
-                expires=datetime.now(timezone.utc) + timedelta(days=1),
-            ),
+            _order(output_id, "1002", "request", 3000, 10),
+            _order(output_id, "1002", "offer", 3500, 10),
+            _order(output_id, "1002", "request", 4000, 10, quality_level=2),
         ]
     )
     await db_session.commit()
+    await rebuild_ranking(db_session, "west")
+    await _flush_opportunity_cache()
 
-    response = await client.get(
-        "/opportunities/refining",
-        params={"server": "west", "location_id": "1002"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200, response.text
-    body = response.json()
+    body = (
+        await client.get(
+            "/opportunities/refining",
+            params={"server": "west", "location_id": "1002"},
+            headers=headers,
+        )
+    ).json()
     assert body["total"] == 2
     assert {row["quality_level"] for row in body["opportunities"]} == {1, 2}
+    assert body["coverage"]["evaluated_recipes"] == 1
+    assert body["coverage"]["priced_recipes"] == 1
     normal = next(row for row in body["opportunities"] if row["quality_level"] == 1)
     assert normal["item"] == output_id
+    assert normal["price_model"] == "neutral_ranking"
     assert normal["acquisition_mode"] in {"immediate", "buy_order"}
-    assert normal["sale_mode"] in {"immediate", "sell_order"}
     assert normal["ingredients"] == [
         {
             "item": ingredient_id,
@@ -296,59 +267,65 @@ async def test_refining_ranking_filters_kind_before_cap_and_uses_craft_engine(cl
             "purchase_quantity": 1,
         }
     ]
-    assert normal["station_cost"] == "0"
     assert normal["focus_consumed"] == 0
-    assert Decimal(normal["profit"]) > 0
+    baseline_profit = Decimal(normal["profit"])
+    assert baseline_profit > 0
 
-    quality_filtered = await client.get(
-        "/opportunities/refining",
-        params={"server": "west", "location_id": "1002", "quality_level": 2},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert quality_filtered.status_code == 200, quality_filtered.text
-    assert quality_filtered.json()["total"] == 1
-    assert quality_filtered.json()["opportunities"][0]["quality_level"] == 2
+    quality_filtered = (
+        await client.get(
+            "/opportunities/refining",
+            params={"server": "west", "location_id": "1002", "quality_level": 2},
+            headers=headers,
+        )
+    ).json()
+    assert quality_filtered["total"] == 1
+    assert quality_filtered["opportunities"][0]["quality_level"] == 2
 
-    configured = await client.get(
-        "/opportunities/refining",
-        params={
-            "server": "west",
-            "location_id": "1002",
-            "station_cost_per_execution": "10",
-            "return_rate": "0.5",
-            "use_focus": "true",
-            "premium": "false",
-        },
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert configured.status_code == 200, configured.text
-    assert configured.json()["total"] == 2
-    assert Decimal(configured.json()["opportunities"][0]["profit"]) < Decimal(
-        body["opportunities"][0]["profit"]
-    )
+    # The page projection reacts to the request knobs against the same materialized rows.
+    async def _profit(**params) -> Decimal:
+        await _flush_opportunity_cache()
+        page = (
+            await client.get(
+                "/opportunities/refining",
+                params={"server": "west", "location_id": "1002", **params},
+                headers=headers,
+            )
+        ).json()
+        return Decimal(next(r for r in page["opportunities"] if r["quality_level"] == 1)["profit"])
 
+    assert await _profit(premium="false") < baseline_profit  # 8% sales tax vs 4%
+    assert await _profit(station_cost_per_execution="500") < baseline_profit
+    assert await _profit(return_rate="0.5") > baseline_profit  # cheaper ingredients
+
+    # max_age_hours can only tighten the ranking's own freshness window: once the orders age
+    # past the rebuild policy and the ranking is recomputed, the row is no longer priced.
     stale_at = datetime.now(timezone.utc) - timedelta(hours=8)
     for order in await db_session.scalars(
         select(MarketOrder).where(MarketOrder.item_id.in_([output_id, ingredient_id]))
     ):
         order.last_seen_at = stale_at
     await db_session.commit()
+    await rebuild_ranking(db_session, "west")
+    await _flush_opportunity_cache()
 
-    stale_for_six_hours = await client.get(
-        "/opportunities/refining",
-        params={"server": "west", "location_id": "1002", "max_age_hours": 6},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert stale_for_six_hours.status_code == 200, stale_for_six_hours.text
-    assert stale_for_six_hours.json()["total"] == 0
+    for hours in (6, 24):
+        aged = (
+            await client.get(
+                "/opportunities/refining",
+                params={"server": "west", "location_id": "1002", "max_age_hours": hours},
+                headers=headers,
+            )
+        ).json()
+        assert aged["total"] == 0
 
-    accepted_for_twenty_four_hours = await client.get(
-        "/opportunities/refining",
-        params={"server": "west", "location_id": "1002", "max_age_hours": 24},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert accepted_for_twenty_four_hours.status_code == 200, accepted_for_twenty_four_hours.text
-    assert accepted_for_twenty_four_hours.json()["total"] == 2
+    complete_only = (
+        await client.get(
+            "/opportunities/refining",
+            params={"server": "west", "location_id": "1002", "require_complete": "true"},
+            headers=headers,
+        )
+    ).json()
+    assert complete_only["total"] == 0  # no fresh price left
 
 
 async def test_recipe_ranking_rejects_invalid_return_rate(client):

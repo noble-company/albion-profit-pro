@@ -210,6 +210,22 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
         />
       </div>
 
+      {result.data?.coverage && (
+        <p
+          className={`text-xs ${
+            result.data.coverage.stale ? 'text-amber-400' : 'text-stone-500'
+          }`}
+        >
+          Ranking cobre {result.data.coverage.priced_recipes} receitas com preço
+          de {result.data.coverage.evaluated_recipes} avaliadas ·{' '}
+          {result.data.coverage.total_recipes} receitas no total
+          {result.data.coverage.computed_at
+            ? ` · recalculado ${formatarIdade(result.data.coverage.computed_at)}`
+            : ' · ainda não calculado'}
+          {result.data.coverage.stale ? ' · desatualizado' : ''}
+        </p>
+      )}
+
       <div className="opportunity-filters overflow-hidden rounded-2xl border border-stone-800 bg-stone-900/70 shadow-2xl shadow-black/20">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800 px-5 py-4">
           <div>

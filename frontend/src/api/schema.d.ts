@@ -1280,7 +1280,7 @@ export interface components {
       /** Sale Mode */
       sale_mode?: ('immediate' | 'sell_order') | null
       /** Price Model */
-      price_model?: 'top_of_book' | null
+      price_model?: ('top_of_book' | 'neutral_ranking') | null
       /** Ingredients */
       ingredients?: components['schemas']['OpportunityIngredientOut'][]
       /** Station Cost */
@@ -1308,6 +1308,7 @@ export interface components {
       limit: number
       /** Offset */
       offset: number
+      coverage?: components['schemas']['RankingCoverage'] | null
     }
     /** OutputSaleQuotesOut */
     OutputSaleQuotesOut: {
@@ -1355,6 +1356,23 @@ export interface components {
       subtotal: string
       /** Observed At */
       observed_at?: string | null
+    }
+    /**
+     * RankingCoverage
+     * @description Cobertura da última reconstrução do ranking materializado, para a UI nunca esconder
+     *     truncamento (``B02``).
+     */
+    RankingCoverage: {
+      /** Evaluated Recipes */
+      evaluated_recipes: number
+      /** Priced Recipes */
+      priced_recipes: number
+      /** Total Recipes */
+      total_recipes: number
+      /** Computed At */
+      computed_at?: string | null
+      /** Stale */
+      stale: boolean
     }
     /** RecipeIngredientOut */
     RecipeIngredientOut: {
@@ -2539,6 +2557,7 @@ export interface operations {
     parameters: {
       query: {
         server: components['schemas']['AlbionServer']
+        item_id?: string | null
         location_id?: string[] | null
         tier?: number | null
         enchantment_level?: number | null
@@ -2584,6 +2603,7 @@ export interface operations {
     parameters: {
       query: {
         server: components['schemas']['AlbionServer']
+        item_id?: string | null
         location_id?: string[] | null
         tier?: number | null
         enchantment_level?: number | null
