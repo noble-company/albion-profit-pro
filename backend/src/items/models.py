@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, String
+from sqlalchemy import BigInteger, Boolean, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
@@ -25,6 +25,9 @@ class Item(Base):
     enchantment_level: Mapped[int] = mapped_column(default=0)
     shop_category: Mapped[str | None] = mapped_column(String(64))
     shop_subcategory: Mapped[str | None] = mapped_column(String(64))
+    shop_subcategory2: Mapped[str | None] = mapped_column(String(64))
+    shop_subcategory3: Mapped[str | None] = mapped_column(String(64))
+    busca_normalizada: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))
 
 
 class Location(Base):

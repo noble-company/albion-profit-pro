@@ -1,0 +1,1 @@
+"""Pure crafting calculation primitives."""

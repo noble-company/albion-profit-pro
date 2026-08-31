@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import BigInteger, ForeignKey, Numeric, String
+from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
@@ -50,12 +50,18 @@ class Recipe(Base):
     upgrade_resource_count: Mapped[int | None] = mapped_column(nullable=True)
 
     ingredients: Mapped[list["RecipeIngredient"]] = relationship(
-        back_populates="recipe", cascade="all, delete-orphan"
+        back_populates="recipe",
+        cascade="all, delete-orphan",
+        order_by="RecipeIngredient.position",
     )
 
 
 class RecipeIngredient(Base):
     __tablename__ = "recipe_ingredient"
+    __table_args__ = (
+        CheckConstraint("position >= 0", name="ck_recipe_ingredient_position_nonnegative"),
+        UniqueConstraint("recipe_id", "position", name="uq_recipe_ingredient_position"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     recipe_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("recipe.id"), index=True)
@@ -68,5 +74,6 @@ class RecipeIngredient(Base):
     )  # Index resolvido via items.json
     count: Mapped[int]  # @count
     enchantment_level: Mapped[int] = mapped_column(default=0)  # @enchantmentlevel
+    position: Mapped[int]  # ordem original de craftresource no dump (base zero)
 
     recipe: Mapped["Recipe"] = relationship(back_populates="ingredients")

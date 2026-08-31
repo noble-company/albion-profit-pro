@@ -5,7 +5,7 @@ Uso em produção, após as migrations::
     uv run python -m scripts.seed_static_data
 
 Por padrão os arquivos são baixados diretamente da revisão imutável declarada no manifesto. Para
-ambiente sem egress, monte os dois dumps em volume read-only e use ``--dataset-dir /datasets``.
+ambiente sem egress, monte os três dumps em volume read-only e use ``--dataset-dir /datasets``.
 """
 
 import argparse
@@ -23,9 +23,15 @@ from pydantic import AnyHttpUrl, BaseModel, Field
 from sqlalchemy import func, select, text, update
 
 from scripts.import_items import ItemImportPlan, apply_item_import, prepare_item_import
+from scripts.import_locations import (
+    LocationImportPlan,
+    apply_location_import,
+    prepare_location_import,
+)
 from scripts.import_recipes import RecipeImportPlan, apply_recipe_import, prepare_recipe_import
 from src.database import async_session_maker
 from src.logging_config import configure_logging
+from src.static_data.constants import STATIC_TRANSFORM_REVISION
 from src.static_data.models import StaticDatasetVersion
 
 configure_logging()
@@ -55,6 +61,12 @@ class FileManifest(BaseModel):
 class FilesManifest(BaseModel):
     items: FileManifest
     item_dump: FileManifest
+    world: FileManifest
+
+
+class LocationsManifest(BaseModel):
+    confirmed_market_ids: list[str] = Field(min_length=1)
+    royal_city_ids: list[str] = Field(default_factory=list)
 
 
 class ExpectedCounts(BaseModel):
@@ -64,14 +76,17 @@ class ExpectedCounts(BaseModel):
     recipes: int = Field(ge=0)
     skipped_multiple_recipes: int = Field(ge=0)
     recipes_without_item_id: int = Field(ge=0)
+    curated_locations: int = Field(ge=0)
 
 
 class DatasetManifest(BaseModel):
-    schema_version: int = Field(ge=1, le=1)
+    schema_version: int = Field(ge=2, le=2)
     dataset_name: str = Field(min_length=1, max_length=64)
     version: str = Field(min_length=1, max_length=128)
+    transform_revision: str = Field(min_length=1, max_length=64)
     source: SourceManifest
     files: FilesManifest
+    locations: LocationsManifest
     expected: ExpectedCounts
 
 
@@ -85,6 +100,7 @@ class LoadedManifest:
 class PreparedDataset:
     items: ItemImportPlan
     recipes: RecipeImportPlan
+    locations: LocationImportPlan
 
 
 @dataclass(frozen=True)
@@ -145,9 +161,14 @@ def materialize_dataset(manifest: DatasetManifest, dataset_dir: Path | None):
         paths = {
             "items": dataset_dir / manifest.files.items.filename,
             "item_dump": dataset_dir / manifest.files.item_dump.filename,
+            "world": dataset_dir / manifest.files.world.filename,
         }
-        validate_file(paths["items"], manifest.files.items)
-        validate_file(paths["item_dump"], manifest.files.item_dump)
+        for key, spec in (
+            ("items", manifest.files.items),
+            ("item_dump", manifest.files.item_dump),
+            ("world", manifest.files.world),
+        ):
+            validate_file(paths[key], spec)
         yield paths
         return
 
@@ -156,17 +177,31 @@ def materialize_dataset(manifest: DatasetManifest, dataset_dir: Path | None):
         paths = {
             "items": directory / manifest.files.items.filename,
             "item_dump": directory / manifest.files.item_dump.filename,
+            "world": directory / manifest.files.world.filename,
         }
-        download_file(manifest.files.items, paths["items"])
-        download_file(manifest.files.item_dump, paths["item_dump"])
-        validate_file(paths["items"], manifest.files.items)
-        validate_file(paths["item_dump"], manifest.files.item_dump)
+        for key, spec in (
+            ("items", manifest.files.items),
+            ("item_dump", manifest.files.item_dump),
+            ("world", manifest.files.world),
+        ):
+            download_file(spec, paths[key])
+            validate_file(paths[key], spec)
         yield paths
 
 
 def prepare_dataset(manifest: DatasetManifest, paths: dict[str, Path]) -> PreparedDataset:
+    if manifest.transform_revision != STATIC_TRANSFORM_REVISION:
+        raise DatasetValidationError(
+            "Revisão de transformação incompatível: "
+            f"manifesto={manifest.transform_revision}, código={STATIC_TRANSFORM_REVISION}"
+        )
     item_plan = prepare_item_import(paths["items"], paths["item_dump"])
     recipe_plan = prepare_recipe_import(paths["item_dump"], paths["items"])
+    location_plan = prepare_location_import(
+        paths["world"],
+        manifest.locations.confirmed_market_ids,
+        manifest.locations.royal_city_ids,
+    )
     actual = {
         "source_items": item_plan.source_count,
         "imported_items": len(item_plan.rows),
@@ -174,6 +209,7 @@ def prepare_dataset(manifest: DatasetManifest, paths: dict[str, Path]) -> Prepar
         "recipes": len(recipe_plan.recipes),
         "skipped_multiple_recipes": len(recipe_plan.skipped_multi_recipe),
         "recipes_without_item_id": len(recipe_plan.not_found),
+        "curated_locations": len(location_plan.rows),
     }
     expected = manifest.expected.model_dump()
     if actual != expected:
@@ -183,7 +219,7 @@ def prepare_dataset(manifest: DatasetManifest, paths: dict[str, Path]) -> Prepar
             if expected[key] != actual[key]
         }
         raise DatasetValidationError(f"Contagens inesperadas no dataset: {differences}")
-    return PreparedDataset(item_plan, recipe_plan)
+    return PreparedDataset(item_plan, recipe_plan, location_plan)
 
 
 async def _active_version(dataset_name: str) -> StaticDatasetVersion | None:
@@ -217,6 +253,7 @@ async def apply_dataset(loaded: LoadedManifest, prepared: PreparedDataset) -> Se
         # completa ou a nova completa, nunca as tabelas no meio da substituição.
         await apply_item_import(session, prepared.items, replace=True)
         await apply_recipe_import(session, prepared.recipes)
+        await apply_location_import(session, prepared.locations)
         await session.execute(
             update(StaticDatasetVersion)
             .where(
@@ -290,7 +327,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-dir",
         type=Path,
-        help="Diretório com items.json e ITEM DUMP.json (volume read-only em produção)",
+        help=(
+            "Diretório com items.json, ITEM DUMP.json e world.json (volume read-only em produção)"
+        ),
     )
     return parser.parse_args()
 

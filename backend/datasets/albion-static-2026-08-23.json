@@ -1,7 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "dataset_name": "albion-static",
-  "version": "2026-08-23-5cf2e8e9",
+  "version": "2026-08-26-5cf2e8e9-standard-refining-v1",
+  "transform_revision": "item-search-v1-recipe-order-v1-standard-refining-v1",
   "source": {
     "repository": "https://github.com/ao-data/ao-bin-dumps",
     "revision": "5cf2e8e9b7021f98683181fa5b0e3c64575978e4"
@@ -18,14 +19,25 @@
       "url": "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/5cf2e8e9b7021f98683181fa5b0e3c64575978e4/items.json",
       "size": 17219057,
       "sha256": "fc009a9fb60fb9219c9e44391a842fa6032b5a1d218d1b53e0ffdaa28f29c077"
+    },
+    "world": {
+      "filename": "world.json",
+      "url": "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/5cf2e8e9b7021f98683181fa5b0e3c64575978e4/formatted/world.json",
+      "size": 91492,
+      "sha256": "30f1d41b9a5215a1a706023bfb25e20a0e69705d98e4f58a67b8cc0dae5525b9"
     }
+  },
+  "locations": {
+    "confirmed_market_ids": ["3005", "2004", "4002", "1002", "1301", "3008", "0007", "5003", "3003"],
+    "royal_city_ids": ["3005", "2004", "4002", "1002", "1301", "3008", "0007"]
   },
   "expected": {
     "source_items": 12071,
     "imported_items": 12062,
     "skipped_long_item_names": 9,
-    "recipes": 5553,
-    "skipped_multiple_recipes": 3219,
-    "recipes_without_item_id": 78
+    "recipes": 5633,
+    "skipped_multiple_recipes": 3139,
+    "recipes_without_item_id": 39,
+    "curated_locations": 9
   }
 }

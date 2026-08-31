@@ -13,11 +13,15 @@ from src.api_tokens.router import router as api_tokens_router
 from src.auth.router import router as auth_router
 from src.cache.redis_client import get_redis
 from src.config import get_settings
+from src.craft.router import router as craft_router
 from src.database import async_session_maker
 from src.ingest.router import router as ingest_router
+from src.items.router import router as items_router
 from src.logging_config import configure_logging
+from src.opportunities.router import router as opportunities_router
 from src.prices.router import router as prices_router
 from src.readiness import check_rabbitmq
+from src.recipes.router import router as recipes_router
 from src.static_data.models import StaticDatasetVersion
 
 configure_logging()
@@ -67,7 +71,14 @@ app.include_router(api_tokens_router)
 app.include_router(auth_router)
 app.include_router(client_router)
 app.include_router(ingest_router)
+# Receita específica vem antes das demais rotas sob `/items/{unique_name}`.
+app.include_router(recipes_router)
+# Rotas estáticas de catálogo precisam vir antes de `prices_router`, cujo prefixo contém
+# parâmetros dinâmicos em `/items/{item_id}/...`.
+app.include_router(items_router)
 app.include_router(prices_router)
+app.include_router(craft_router)
+app.include_router(opportunities_router)
 
 
 @app.exception_handler(RequestValidationError)

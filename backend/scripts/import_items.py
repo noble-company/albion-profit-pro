@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from scripts._dumps import iter_category_entries, load_item_dump_items, load_items_json
 from src.database import async_session_maker
 from src.items.models import Item
+from src.items.normalization import normalize_item_search
 from src.logging_config import configure_logging
 
 configure_logging()
@@ -72,6 +73,8 @@ def load_dump_metadata(dump_path: Path) -> dict[str, dict]:
             "tier": int(tier) if tier is not None else None,
             "shop_category": entry.get("@shopcategory"),
             "shop_subcategory": entry.get("@shopsubcategory1"),
+            "shop_subcategory2": entry.get("@shopsubcategory2"),
+            "shop_subcategory3": entry.get("@shopsubcategory3"),
         }
     return metadata
 
@@ -101,6 +104,13 @@ def build_items(
                 "enchantment_level": _enchantment_level(unique_name),
                 "shop_category": meta.get("shop_category"),
                 "shop_subcategory": meta.get("shop_subcategory"),
+                "shop_subcategory2": meta.get("shop_subcategory2"),
+                "shop_subcategory3": meta.get("shop_subcategory3"),
+                "busca_normalizada": normalize_item_search(
+                    unique_name,
+                    localized_names.get("PT-BR"),
+                    localized_names.get("EN-US"),
+                ),
             }
         )
     return rows
@@ -136,6 +146,9 @@ async def apply_item_import(
                     "enchantment_level": stmt.excluded.enchantment_level,
                     "shop_category": stmt.excluded.shop_category,
                     "shop_subcategory": stmt.excluded.shop_subcategory,
+                    "shop_subcategory2": stmt.excluded.shop_subcategory2,
+                    "shop_subcategory3": stmt.excluded.shop_subcategory3,
+                    "busca_normalizada": stmt.excluded.busca_normalizada,
                 },
             )
         await session.execute(stmt)

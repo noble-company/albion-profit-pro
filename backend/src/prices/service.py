@@ -1,11 +1,14 @@
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from sqlalchemy import and_, exists, func, literal, select, tuple_
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from src.cache.redis_client import (
     delete_book_depth,
@@ -18,6 +21,49 @@ from src.items.models import Item
 from src.prices.constants import MarketScanSource
 from src.prices.models import MarketHistoryEntry, MarketOrder, MarketScan
 from src.prices.policy import MarketBookPolicy, get_market_book_policy
+
+LATEST_OBSERVATION_TOLERANCE = timedelta(seconds=5)
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutableBookLevel:
+    item_id: str
+    location_id: str
+    quality_level: int
+    enchantment_level: int
+    auction_type: str
+    unit_price: Decimal
+    amount: int
+    latest_seen_at: datetime
+
+
+def latest_order_observation_filter():
+    """Restrict a MarketOrder query to the newest observation for each book side.
+
+    The client sends a batch of orders in one transaction, so PostgreSQL assigns the same
+    ``last_seen_at`` to all rows in that observation. Grouping by the complete market identity
+    and auction side prevents a newer price from being mixed with an older order that was already
+    sold or replaced. This is a read projection; task 20.4 may add explicit empty-snapshot
+    reconciliation later.
+    """
+    newest = aliased(MarketOrder)
+    latest_seen = (
+        select(func.max(newest.last_seen_at))
+        .where(
+            newest.server_id == MarketOrder.server_id,
+            newest.item_id == MarketOrder.item_id,
+            newest.location_id == MarketOrder.location_id,
+            newest.quality_level == MarketOrder.quality_level,
+            newest.enchantment_level == MarketOrder.enchantment_level,
+            newest.auction_type == MarketOrder.auction_type,
+        )
+        .correlate(MarketOrder)
+        .scalar_subquery()
+    )
+    # A single ingest transaction normally gives every row the exact same PostgreSQL
+    # transaction timestamp. The small tolerance also keeps rows from the same response when
+    # fixtures or alternate producers provide per-row timestamps a few microseconds apart.
+    return MarketOrder.last_seen_at >= latest_seen - LATEST_OBSERVATION_TOLERANCE
 
 
 def _observation_age_seconds(observed_at: datetime | None, now: datetime) -> int | None:
@@ -270,6 +316,7 @@ async def query_book_depth(
         )
         .where(
             MarketOrder.server_id == server_id,
+            latest_order_observation_filter(),
             tuple_(
                 MarketOrder.item_id,
                 MarketOrder.location_id,
@@ -288,6 +335,104 @@ async def query_book_depth(
         stmt = stmt.where(_scan_exists_for_order(server_id, user_id))
     result = await session.execute(stmt)
     return {(r.item_id, r.location_id, r.quality_level, r.enchantment_level): r for r in result}
+
+
+async def query_executable_book_levels(
+    session: AsyncSession,
+    server_id: str,
+    combos: list[tuple[str, str, int, int]],
+    freshness_hours: int,
+) -> list[ExecutableBookLevel]:
+    """Load executable price levels for all requested combinations in one query.
+
+    Expired orders are excluded. Stale active levels are retained with ``amount=0`` so callers
+    can distinguish ``dado_velho`` from a side that has never had a price. Orders at the same
+    price are aggregated, but only fresh quantities contribute to an executable fill.
+    """
+
+    if not combos:
+        return []
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=freshness_hours)
+    fresh_amount = func.sum(MarketOrder.amount).filter(MarketOrder.last_seen_at > cutoff)
+    stmt = (
+        select(
+            MarketOrder.item_id,
+            MarketOrder.location_id,
+            MarketOrder.quality_level,
+            MarketOrder.enchantment_level,
+            MarketOrder.auction_type,
+            MarketOrder.unit_price_silver,
+            fresh_amount.label("fresh_amount"),
+            func.max(MarketOrder.last_seen_at).label("latest_seen_at"),
+        )
+        .where(
+            MarketOrder.server_id == server_id,
+            latest_order_observation_filter(),
+            MarketOrder.expires > now,
+            tuple_(
+                MarketOrder.item_id,
+                MarketOrder.location_id,
+                MarketOrder.quality_level,
+                MarketOrder.enchantment_level,
+            ).in_(combos),
+        )
+        .group_by(
+            MarketOrder.item_id,
+            MarketOrder.location_id,
+            MarketOrder.quality_level,
+            MarketOrder.enchantment_level,
+            MarketOrder.auction_type,
+            MarketOrder.unit_price_silver,
+        )
+    )
+    rows = await session.execute(stmt)
+    return [
+        ExecutableBookLevel(
+            item_id=row.item_id,
+            location_id=row.location_id,
+            quality_level=row.quality_level,
+            enchantment_level=row.enchantment_level,
+            auction_type=row.auction_type,
+            unit_price=row.unit_price_silver,
+            amount=int(row.fresh_amount or 0),
+            latest_seen_at=row.latest_seen_at,
+        )
+        for row in rows
+    ]
+
+
+async def query_book_coverage(
+    session: AsyncSession,
+    server_id: str,
+    combos: list[tuple[str, str, int, int]],
+    user_id: uuid.UUID | None = None,
+) -> set[tuple[str, str, int, int]]:
+    """Resolve book coverage in bulk, preserving the existing ``scope=mine`` semantics."""
+
+    if not combos:
+        return set()
+
+    triples = {(item_id, location_id, quality) for item_id, location_id, quality, _ in combos}
+    stmt = select(
+        MarketScan.item_key,
+        MarketScan.location_id,
+        MarketScan.quality_level,
+    ).where(
+        MarketScan.server_id == server_id,
+        MarketScan.fonte == MarketScanSource.BOOK,
+        tuple_(
+            MarketScan.item_key,
+            MarketScan.location_id,
+            MarketScan.quality_level,
+        ).in_(list(triples)),
+    )
+    if user_id is not None:
+        stmt = stmt.where(MarketScan.user_id == user_id)
+
+    covered_triples = {tuple(row) for row in await session.execute(stmt)}
+    return {combo for combo in combos if (combo[0], combo[1], combo[2]) in covered_triples}
 
 
 async def query_24h_turnover(

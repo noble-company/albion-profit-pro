@@ -48,6 +48,16 @@ class MarketOrder(Base):
             "quality_level",
             "auction_type",
         ),
+        Index(
+            "ix_market_order_latest_observation",
+            "server_id",
+            "item_id",
+            "location_id",
+            "quality_level",
+            "enchantment_level",
+            "auction_type",
+            "last_seen_at",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
