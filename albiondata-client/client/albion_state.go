@@ -49,6 +49,10 @@ type albionState struct {
 	// varias interfaces capturam o mesmo fluxo. O router serializado guarda a resposta em
 	// vez de dormir e bloquear todas as operacoes por ate 30 segundos.
 	pendingMarketHistoryResponses map[uint64]operationAuctionGetItemAverageStatsResponse
+	// Saldo observado para correlacionar transações de mercado com o valor líquido.
+	silverBalance    int64
+	hasSilverBalance bool
+	pendingMarketSale *marketTransactionObservation
 	// TODO could this be improved?!
 }
 

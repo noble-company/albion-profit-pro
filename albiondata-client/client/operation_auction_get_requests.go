@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/ao-data/albiondata-client/lib"
 	"github.com/ao-data/albiondata-client/log"
@@ -19,6 +20,7 @@ func (op operationAuctionGetRequestsResponse) Process(state *albionState) {
 		return
 	}
 
+	capturedAt := time.Now().UTC()
 	var orders []*lib.MarketOrder
 
 	for _, v := range op.MarketOrders {
@@ -37,9 +39,7 @@ func (op operationAuctionGetRequestsResponse) Process(state *albionState) {
 		return
 	}
 
-	upload := lib.MarketUpload{
-		Orders: orders,
-	}
+	upload := marketUploadWithSnapshot(orders, capturedAt)
 
 	identifier, _ := uuid.NewV4()
 	log.Infof("Sending %d live market buy orders to ingest (Identifier: %s)", len(orders), identifier)

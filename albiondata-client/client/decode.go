@@ -51,6 +51,12 @@ func decodeRequest(params map[uint8]interface{}) (operation operation, err error
 		operation = &operationGetGameServerByCluster{}
 	case opAuctionGetOffers:
 		operation = &operationAuctionGetOffers{}
+	case opAuctionSellRequest:
+		operation = &rawMarketTransactionOperation{name: "opAuctionSellRequest"}
+	case opAuctionSellSpecificItemRequest:
+		operation = &rawMarketTransactionOperation{name: "opAuctionSellSpecificItemRequest"}
+	case opQuickSellAuctionSellAction:
+		operation = &rawMarketTransactionOperation{name: "opQuickSellAuctionSellAction"}
 	case opAuctionGetItemAverageStats:
 		operation = &operationAuctionGetItemAverageStats{}
 	case opGetClusterMapInfo:
@@ -67,6 +73,9 @@ func decodeRequest(params map[uint8]interface{}) (operation operation, err error
 	}
 
 	err = decodeParams(params, operation)
+	if raw, ok := operation.(interface{ setRawParams(map[uint8]interface{}) }); ok {
+		raw.setRawParams(params)
+	}
 
 	return operation, err
 }
@@ -92,6 +101,12 @@ func decodeResponse(params map[uint8]interface{}) (operation operation, err erro
 		operation = &operationAuctionGetRequestsResponse{}
 	case opAuctionGetItemAverageStats:
 		operation = &operationAuctionGetItemAverageStatsResponse{}
+	case opAuctionSellRequest:
+		operation = &rawMarketTransactionOperation{name: "opAuctionSellRequest"}
+	case opAuctionSellSpecificItemRequest:
+		operation = &rawMarketTransactionOperation{name: "opAuctionSellSpecificItemRequest"}
+	case opQuickSellAuctionSellAction:
+		operation = &rawMarketTransactionOperation{name: "opQuickSellAuctionSellAction"}
 	case opGetMailInfos:
 		operation = &operationGetMailInfosResponse{}
 	case opReadMail:
@@ -119,6 +134,9 @@ func decodeResponse(params map[uint8]interface{}) (operation operation, err erro
 	}
 
 	err = decodeParams(params, operation)
+	if raw, ok := operation.(interface{ setRawParams(map[uint8]interface{}) }); ok {
+		raw.setRawParams(params)
+	}
 
 	return operation, err
 }
@@ -133,6 +151,8 @@ func decodeEvent(params map[uint8]interface{}) (event operation, err error) {
 	// log.Infof("decodeEvent: %v, params: %v", eventType, params)
 
 	switch EventType(eventType) {
+	case evUpdateMoney:
+		event = &eventUpdateMoney{}
 	// case evRespawn: //TODO: confirm this eventCode (old 77)
 	// 	event = &eventPlayerOnlineStatus{}
 	// case evCharacterStats: //TODO: confirm this eventCode (old 114)
