@@ -60,7 +60,8 @@ contagens. Para trabalhar offline, obtenha os arquivos antecipadamente:
 $dumpRevision = '5cf2e8e9b7021f98683181fa5b0e3c64575978e4'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/formatted/items.json" -OutFile 'items.json'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/items.json" -OutFile 'ITEM DUMP.json'
-Get-FileHash -Algorithm SHA256 'items.json', 'ITEM DUMP.json'
+Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/formatted/world.json" -OutFile 'world.json'
+Get-FileHash -Algorithm SHA256 'items.json', 'ITEM DUMP.json', 'world.json'
 ```
 
 Confira os hashes e a política de atualização em
@@ -156,6 +157,10 @@ O procedimento e as evidências do fechamento estão no
 
 - `origin`: `https://github.com/noble-company/albion-profit-pro.git`;
 - branch canônica: `main`;
+- **critério de baseline versionado:** não basta existir `origin` e um commit. Todo o trabalho
+  precisa estar publicado — `git status --porcelain` não pode listar nenhum arquivo de fonte
+  (`.py`, `.ts`, `.tsx`, `.go`, `.md`) não rastreado. Só caches, artefatos de build e os dumps
+  estáticos ficam de fora, sempre via `.gitignore`. Cheque isso antes de dar uma fase por salva;
 - o client é uma pasta normal deste monorepo, sem `.git` próprio e sem submódulo;
 - upstream do client: <https://github.com/ao-data/albiondata-client>;
 - commits devem ser pequenos e descrever uma mudança coerente, preferencialmente no padrão
