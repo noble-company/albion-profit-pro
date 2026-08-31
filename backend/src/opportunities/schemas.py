@@ -30,6 +30,9 @@ class OpportunityOut(BaseModel):
     roi: Decimal | None = None
     acquisition_mode: Literal["immediate", "buy_order"] | None = None
     sale_mode: Literal["immediate", "sell_order"] | None = None
+    # Flip cota o topo do livro: melhor oferta/procura por cidade, quantidade limitada ao que
+    # esses níveis realmente têm. Não caminha a profundidade como o motor de craft.
+    price_model: Literal["top_of_book"] | None = None
     ingredients: list[OpportunityIngredientOut] = Field(default_factory=list)
     station_cost: Decimal | None = None
     focus_consumed: int | None = None

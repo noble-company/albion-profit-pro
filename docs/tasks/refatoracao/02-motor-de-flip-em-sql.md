@@ -60,3 +60,63 @@ Task 01. Recomendado fazer junto ou logo antes da task 05 (constantes compartilh
 
 Comparar a primeira página de `/opportunities/flips` antes e depois no mesmo dump, conferindo
 que os itens no topo continuam fazendo sentido e que o tempo de resposta caiu.
+
+## Estado da implementação
+
+Concluída em 2026-08-31.
+
+`flip_opportunities` (`src/opportunities/service.py`) virou **uma única consulta** encadeada em
+CTEs — `flip_orders` (janela `max(last_seen_at)` por lado, substituindo a subquery correlacionada)
+→ `fresh_flip_orders` (última observação + `expires > now()` + `max_age_hours`) → `best_offers` /
+`best_requests` (`DISTINCT ON` por cidade) → `flip_candidates` (self-join compra×venda + lucro/ROI
+em SQL) → `filtered_flips`. A página faz `COUNT` + `SELECT` paginado (2 statements fixos); o join
+com `item` para o nome roda só sobre a página (≤ `limit` linhas).
+
+Mudanças de contrato/comportamento:
+
+- **`B03`**: ordens expiradas somem do flip nas duas pontas (igual ao motor de craft).
+- **`B06`**: `OpportunityOut.price_model = "top_of_book"` declara que o flip cota o melhor nível
+  de cada lado, com quantidade limitada ao que esses níveis realmente têm — não caminha a
+  profundidade. Caminhar profundidade como o craft fica como possível `W` futuro.
+- **`B07`/`B08` (parcial, resto na task 05)**: removidos `PREMIUM_SALES_TAX`,
+  `NON_PREMIUM_SALES_TAX`, `SETUP_FEE` e `_charge` locais; as rates vêm de `craft/constants.py` e
+  o arredondamento `ceil()` no SQL reproduz `calculate_percentage_charge`. `6 * 3600` trocado por
+  `get_market_book_policy().freshness_seconds`.
+- Desempate de preço no melhor nível: `ORDER BY unit_price, amount DESC, last_seen_at DESC`
+  (antes era a ordem indefinida do `min()` do Python).
+- `roi` arredondado a 4 casas no SQL (antes: divisão `Decimal` com ~28 dígitos no payload).
+- `gross_revenue` **continua** carregando o valor líquido no flip (o rename é `B04`, task 04).
+
+### Medição antes/depois
+
+| | Antes (`B01`, auditoria) | Depois (medido) |
+|---|---|---|
+| Trabalho | carrega todas as ordens do realm para a memória da API, cruza `grouped.items()` dentro de `grouped.items()` (~25 M de iterações para ~5.000 combinações), ordena e pagina em Python | tudo no Postgres |
+| Queries por request | 1 `SELECT` gigante + processamento Python O(n²) | **2**, constante — teste `test_flip_query_count_is_constant_regardless_of_dataset_size` compara dataset pequeno vs. 2.500 combinações |
+| `EXPLAIN (ANALYZE, BUFFERS)` da página, 3.000 itens / 9.000 ordens / 6.000 candidatos | — | `Execution Time: ~25 ms`, `Buffers: shared hit=337`, `Index Scan using ix_market_order_item_id` → `WindowAgg` → `Merge Join` → `top-N heapsort` → `Index Scan using item_pkey (loops=50)` |
+
+Plano resumido:
+
+```text
+Nested Loop (rows=50)
+  CTE fresh_flip_orders
+    -> WindowAgg -> Incremental Sort -> Index Scan using ix_market_order_item_id on market_order
+  -> Limit -> Sort (top-N heapsort) -> Merge Join
+       -> Unique (DISTINCT ON best_offers) -> Sort -> CTE Scan fresh_flip_orders
+       -> Materialize -> Unique (DISTINCT ON best_requests) -> Sort -> CTE Scan fresh_flip_orders
+  -> Index Scan using item_pkey on item (loops=50)
+Planning Time: ~0.4 ms / Execution Time: ~25 ms
+```
+
+O índice `ix_market_order_latest_observation` existe e cobre a chave da janela; nos dados
+sintéticos o planner preferiu `ix_market_order_item_id` + sort incremental por o volume caber em
+memória, mas a chave está disponível para o otimizador em produção.
+
+### Testes
+
+- `uv run pytest tests/ -q` → **294 passed** (inclui 4 testes novos de flip: expira nos dois
+  lados, `total` estável até a última página, quantidade ≤ profundidade do comprador sem cruzar
+  item/encantamento, contagem de queries constante).
+- `uv run ruff check .` → limpo.
+- Frontend `npm run lint && npm run typecheck && npm run test` → 0 erros, 24 testes verdes;
+  `src/api/schema.d.ts` regenerado com `price_model`.

@@ -106,7 +106,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 ## Status
 
 - [x] 01 — Baseline Git da Fase 3
-- [ ] 02 — Motor de flip em SQL
+- [x] 02 — Motor de flip em SQL
 - [ ] 03 — Ranking de produção materializado
 - [ ] 04 — Contrato único de resultado
 - [ ] 05 — Núcleo de cálculo único

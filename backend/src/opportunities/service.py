@@ -1,9 +1,14 @@
 from datetime import datetime, timedelta, timezone
-from decimal import ROUND_CEILING, Decimal
+from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Interval, and_, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.craft.constants import (
+    DEFAULT_NON_PREMIUM_SALES_TAX_RATE,
+    DEFAULT_PREMIUM_SALES_TAX_RATE,
+    DEFAULT_SETUP_FEE_RATE,
+)
 from src.craft.schemas import CraftSimulationRequest
 from src.craft.service import simulate_craft
 from src.items.models import Item, Location
@@ -11,16 +16,9 @@ from src.items.normalization import normalize_item_search
 from src.opportunities.schemas import OpportunityOut
 from src.prices.constants import AlbionServer
 from src.prices.models import MarketOrder
-from src.prices.service import latest_order_observation_filter
+from src.prices.policy import get_market_book_policy
+from src.prices.service import LATEST_OBSERVATION_TOLERANCE, latest_order_observation_filter
 from src.recipes.models import Recipe, RecipeIngredient
-
-PREMIUM_SALES_TAX = Decimal("0.04")
-NON_PREMIUM_SALES_TAX = Decimal("0.08")
-SETUP_FEE = Decimal("0.025")
-
-
-def _charge(amount: Decimal, rate: Decimal) -> Decimal:
-    return (amount * rate).quantize(Decimal("1"), rounding=ROUND_CEILING)
 
 
 def _is_refining_item(item: Item) -> bool:
@@ -41,6 +39,29 @@ def _refining_item_filter():
             for token in ("resource", "refin", "material")
         )
     )
+
+
+def _flip_item_filters(item_id, category, subcategory, subcategory2, subcategory3, tier):
+    """Item-scoped predicates shared by the flip query. Empty when no item filter is active."""
+    predicates = []
+    if item_id:
+        predicates.append(
+            or_(
+                MarketOrder.item_id == item_id,
+                Item.busca_normalizada.contains(normalize_item_search(item_id), autoescape=True),
+            )
+        )
+    if category:
+        predicates.append(Item.shop_category == category)
+    if subcategory:
+        predicates.append(Item.shop_subcategory == subcategory)
+    if subcategory2:
+        predicates.append(Item.shop_subcategory2 == subcategory2)
+    if subcategory3:
+        predicates.append(Item.shop_subcategory3 == subcategory3)
+    if tier is not None:
+        predicates.append(Item.tier == tier)
+    return predicates
 
 
 async def flip_opportunities(
@@ -66,112 +87,198 @@ async def flip_opportunities(
     buy_order: bool = False,
     sell_order: bool = False,
 ) -> tuple[list[OpportunityOut], int]:
-    statement = (
-        select(MarketOrder, Item)
-        .join(Item, Item.unique_name == MarketOrder.item_id)
-        .where(
-            MarketOrder.server_id == server,
-            latest_order_observation_filter(),
-            MarketOrder.auction_type.in_(["offer", "request"]),
-        )
+    """Rank cross-city arbitrage entirely in PostgreSQL.
+
+    The book is projected to the best executable offer and the best executable request per city
+    (top of book, ``price_model="top_of_book"``), the buy/sell cross join runs as a SQL self-join,
+    and ordering/pagination/counting happen in the database. Expired orders are excluded, matching
+    the craft engine. A constant two statements run per request regardless of dataset size.
+    """
+    policy = get_market_book_policy()
+    sales_tax_rate = (
+        DEFAULT_PREMIUM_SALES_TAX_RATE if premium else DEFAULT_NON_PREMIUM_SALES_TAX_RATE
     )
-    if locations:
-        statement = statement.where(MarketOrder.location_id.in_(locations))
-    if item_id:
-        normalized_item = normalize_item_search(item_id)
-        statement = statement.where(
-            or_(
-                MarketOrder.item_id == item_id,
-                Item.busca_normalizada.contains(normalized_item, autoescape=True),
+    setup_fee_rate = DEFAULT_SETUP_FEE_RATE
+    tolerance = literal(LATEST_OBSERVATION_TOLERANCE, Interval())
+    item_filters = _flip_item_filters(
+        item_id, category, subcategory, subcategory2, subcategory3, tier
+    )
+
+    # 1. Every book row plus the newest observation timestamp for its (item, city, quality,
+    #    enchantment, side) partition. The window replaces the per-row correlated subquery.
+    base = select(
+        MarketOrder.item_id.label("item_id"),
+        MarketOrder.location_id.label("location_id"),
+        MarketOrder.quality_level.label("quality_level"),
+        MarketOrder.enchantment_level.label("enchantment_level"),
+        MarketOrder.auction_type.label("auction_type"),
+        MarketOrder.unit_price_silver.label("unit_price"),
+        MarketOrder.amount.label("amount"),
+        MarketOrder.last_seen_at.label("last_seen_at"),
+        MarketOrder.expires.label("expires"),
+        func.max(MarketOrder.last_seen_at)
+        .over(
+            partition_by=(
+                MarketOrder.item_id,
+                MarketOrder.location_id,
+                MarketOrder.quality_level,
+                MarketOrder.enchantment_level,
+                MarketOrder.auction_type,
             )
         )
-    if category:
-        statement = statement.where(Item.shop_category == category)
-    if subcategory:
-        statement = statement.where(Item.shop_subcategory == subcategory)
-    if subcategory2:
-        statement = statement.where(Item.shop_subcategory2 == subcategory2)
-    if subcategory3:
-        statement = statement.where(Item.shop_subcategory3 == subcategory3)
-    if tier is not None:
-        statement = statement.where(Item.tier == tier)
+        .label("latest_seen"),
+    ).where(
+        MarketOrder.server_id == server,
+        MarketOrder.auction_type.in_(["offer", "request"]),
+    )
+    if item_filters:
+        base = base.join(Item, Item.unique_name == MarketOrder.item_id).where(*item_filters)
+    if locations:
+        base = base.where(MarketOrder.location_id.in_(locations))
     if enchantment is not None:
-        statement = statement.where(MarketOrder.enchantment_level == enchantment)
+        base = base.where(MarketOrder.enchantment_level == enchantment)
     if quality is not None:
-        statement = statement.where(MarketOrder.quality_level == quality)
+        base = base.where(MarketOrder.quality_level == quality)
+    base_cte = base.cte("flip_orders")
+
+    # 2. Keep only the newest observation per side, and only orders still live in game.
+    fresh = select(base_cte).where(
+        base_cte.c.last_seen_at >= base_cte.c.latest_seen - tolerance,
+        base_cte.c.expires > func.now(),
+    )
     if max_age_hours is not None:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
-        statement = statement.where(MarketOrder.last_seen_at >= cutoff)
-    rows = (await session.execute(statement)).all()
-    grouped: dict[tuple[str, int, int, str], dict[str, list[tuple[MarketOrder, Item]]]] = {}
-    for order, item in rows:
-        key = (order.item_id, order.quality_level, order.enchantment_level, order.location_id)
-        grouped.setdefault(key, {"offer": [], "request": []})[order.auction_type].append(
-            (order, item)
+        fresh = fresh.where(base_cte.c.last_seen_at >= cutoff)
+    fresh_cte = fresh.cte("fresh_flip_orders")
+
+    def _best_side(auction_type: str, price_order):
+        return (
+            select(
+                fresh_cte.c.item_id,
+                fresh_cte.c.location_id,
+                fresh_cte.c.quality_level,
+                fresh_cte.c.enchantment_level,
+                fresh_cte.c.unit_price.label("price"),
+                fresh_cte.c.amount.label("amount"),
+                fresh_cte.c.last_seen_at.label("seen"),
+            )
+            .where(fresh_cte.c.auction_type == auction_type)
+            .distinct(
+                fresh_cte.c.item_id,
+                fresh_cte.c.location_id,
+                fresh_cte.c.quality_level,
+                fresh_cte.c.enchantment_level,
+            )
+            .order_by(
+                fresh_cte.c.item_id,
+                fresh_cte.c.location_id,
+                fresh_cte.c.quality_level,
+                fresh_cte.c.enchantment_level,
+                price_order,
+                fresh_cte.c.amount.desc(),
+                fresh_cte.c.last_seen_at.desc(),
+            )
         )
-    results: list[OpportunityOut] = []
-    for (item_id, quality, ench, location), sides in grouped.items():
-        offers = sides["offer"]
-        if not offers:
-            continue
-        buy = min(offers, key=lambda pair: pair[0].unit_price_silver)
-        for (other_item, other_quality, other_ench, sell_location), sell_sides in grouped.items():
-            if (
-                other_item != item_id
-                or other_quality != quality
-                or other_ench != ench
-                or sell_location == location
-                or not sell_sides["request"]
-            ):
-                continue
-            sale = max(sell_sides["request"], key=lambda pair: pair[0].unit_price_silver)
-            qty = min(buy[0].amount, sale[0].amount)
-            cost = buy[0].unit_price_silver * qty
-            buy_setup = _charge(cost, SETUP_FEE) if buy_order else Decimal("0")
-            gross_revenue = sale[0].unit_price_silver * qty
-            sales_tax = _charge(
-                gross_revenue, PREMIUM_SALES_TAX if premium else NON_PREMIUM_SALES_TAX
+
+    offers = _best_side("offer", fresh_cte.c.unit_price.asc()).cte("best_offers")
+    requests = _best_side("request", fresh_cte.c.unit_price.desc()).cte("best_requests")
+
+    # 3. Cross city buy vs sell as a self-join, then the money math from craft's rates.
+    qty = func.least(offers.c.amount, requests.c.amount)
+    cost = offers.c.price * qty
+    gross = requests.c.price * qty
+    buy_setup = func.ceil(cost * setup_fee_rate) if buy_order else literal(Decimal("0"))
+    sell_setup = func.ceil(gross * setup_fee_rate) if sell_order else literal(Decimal("0"))
+    sales_tax = func.ceil(gross * sales_tax_rate)
+    net_revenue = gross - sales_tax - sell_setup
+    total_cost = cost + buy_setup
+    profit = net_revenue - total_cost
+    roi = func.round(profit / func.nullif(total_cost, 0) * 100, 4)
+    oldest_seen = func.least(offers.c.seen, requests.c.seen)
+    age_seconds = func.extract("epoch", func.now() - oldest_seen)
+
+    computed = (
+        select(
+            offers.c.item_id.label("item_id"),
+            offers.c.quality_level.label("quality_level"),
+            offers.c.location_id.label("buy_location"),
+            requests.c.location_id.label("sell_location"),
+            offers.c.price.label("buy_price"),
+            requests.c.price.label("sell_price"),
+            qty.label("quantity"),
+            total_cost.label("total_cost"),
+            net_revenue.label("net_revenue"),
+            profit.label("profit"),
+            roi.label("roi"),
+            oldest_seen.label("oldest_seen"),
+            (age_seconds > policy.freshness_seconds).label("is_stale"),
+        )
+        .select_from(
+            offers.join(
+                requests,
+                and_(
+                    offers.c.item_id == requests.c.item_id,
+                    offers.c.quality_level == requests.c.quality_level,
+                    offers.c.enchantment_level == requests.c.enchantment_level,
+                    offers.c.location_id != requests.c.location_id,
+                ),
             )
-            sell_setup = _charge(gross_revenue, SETUP_FEE) if sell_order else Decimal("0")
-            revenue = gross_revenue - sales_tax - sell_setup
-            total_cost = cost + buy_setup
-            profit = revenue - total_cost
-            roi = (profit / total_cost * 100) if total_cost else None
-            if min_profit is not None and (profit is None or profit < min_profit):
-                continue
-            if min_roi is not None and (roi is None or roi < min_roi):
-                continue
-            warnings = []
-            oldest = min(buy[0].last_seen_at, sale[0].last_seen_at)
-            if oldest.tzinfo is None:
-                oldest = oldest.replace(tzinfo=timezone.utc)
-            age = (datetime.now(timezone.utc) - oldest).total_seconds()
-            if age > 6 * 3600:
-                warnings.append("dado_velho")
-            if require_complete and warnings:
-                continue
-            results.append(
-                OpportunityOut(
-                    kind="flip",
-                    item=item_id,
-                    item_name=buy[1].name_pt or buy[1].name_en,
-                    quality_level=quality,
-                    buy_location=location,
-                    sell_location=sell_location,
-                    buy_price=buy[0].unit_price_silver,
-                    sell_price=sale[0].unit_price_silver,
-                    quantity=qty,
-                    total_cost=total_cost,
-                    gross_revenue=revenue,
-                    profit=profit,
-                    roi=roi,
-                    oldest_observed_at=oldest.isoformat(),
-                    warnings=warnings,
-                )
-            )
-    results.sort(key=lambda row: row.profit or Decimal("-1"), reverse=True)
-    total = len(results)
-    return results[offset : offset + limit], total
+        )
+        .cte("flip_candidates")
+    )
+
+    # 4. Filter, count and paginate in the database. The item name join stays out of the
+    #    candidate set and runs only over the page (<= limit rows).
+    filtered = select(computed)
+    conditions = []
+    if min_profit is not None:
+        conditions.append(computed.c.profit >= min_profit)
+    if min_roi is not None:
+        conditions.append(computed.c.roi >= min_roi)
+    if require_complete:
+        conditions.append(computed.c.is_stale.is_(False))
+    if conditions:
+        filtered = filtered.where(*conditions)
+    filtered_cte = filtered.cte("filtered_flips")
+
+    total = int(await session.scalar(select(func.count()).select_from(filtered_cte)) or 0)
+
+    page_ids = (
+        select(filtered_cte)
+        .order_by(filtered_cte.c.profit.desc().nulls_last())
+        .limit(limit)
+        .offset(offset)
+        .subquery("flip_page")
+    )
+    page = (
+        select(page_ids, Item.name_pt.label("name_pt"), Item.name_en.label("name_en"))
+        .join(Item, Item.unique_name == page_ids.c.item_id)
+        .order_by(page_ids.c.profit.desc().nulls_last())
+    )
+    rows = (await session.execute(page)).all()
+
+    results = [
+        OpportunityOut(
+            kind="flip",
+            item=row.item_id,
+            item_name=row.name_pt or row.name_en,
+            quality_level=row.quality_level,
+            buy_location=row.buy_location,
+            sell_location=row.sell_location,
+            buy_price=row.buy_price,
+            sell_price=row.sell_price,
+            quantity=int(row.quantity),
+            total_cost=row.total_cost,
+            gross_revenue=row.net_revenue,
+            profit=row.profit,
+            roi=row.roi,
+            oldest_observed_at=row.oldest_seen.isoformat() if row.oldest_seen else None,
+            warnings=["dado_velho"] if row.is_stale else [],
+            price_model="top_of_book",
+        )
+        for row in rows
+    ]
+    return results, total
 
 
 async def recipe_opportunities(

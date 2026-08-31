@@ -1279,6 +1279,8 @@ export interface components {
       acquisition_mode?: ('immediate' | 'buy_order') | null
       /** Sale Mode */
       sale_mode?: ('immediate' | 'sell_order') | null
+      /** Price Model */
+      price_model?: 'top_of_book' | null
       /** Ingredients */
       ingredients?: components['schemas']['OpportunityIngredientOut'][]
       /** Station Cost */
