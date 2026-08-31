@@ -109,7 +109,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 02 — Motor de flip em SQL
 - [ ] 03 — Ranking de produção materializado
 - [ ] 04 — Contrato único de resultado
-- [ ] 05 — Núcleo de cálculo único
+- [x] 05 — Núcleo de cálculo único
 - [ ] 06 — Rate limit e hardening de leitura
 - [ ] 07 — Idioma único da API
 - [ ] 08 — Decisão do pub/sub de preço

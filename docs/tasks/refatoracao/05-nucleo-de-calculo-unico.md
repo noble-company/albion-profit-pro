@@ -50,3 +50,49 @@ Task 01. Recomendado fazer antes ou junto da task 02.
 ## Testes manuais
 
 Nenhum específico. A validação é a suíte de backend inteira permanecer verde.
+
+## Estado da implementação
+
+Concluída em 2026-08-31. Sem mudança de contrato de API nem de schema.
+
+**Já feito na task 02** (flip em SQL):
+
+- `opportunities/service.py` deixou de ter `PREMIUM_SALES_TAX` / `NON_PREMIUM_SALES_TAX` /
+  `SETUP_FEE` / `_charge` próprios; passou a `6*3600` → `get_market_book_policy().freshness_seconds`.
+
+**Feito nesta task:**
+
+1. **`src/craft/quotes.py`** (novo) — fronteira pública de cotação. Movidos de `craft/service.py`,
+   agora sem `_`: `QuoteResult`, `quote` (+ `zero_quote`, `manual_quote`, `empty_quote`,
+   `immediate_book_quote`, `order_quote`), `manual_side`, `ordered_warnings`,
+   `sorted_fresh_levels`, `has_stale_side`, `quote_age_seconds`, `WARNING_ORDER`.
+   `manual_side` passou a receber o dict `manual_prices` em vez do request inteiro — serve
+   `CraftSimulationRequest` e `CraftCompareRequest` sem importar os dois schemas.
+2. `craft/service.py` e `craft/compare_service.py` importam de `craft/quotes.py`.
+   `compare_service.py` ainda importa `InvalidOverrideError` de `craft/service.py` — símbolo
+   **público**, dependência visível, sem ciclo.
+3. As três consumidoras de taxa (`craft/service.py`, `craft/compare_service.py`,
+   `opportunities/service.py`) leem `constants.DEFAULT_*` por **atributo de módulo**
+   (`from src.craft import constants`), então trocar a constante propaga sem rebind.
+4. **Zero import de símbolo `_privado` cruzando módulo** — verificado por
+   `tests/test_module_boundaries.py` (varre a AST de `src/`).
+5. Ponto 5 do spec: o flip **não** reusa as primitivas de cotação — virou SQL na task 02
+   (`price_model="top_of_book"`). O caminho de refino/craft já delega a `simulate_craft`, que
+   usa `craft/quotes.py`. Decisão registrada aqui em vez de forçar a convergência.
+
+**`craft/quotes.py` → `prices/service.py`** (por `ExecutableBookLevel`) não fecha ciclo:
+`prices/service.py` não importa `craft`.
+
+### Testes
+
+- `tests/craft/test_quotes.py` (novo, 10) — primitivas na nova fronteira: walk imediato,
+  profundidade insuficiente, sugestão de ordem, manual, sem cobertura/preço, lado velho,
+  ordenação de avisos, `manual_side`.
+- `tests/craft/test_rate_source_of_truth.py` (novo, 2) — trocar
+  `DEFAULT_PREMIUM_SALES_TAX_RATE` move lucro de flip + refino + `/craft/simulate` juntos;
+  trocar a janela de frescor move `dado_velho` no flip.
+- `tests/test_module_boundaries.py` (novo, 1) — sem `_privado` cruzando módulo.
+- `tests/conftest.py` — limpeza de teste passou a apagar `opportunities:v2:*` e `livro:*` do
+  Redis entre testes (buraco de isolamento que os testes novos de flip expuseram).
+- `uv run pytest tests/ -q` → **307 passed**. `uv run ruff check .` → limpo.
+- `tests/craft/` (suíte pré-existente) segue verde após a extração.
