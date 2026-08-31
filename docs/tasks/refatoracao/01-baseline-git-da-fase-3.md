@@ -39,6 +39,21 @@ O critério estava errado: ele não detecta trabalho novo ficando de fora.
 6. Redefinir o critério de pronto do baseline: além de existir remote, `git status --porcelain`
    não pode listar arquivo de fonte não rastreado. Documentar isso no `README.md` da raiz.
 
+## Estado da implementação
+
+Concluída em 2026-08-31.
+
+- `.gitignore`: além dos caches previstos (`.uv-cache*/`, `.cache/`, `backend/.uv-cache/`,
+  `albiondata-client/.gocache/`), foram adicionados `backend/runtime-logs/` (tinha `.err` não
+  coberto por `*.log`), `*.exe~` e `/world.json` — a spec assumia que os três já estavam de fora.
+- O `origin` **já existia** (`github.com/noble-company/albion-profit-pro.git`) com `origin/main`
+  publicado; o passo "configurar remote" virou apenas `git push`.
+- Sete commits em lotes coerentes: `.gitignore` → backend src+migrations → backend testes →
+  client Go → frontend → docs → critério de baseline no `README.md`.
+- Achado vizinho registrado como `W2` no README da fase: `.dockerignore` não exclui os dumps.
+- Os 39 tracked modificados da Fase 3 (integração em `main.py`, docs, client) entraram nos
+  mesmos lotes; sem eles a árvore não ficava limpa.
+
 ## Depende de
 
 Nada. **Bloqueia todas as demais tasks desta fase.**

@@ -105,7 +105,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 
 ## Status
 
-- [ ] 01 — Baseline Git da Fase 3
+- [x] 01 — Baseline Git da Fase 3
 - [ ] 02 — Motor de flip em SQL
 - [ ] 03 — Ranking de produção materializado
 - [ ] 04 — Contrato único de resultado
@@ -152,3 +152,4 @@ o estado real e receber confirmação explícita antes de alterar código.
 | # | Achado | Corrigido em |
 |---|---|---|
 | `W1` | A task 2.5/01 (`R03`) deu o baseline Git por resolvido, mas a Fase 3 inteira voltou a ficar untracked. O critério de pronto era "existe commit e remote", não "a árvore está limpa". | Task 01 redefine o critério e adiciona verificação recorrente |
+| `W2` | `backend/.dockerignore` não exclui `world.json` / `items.json` / `ITEM DUMP.json`. O `Dockerfile` faz `COPY . .`, então um build feito na máquina de dev embute ~60 MB de dado estático não-licenciado na imagem, que pode ir para um registry. Fora do escopo da task 01 (versionamento), registrado ao ignorá-los no Git. | Task própria: 1 linha por arquivo no `.dockerignore` |
