@@ -129,6 +129,35 @@ retorno utilizável é arredondado para baixo. Receita, lucro e ROI permanecem e
 só são arredondados para baixo, com uma casa decimal, na apresentação. Portanto, um filtro como
 “ROI mínimo de 10%” compara o valor interno conservador com `0.10`, nunca o texto já formatado.
 
+## Contrato de resultado nas oportunidades (`B04`)
+
+`/opportunities/flips`, `/opportunities/refining` e `/opportunities/crafting` devolvem o resultado
+financeiro com **os mesmos campos e o mesmo significado** de `craft/schemas.py`
+(`RevenueBreakdownOut` / `CostBreakdownOut`). `gross_revenue` é **sempre** o faturamento bruto —
+nunca o líquido. Identidades garantidas por teste nos três endpoints:
+
+```text
+gross_revenue - sales_tax - sale_setup_fee = net_revenue
+total_fees = sales_tax + sale_setup_fee + acquisition_setup_fee
+net_revenue - total_cost = profit
+roi = round(profit / total_cost * 100, 4)   (null quando total_cost = 0)
+```
+
+- `sales_tax` = `ceil(gross_revenue * aliquota)` — 4% com Premium, 8% sem (`craft/constants.py`).
+- `sale_setup_fee` = `ceil(gross_revenue * 0,025)` quando a venda é por ordem (`sell_order`), senão 0.
+- `acquisition_setup_fee` = `ceil(custo_de_aquisicao * 0,025)` quando a compra é por ordem
+  (`buy_order`), senão 0. Já está incluído em `total_cost`.
+- `total_fees` existe para a UI **não** deduzir as taxas por engenharia reversa (era o `F09`).
+- Todo campo monetário viaja como string decimal, nunca número JSON.
+
+`require_complete` tem **uma** semântica nos três: descarta a linha se ela tiver qualquer aviso
+(`warnings` não vazio) ou não estiver precificada. No flip, cujo único aviso possível é
+`dado_velho`, isso equivale a "somente dados frescos".
+
+O ranking de refino/craft (`neutral_ranking`) devolve esses campos como **projeção** dos
+componentes neutros armazenados; `return_rate` entra como aproximação linear. O recálculo exato,
+com profundidade de livro real, é `POST /craft/simulate`.
+
 ## Encantamento e upgrade
 
 Para um output `.N`, a rota de upgrade é uma cadeia ordenada:

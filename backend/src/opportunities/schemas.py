@@ -24,8 +24,17 @@ class OpportunityOut(BaseModel):
     buy_price: Decimal | None = None
     sell_price: Decimal | None = None
     quantity: int = 0
-    total_cost: Decimal | None = None
+    # Resultado financeiro completo, mesma nomenclatura de craft/schemas.py em toda a API (B04):
+    # gross_revenue é SEMPRE o faturamento bruto; gross_revenue - sales_tax - sale_setup_fee =
+    # net_revenue; net_revenue - total_cost = profit. total_fees soma as três taxas para a UI não
+    # precisar deduzi-las.
     gross_revenue: Decimal | None = None
+    sales_tax: Decimal | None = None
+    sale_setup_fee: Decimal | None = None
+    net_revenue: Decimal | None = None
+    acquisition_setup_fee: Decimal | None = None
+    total_fees: Decimal | None = None
+    total_cost: Decimal | None = None
     profit: Decimal | None = None
     roi: Decimal | None = None
     acquisition_mode: Literal["immediate", "buy_order"] | None = None

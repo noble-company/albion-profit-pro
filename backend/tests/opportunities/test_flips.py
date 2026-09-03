@@ -77,8 +77,15 @@ async def test_flips_ranks_by_profit_and_applies_quantity_and_fees(client, db_se
     assert opportunity["quantity"] == 3
     assert opportunity["quality_level"] == 1
     assert Decimal(opportunity["total_cost"]) == Decimal("300")
-    assert Decimal(opportunity["gross_revenue"]) == Decimal("576")
+    assert Decimal(opportunity["gross_revenue"]) == Decimal("600")  # actual gross (B04)
+    assert Decimal(opportunity["sales_tax"]) == Decimal("24")  # ceil(600 * 0.04)
+    assert Decimal(opportunity["sale_setup_fee"]) == Decimal("0")
+    assert Decimal(opportunity["net_revenue"]) == Decimal("576")
+    assert Decimal(opportunity["total_fees"]) == Decimal("24")
     assert Decimal(opportunity["profit"]) == Decimal("276")
+    assert Decimal(opportunity["gross_revenue"]) - Decimal(opportunity["sales_tax"]) - Decimal(
+        opportunity["sale_setup_fee"]
+    ) == Decimal(opportunity["net_revenue"])
 
 
 async def test_flip_rates_follow_premium_and_order_flags(client, db_session):
@@ -106,8 +113,15 @@ async def test_flip_rates_follow_premium_and_order_flags(client, db_session):
 
     assert response.status_code == 200, response.text
     opportunity = response.json()["opportunities"][0]
+    assert Decimal(opportunity["gross_revenue"]) == Decimal("2000")
+    assert Decimal(opportunity["sales_tax"]) == Decimal("160")  # ceil(2000 * 0.08), no premium
+    assert Decimal(opportunity["sale_setup_fee"]) == Decimal("50")  # sell_order: ceil(2000*0.025)
+    assert Decimal(opportunity["acquisition_setup_fee"]) == Decimal(
+        "25"
+    )  # buy_order: ceil(1000*0.025)
+    assert Decimal(opportunity["net_revenue"]) == Decimal("1790")
+    assert Decimal(opportunity["total_fees"]) == Decimal("235")
     assert Decimal(opportunity["total_cost"]) == Decimal("1025")
-    assert Decimal(opportunity["gross_revenue"]) == Decimal("1790")
     assert Decimal(opportunity["profit"]) == Decimal("765")
 
 

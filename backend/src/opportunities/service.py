@@ -168,6 +168,7 @@ async def flip_opportunities(
     sales_tax = func.ceil(gross * sales_tax_rate)
     net_revenue = gross - sales_tax - sell_setup
     total_cost = cost + buy_setup
+    total_fees = sales_tax + sell_setup + buy_setup
     profit = net_revenue - total_cost
     roi = func.round(profit / func.nullif(total_cost, 0) * 100, 4)
     oldest_seen = func.least(offers.c.seen, requests.c.seen)
@@ -182,6 +183,11 @@ async def flip_opportunities(
             offers.c.price.label("buy_price"),
             requests.c.price.label("sell_price"),
             qty.label("quantity"),
+            gross.label("gross_revenue"),
+            sales_tax.label("sales_tax"),
+            sell_setup.label("sale_setup_fee"),
+            buy_setup.label("acquisition_setup_fee"),
+            total_fees.label("total_fees"),
             total_cost.label("total_cost"),
             net_revenue.label("net_revenue"),
             profit.label("profit"),
@@ -244,12 +250,17 @@ async def flip_opportunities(
             buy_price=row.buy_price,
             sell_price=row.sell_price,
             quantity=int(row.quantity),
+            gross_revenue=row.gross_revenue,
+            sales_tax=row.sales_tax,
+            sale_setup_fee=row.sale_setup_fee,
+            net_revenue=row.net_revenue,
+            acquisition_setup_fee=row.acquisition_setup_fee,
+            total_fees=row.total_fees,
             total_cost=row.total_cost,
-            gross_revenue=row.net_revenue,
             profit=row.profit,
             roi=row.roi,
             oldest_observed_at=row.oldest_seen.isoformat() if row.oldest_seen else None,
-            warnings=["dado_velho"] if row.is_stale else [],
+            warnings=[constants.CraftWarning.STALE_DATA.value] if row.is_stale else [],
             price_model="top_of_book",
         )
         for row in rows

@@ -108,7 +108,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 01 — Baseline Git da Fase 3
 - [x] 02 — Motor de flip em SQL
 - [x] 03 — Ranking de produção materializado
-- [ ] 04 — Contrato único de resultado
+- [x] 04 — Contrato único de resultado
 - [x] 05 — Núcleo de cálculo único
 - [ ] 06 — Rate limit e hardening de leitura
 - [ ] 07 — Idioma único da API

@@ -56,3 +56,48 @@ Tasks 01, 02 e 03 (os dois motores precisam existir na forma nova antes de fixar
 
 Conferir na UI que a soma exibida (custo + taxas + lucro) fecha com o faturamento mostrado, sem
 nenhuma conta feita no navegador.
+
+## Estado da implementação
+
+Concluída em 2026-08-31.
+
+### `B04` — `gross_revenue`
+
+`OpportunityOut` ganhou `sales_tax`, `sale_setup_fee`, `net_revenue`, `acquisition_setup_fee`,
+`total_fees`. **`gross_revenue` passa a ser o faturamento bruto** em todos os endpoints (antes
+carregava o líquido no flip e no ranking). Nomenclatura idêntica à de
+`craft/schemas.py` (`RevenueBreakdownOut`/`CostBreakdownOut`).
+
+- `flip_opportunities`: o SQL já calculava `gross`, `sales_tax`, `sell_setup`, `buy_setup`,
+  `net_revenue` — agora todos sobem no `OpportunityOut`. `total_fees = sales_tax + sell_setup +
+  buy_setup`.
+- `ranking_service._project_row`: expõe os mesmos componentes da projeção.
+- Contrato documentado em `docs/11-formulas-de-craft.md` (seção "Contrato de resultado nas
+  oportunidades").
+
+### `B05` — `require_complete`
+
+Já estava alinhado após as tasks 02/03: flip filtra `is_stale=false` (seu único aviso é
+`dado_velho`) e o ranking filtra `neutral_profit IS NOT NULL AND warnings == []`. As duas
+condições são a mesma semântica — "precificado e sem aviso". Mantido **um** parâmetro; teste
+`test_require_complete_drops_the_same_kind_of_row_everywhere` prova o alinhamento. `warnings` do
+flip passou a usar `CraftWarning.STALE_DATA.value` explicitamente (mesmo vocabulário dos 3).
+
+### Frontend
+
+- `schema.d.ts` regenerado.
+- `opportunities/pages.tsx`: coluna "Taxas" passou a exibir `row.total_fees` — **removida** a
+  reconstrução com 4 `Number()` encadeados (`F09`). "Faturamento" agora mostra o bruto real.
+- `production-pages.tsx`: nenhuma mudança necessária ("Venda bruta" já era o rótulo certo; só o
+  dado ficou correto).
+
+### Testes
+
+- `uv run pytest tests/ -q` → **321 passed**. `uv run ruff check .` → limpo.
+- `tests/opportunities/test_result_contract.py` (novo): identidades de receita/lucro nos 3
+  endpoints · `total_fees` = soma das 3 taxas · `gross >= net` (falha se um endpoint puser
+  líquido em `gross_revenue`) · todo campo monetário é string · `require_complete` remove o mesmo
+  tipo de linha nos 3.
+- `test_flips.py`: asserts de `gross_revenue` atualizados (600/2000 em vez de 576/1790) + novos
+  asserts de `sales_tax`/`net_revenue`/`total_fees`.
+- Frontend `npm run lint && npm run typecheck && npm run test` → 0 erros, 24 verdes.

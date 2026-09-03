@@ -660,19 +660,7 @@ function OpportunityTable({
                   )}
                 </td>
                 <td className="p-4 text-stone-400">
-                  {row.gross_revenue &&
-                  row.sell_price &&
-                  row.buy_price &&
-                  row.total_cost
-                    ? formatarSilver(
-                        String(
-                          Number(row.sell_price) * row.quantity -
-                            Number(row.gross_revenue) +
-                            (Number(row.total_cost) -
-                              Number(row.buy_price) * row.quantity),
-                        ),
-                      )
-                    : '—'}
+                  {formatarSilver(row.total_fees)}
                 </td>
                 <td className="p-4 font-semibold text-stone-300">
                   {row.quantity}

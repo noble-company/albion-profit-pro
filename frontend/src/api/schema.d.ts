@@ -1267,10 +1267,20 @@ export interface components {
        * @default 0
        */
       quantity: number
-      /** Total Cost */
-      total_cost?: string | null
       /** Gross Revenue */
       gross_revenue?: string | null
+      /** Sales Tax */
+      sales_tax?: string | null
+      /** Sale Setup Fee */
+      sale_setup_fee?: string | null
+      /** Net Revenue */
+      net_revenue?: string | null
+      /** Acquisition Setup Fee */
+      acquisition_setup_fee?: string | null
+      /** Total Fees */
+      total_fees?: string | null
+      /** Total Cost */
+      total_cost?: string | null
       /** Profit */
       profit?: string | null
       /** Roi */
