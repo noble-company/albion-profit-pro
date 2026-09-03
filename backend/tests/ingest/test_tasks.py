@@ -81,6 +81,45 @@ async def test_process_market_orders_inserts_batch_and_updates_cache(db_session)
     assert cached["sell"]["observed_orders"] == 2
 
 
+async def test_ingest_does_not_publish_to_redis_pubsub(monkeypatch):
+    """B10 / task 3.5/08 opção B: o caminho quente do ingest não publica mais preço no pub/sub
+    (não existe consumidor). Um PUBLISH aqui seria custo puro."""
+    from redis.asyncio import Redis
+
+    published: list[tuple] = []
+    original_publish = Redis.publish
+
+    async def _spy(self, channel, message):
+        published.append((channel, message))
+        return await original_publish(self, channel, message)
+
+    monkeypatch.setattr(Redis, "publish", _spy)
+
+    item_id = _unique_item_id()
+    future_expires = (
+        (datetime.now(timezone.utc) + timedelta(days=30)).replace(tzinfo=None).isoformat()
+    )
+    payload = {
+        "orders": [
+            {
+                "id": 1,
+                "item_id": item_id,
+                "group_type_id": "",
+                "location_id": "1002",
+                "quality_level": 1,
+                "enchantment_level": 0,
+                "unit_price_silver": 1000000,
+                "amount": 50,
+                "auction_type": "offer",
+                "expires": future_expires,
+            }
+        ]
+    }
+    await save_market_orders(async_session_maker, get_redis(), payload, "west")
+
+    assert published == []
+
+
 async def test_process_market_orders_with_empty_list_does_nothing():
     await save_market_orders(
         async_session_maker, get_redis(), {"orders": []}, "west"

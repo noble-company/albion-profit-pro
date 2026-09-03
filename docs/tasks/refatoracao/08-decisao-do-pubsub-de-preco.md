@@ -59,3 +59,39 @@ Task 01. Se escolhida a Opção A, depende também da task 15.
 
 **Opção A:** abrir a tela de preços e confirmar atualização sem recarregar, com o client Go
 coletando ao vivo. **Opção B:** conferir com `MONITOR` no Redis que o ingest não publica mais.
+
+## Estado da implementação
+
+Concluída em 2026-08-31. **Decisão: Opção B** (remover o custo), conforme a recomendação da spec.
+
+Motivo: não existia nenhum endpoint WebSocket/SSE, nem assinante — `publish_price_update` era
+custo puro no caminho mais quente do sistema (uma chamada por combinação, por lote de ingest),
+e a UI continuava sendo polling. O polling com cache e visibilidade (task 15) já cobre a
+percepção de "dado atualizado". O push volta como implementação nova quando o volume de
+usuários justificar uma conexão persistente.
+
+### O que foi feito
+
+1. `publish_price_update` **removido** de `recompute_and_cache_book` (`prices/service.py`) e do
+   import.
+2. A função `publish_price_update` foi **apagada** de `cache/redis_client.py` — código morto com
+   docstring enganosa é pior que ausência. Substituída por um comentário explicando a decisão.
+3. `docs/00-plano-macro.md` corrigido nos 4 pontos que prometiam "pub/sub → WebSocket alimentado
+   pelo Redis, em vez de polling".
+4. Polling da task 15 mantido (o frontend já faz; intervalo/visibilidade corretos ficam com a
+   task 15).
+
+### Testes
+
+- `tests/ingest/test_tasks.py::test_ingest_does_not_publish_to_redis_pubsub` (novo): faz espião
+  em `Redis.publish` e roda `save_market_orders` — **nenhum PUBLISH** é emitido.
+- `tests/test_redis_client.py`: teste do `publish_price_update` removido junto com a função.
+- `uv run pytest tests/ -q` → **333 passed**. `uv run ruff check .` → limpo. O caminho quente do
+  ingest não regride (uma chamada de rede a menos por combinação).
+
+### Nota para a task 28
+
+`docs/tasks/frontend/20.6` ("Invalidação de cache e pub/sub") e a linha de `20.3` que menciona
+"a atualização por pub/sub da Task 20.6" foram deixadas como estão — as tasks 20.4-20.11 estão
+adiadas e a task 28 vai revalidá-las contra esta decisão (não haverá pub/sub; a invalidação de
+cache pós-ingest, se precisar, é outra coisa).

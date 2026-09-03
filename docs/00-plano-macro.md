@@ -105,7 +105,7 @@ Albion Profit Pro/
 O usuário já tem um servidor em **Docker Swarm** com estes serviços rodando:
 - **Traefik** — reverse proxy do swarm; o backend/frontend entram como novos serviços com labels de roteamento, sem precisar configurar nginx à parte.
 - **PostgreSQL 16 (+ pgvector)** — cria-se um banco novo dedicado ao Profit Pro na mesma instância. `pgvector` não é usado no MVP, mas fica disponível para uma feature futura (ex: busca semântica de itens).
-- **Redis** — cache de "preço mais recente por item/cidade" (evita bater no Postgres a cada carregamento da calculadora) e pub/sub para push de atualização de preço em tempo real pro frontend (WebSocket alimentado pelo Redis, em vez de polling).
+- **Redis** — cache de "preço mais recente por item/cidade" (evita bater no Postgres a cada carregamento da calculadora). **O push de preço em tempo real por pub/sub foi descartado na Fase 3.5 (task 08, `B10`)**: não havia consumidor WebSocket/SSE e o frontend faz polling com cache e visibilidade. Um push persistente entra quando o volume de usuários justificar.
 - **RabbitMQ** — usado desde o MVP no pipeline de ingest (ver abaixo), não só como otimização futura.
 
 ### Fluxo de dados
@@ -120,10 +120,10 @@ Client Go (usuário A, B, C...)
     (exchange/routing key por tópico — ex: marketorders.ingest) e responde
     rápido ao client (não espera o banco)
   → Worker separado (consumer) lê da fila, faz upsert em lote no Postgres
-  → Redis: worker atualiza o cache de "preço mais recente" após gravar, e
-    publica no pub/sub pra quem estiver com WebSocket aberto no frontend
+  → Redis: worker atualiza o cache de "preço mais recente" após gravar
   → Frontend (web ou embutido) consulta a API de leitura (GET /prices?item=...),
-    que lê do Redis (cache) com fallback pro Postgres, e monta a calculadora
+    que lê do Redis (cache) com fallback pro Postgres, e monta a calculadora.
+    Atualização por polling com cache e visibilidade — sem push (task 08).
 ```
 
 **Por que isso é pouco código no client**: o `client/uploader_http.go` já faz exatamente `POST <baseURL>/<topic>` com o JSON de upload. Rodar `-i https://api.albionprofitpro.com` já funciona sem tocar em nada — só falta (1) autenticar a requisição e (2) trocar o default. Fora isso, o client continua 100% igual ao vanilla para captura de mercado.
@@ -142,7 +142,7 @@ Novo diretório `backend/`, com dois processos/serviços (API e worker), compart
 - `app/routers/auth.py` — `POST /auth/register`, `POST /auth/login`, `POST /auth/tokens` (gera um `ApiToken` novo pro usuário logado, pra colar no `config.yaml` do client)
 - `app/routers/ingest.py` — replica os tópicos que o client já manda: `POST /marketorders.ingest`, `POST /markethistories.ingest`, `POST /goldprices.ingest` (ver `lib/nats.go` pros nomes exatos de tópico) — autentica via header `Authorization: Bearer <ApiToken>`, **publica a mensagem no RabbitMQ** (exchange dedicado, routing key = nome do tópico) em vez de gravar direto, responde rápido ao client
 - `app/routers/prices.py` — `GET /items/{item_id}/prices?scope=all|mine` — lê do Redis (cache "preço mais recente"), com fallback pro Postgres em cache-miss
-- `app/worker.py` — processo consumer separado (roda como outro serviço no swarm): assina as filas do RabbitMQ, faz upsert em lote no Postgres, atualiza o cache no Redis e publica no pub/sub pra WebSocket do frontend
+- `app/worker.py` — processo consumer separado (roda como outro serviço no swarm): assina as filas do RabbitMQ, faz upsert em lote no Postgres e atualiza o cache no Redis (sem pub/sub — ver task 08)
 - `alembic/` — migrations
 - `Dockerfile` (um só, dois entrypoints: API via uvicorn, worker via `python -m app.worker`) — deploy como dois serviços separados no `stack.yml` do swarm (conectar nas redes overlay existentes do Postgres/Redis/RabbitMQ/Traefik)
 
@@ -181,8 +181,8 @@ Descobertos rodando o client de verdade contra o jogo (ver
    avisar na bandeja/UI ("ande até outra zona pra ativar a coleta"), não deixar o usuário achar
    que está coletando quando não está.
 7. **Conceito de servidor (west/east/europe) — resolvido na Fase 2.5 task 03**: o client envia
-   `X-Albion-Server` no canal autenticado e realm integra fatos, unicidades, rollups, cache,
-   pub/sub e leituras. `market_order` deduplica por `(server_id, source_id)`; as APIs exigem
+   `X-Albion-Server` no canal autenticado e realm integra fatos, unicidades, rollups, cache
+   e leituras. `market_order` deduplica por `(server_id, source_id)`; as APIs exigem
    `server` explicitamente. O legado teve origem West confirmada pelo proprietário.
 
 **Confirmado nesta captura**: a tabela de opcodes do fork **não derivou** em relação à build

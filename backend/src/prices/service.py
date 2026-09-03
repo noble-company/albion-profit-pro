@@ -14,7 +14,6 @@ from src.cache.redis_client import (
     delete_book_depth,
     get_redis,
     mget_book_depths,
-    publish_price_update,
     set_book_depth,
 )
 from src.items.models import Item
@@ -509,19 +508,6 @@ async def recompute_and_cache_book(
             continue
         payload = _build_book_payload(row, turnover)
         await set_book_depth(redis, server_id, item_id, loc, q, e, payload)
-        await publish_price_update(
-            redis,
-            server_id,
-            item_id,
-            {
-                "server": server_id,
-                "location_id": loc,
-                "quality_level": q,
-                "enchantment_level": e,
-                "sell": payload["sell"],
-                "buy": payload["buy"],
-            },
-        )
 
 
 async def record_scans(

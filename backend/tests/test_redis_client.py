@@ -7,7 +7,6 @@ from src.cache.redis_client import (
     delete_book_depth,
     get_redis,
     mget_book_depths,
-    publish_price_update,
     set_book_depth,
 )
 
@@ -41,7 +40,3 @@ async def test_book_depth_expires_after_ttl():
     await asyncio.sleep(1.5)
     result = await mget_book_depths(redis, "west", "T4_LEATHER", [("1002", 2, 0)])
     assert result[("1002", 2, 0)] is None
-
-
-async def test_publish_price_update_does_not_raise_without_subscribers():
-    await publish_price_update(get_redis(), "west", "T2_FIBER", {"price": 100})

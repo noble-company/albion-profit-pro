@@ -75,6 +75,6 @@ async def delete_book_depth(
     )
 
 
-async def publish_price_update(redis: Redis, server_id: str, item_id: str, payload: dict) -> None:
-    """Canal pub/sub — o frontend com WebSocket aberto assina 'prices:<item_id>' e recebe em tempo real."""
-    await redis.publish(f"prices:{server_id}:{item_id}", json.dumps(payload))
+# Não há push de preço em tempo real (task 3.5/08, `B10`): o frontend faz polling com cache e
+# visibilidade (task 15). O pub/sub WebSocket/SSE fica para quando o volume de usuários justificar
+# uma conexão persistente — será uma implementação nova, não este canal.

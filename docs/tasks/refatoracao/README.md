@@ -112,7 +112,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 05 — Núcleo de cálculo único
 - [x] 06 — Rate limit e hardening de leitura
 - [x] 07 — Idioma único da API
-- [ ] 08 — Decisão do pub/sub de preço
+- [x] 08 — Decisão do pub/sub de preço *(Opção B — pub/sub removido)*
 - [ ] 09 — Classificação de refino
 - [ ] 10 — Antifraude de mercado *(adiada por decisão de produto)*
 - [ ] 11 — shadcn/ui de verdade
