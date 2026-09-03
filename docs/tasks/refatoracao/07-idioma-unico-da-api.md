@@ -54,3 +54,63 @@ Task 04 (o contrato de resultado precisa estar estabilizado antes de renomear em
 
 Abrir `/docs` e confirmar que um leitor externo consegue entender a API inteira sem saber
 português.
+
+## Estado da implementação
+
+Concluída em 2026-08-31.
+
+### 1–2. Renomeações
+
+`prices/schemas.py` reescrito: `LadoDoLivro`→`BookSide`, `VolumeVendido`→`SoldVolume`,
+`PrecoPorLocal`→`LocationPrice`, `ItemResumo`→`ItemSummary`, `LivroOut`→`BookOut`,
+`VendidoOut`→`SoldOut`, `PontoSerie6h`→`Series6hPoint`. Campos: `melhor_preco`→`best_price`,
+`unidades_observadas`→`observed_units`, `ordens_observadas`→`observed_orders`,
+`observado_em`→`observed_at`, `idade_segundos`→`age_seconds`, `venda`→`sell`, `compra`→`buy`,
+`vendido_24h`→`sold_24h`, `cobertura`→`coverage`, `janela_frescor_segundos`→
+`freshness_window_seconds`, `unidades`→`units`, `preco_medio`→`average_price`, `nome`→`name`,
+`inicio`→`start`, `livro`→`book`, `vendido`→`sold`, `serie_6h`→`series_6h`,
+`ultimas_24h/7d/30d`→`last_24h/7d/30d`. `prices/service.py` monta as chaves novas (inclusive o
+cache Redis e o payload sem-consumidor de `publish_price_update`). `items/schemas.py`
+`tem_receita`→`has_recipe`; `recipes/schemas.py` `tem_receita_propria`→`has_own_recipe`,
+`variantes_encantadas`→`enchanted_variants`. `description=` dos endpoints traduzidas.
+
+### Glossário do livro
+
+`sell` = lado das ofertas (`offer`, ask — onde você compra) · `buy` = lado das procuras
+(`request`, bid — onde você vende). Mesma semântica do PT antigo (`venda`/`compra`). Fixado no
+`CLAUDE.md` e no README da fase.
+
+### 3. Alcance — só o contrato HTTP
+
+Colunas de banco (`fonte`, `n_varreduras`, `primeira_em`, `ultima_em`, `preco_medio` de
+`market_history_*`, `dia`, `mes`, `busca_normalizada`) e os labels de query interna de
+`query_book_depth` (`menor_venda`, `venda_unidades`, …) **ficam em português** — são internos,
+sem contrato externo. Registrado no `W3`.
+
+### 4. Ciclo de depreciação — cutover coordenado (desvio deliberado da spec)
+
+Sem dual-publish. O único consumidor é o nosso frontend, atualizado no mesmo commit: schema
+antigo e novo nunca coexistem para ninguém. Publicar `venda` **e** `sell` no mesmo schema por
+uma versão dobraria a superfície sem proteger nenhum consumidor. Aprovado.
+
+### 5–6. Frontend e regra fixada
+
+`schema.d.ts` regenerado; `prices/{pages,demand}.tsx`, `items/{pages,items.test}.tsx` atualizados.
+Regra no `CLAUDE.md` (bullet novo) e no README da fase, com o teste `test_api_language.py` como
+guarda.
+
+### `api_tokens` fora de escopo → `W3`
+
+`ApiTokenPublic.token_sufixo`/`nome`/`ultimo_uso_em` seguem em PT — o gêmeo `ClientIdentity` é
+parseado pelo client Go. Task própria coordenada com o client.
+
+### Testes
+
+- `uv run pytest tests/ -q` → **333 passed**. `uv run ruff check .` → limpo.
+- `tests/test_api_language.py` (novo): varre o OpenAPI e falha se qualquer campo fora de `*In` /
+  `ApiTokenPublic` casar com o dicionário PT; confirma que os aliases de ingest (`ItemTypeId`…)
+  seguem intactos.
+- `tests/prices/`, `tests/items/`, `tests/recipes/`, `tests/ingest/` atualizados para os nomes
+  novos (contrato) mantendo os valores de banco (`livro`/`historico` de `MarketScan.fonte`,
+  `preco_medio` de `MarketHistoryDaily`).
+- Frontend `npm run lint && npm run typecheck && npm run test` → 0 erros, 24 verdes.

@@ -39,6 +39,7 @@ When you make an architecture decision, discover something non-obvious about the
 - **Match the Go client's wire contract exactly.** The backend's ingest schemas must mirror the Go structs' JSON field names/casing verbatim (documented in `docs/tasks/backend/15-schemas-ingest.md` and `docs/01-mapeamento-albiondata-client.md`) — these are not up for stylistic renaming to snake_case on the wire; use Pydantic `Field(alias=...)` instead.
 - **Postgres is the source of truth; Redis is a disposable cache.** Never make Redis the only place a piece of data lives. It's fine for it to be flushed at any time.
 - **Communicate in Portuguese** (the user's language) in conversation and in `docs/` prose; code, identifiers, and inline comments follow normal English convention.
+- **The HTTP contract is English-only** (task 3.5/07, `B09`). Every response/request field on every route — `/items/*/prices`, `/demand`, `/craft/*`, `/opportunities/*`, `/recipes/*` — uses English names. Order-book sides are `sell` (game `offer`, the ask) and `buy` (game `request`, the bid). The **only** exception is the ingest upload schemas (`*In`), which mirror the Go wire verbatim per the bullet above. Enforced by `backend/tests/test_api_language.py`. DB column names and internal SQL result labels stay as they are (Portuguese in `prices/`); they are not part of the contract.
 
 ## Key architecture decisions (see `docs/00-plano-macro.md` for full rationale)
 

@@ -53,7 +53,7 @@ def _item_projection():
         Item.shop_subcategory,
         Item.shop_subcategory2,
         Item.shop_subcategory3,
-        has_recipe.label("tem_receita"),
+        has_recipe.label("has_recipe"),
     )
 
 

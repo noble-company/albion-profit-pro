@@ -96,8 +96,8 @@ async def test_same_market_identity_is_isolated_by_server(db_session):
     europe = await get_item_prices(db_session, "europe", item_id, "mine", user.id)
     west_match = next(row for row in west["prices"] if row["location_id"] == "1002")
     europe_match = next(row for row in europe["prices"] if row["location_id"] == "1002")
-    assert west_match["venda"]["melhor_preco"] == "100.0000"
-    assert europe_match["venda"]["melhor_preco"] == "200.0000"
+    assert west_match["sell"]["best_price"] == "100.0000"
+    assert europe_match["sell"]["best_price"] == "200.0000"
 
 
 async def test_book_cache_keys_are_isolated_by_server():

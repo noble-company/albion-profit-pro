@@ -97,7 +97,7 @@ async def test_search_filters_and_limit(cliente_autenticado, db_session):
     )
     assert response.status_code == 200, response.text
     assert [item["unique_name"] for item in response.json()] == ["T4_CLOTH"]
-    assert response.json()[0]["tem_receita"] is True
+    assert response.json()[0]["has_recipe"] is True
 
     invalid = await cliente_autenticado.get("/items/search", params={"q": "t", "limit": 51})
     assert invalid.status_code == 422
@@ -116,7 +116,7 @@ async def test_item_detail_and_semantic_not_found(cliente_autenticado, db_sessio
 
     response = await cliente_autenticado.get("/items/T4_CLOTH")
     assert response.status_code == 200
-    assert response.json()["tem_receita"] is True
+    assert response.json()["has_recipe"] is True
 
     missing = await cliente_autenticado.get("/items/DOES_NOT_EXIST")
     assert missing.status_code == 404

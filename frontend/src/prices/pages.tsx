@@ -159,27 +159,25 @@ export function ItemPricesPage() {
                   {row.quality_level} / .{row.enchantment_level}
                 </td>
                 <td className="p-3">
-                  {row.venda.melhor_preco
-                    ? formatarSilver(row.venda.melhor_preco)
+                  {row.sell.best_price
+                    ? formatarSilver(row.sell.best_price)
                     : 'Sem cobertura'}
                   <br />
                   <span className="text-xs text-stone-500">
-                    {formatarIdade(row.venda.observado_em)}
+                    {formatarIdade(row.sell.observed_at)}
                   </span>
                 </td>
                 <td className="p-3">
-                  {row.compra.melhor_preco
-                    ? formatarSilver(row.compra.melhor_preco)
+                  {row.buy.best_price
+                    ? formatarSilver(row.buy.best_price)
                     : 'Sem cobertura'}
                   <br />
                   <span className="text-xs text-stone-500">
-                    {formatarIdade(row.compra.observado_em)}
+                    {formatarIdade(row.buy.observed_at)}
                   </span>
                 </td>
                 <td className="p-3">
-                  {row.vendido_24h
-                    ? `${row.vendido_24h.unidades} un.`
-                    : 'Sem histórico'}
+                  {row.sold_24h ? `${row.sold_24h.units} un.` : 'Sem histórico'}
                 </td>
               </tr>
             ))}

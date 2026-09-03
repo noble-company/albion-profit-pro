@@ -140,11 +140,11 @@ async def test_base_recipe_has_ordered_enriched_ingredients_and_variants(
         "T3_CLOTH",
     ]
     assert [row["position"] for row in body["ingredients"]] == [0, 1]
-    assert body["ingredients"][0]["tem_receita_propria"] is False
-    assert body["ingredients"][1]["tem_receita_propria"] is True
+    assert body["ingredients"][0]["has_own_recipe"] is False
+    assert body["ingredients"][1]["has_own_recipe"] is True
     assert body["ingredients"][0]["name_pt"] == "Fibra"
     assert body["upgrade_resource"] is None
-    assert body["variantes_encantadas"] == ["T4_OFF_SHIELD@1", "T4_OFF_SHIELD@2"]
+    assert body["enchanted_variants"] == ["T4_OFF_SHIELD@1", "T4_OFF_SHIELD@2"]
 
 
 async def test_enchanted_key_is_exact_and_has_upgrade_resource(cliente_autenticado, db_session):
@@ -163,7 +163,7 @@ async def test_enchanted_key_is_exact_and_has_upgrade_resource(cliente_autentica
         "name_en": "Runa EN",
         "count": 8,
     }
-    assert body["variantes_encantadas"] == ["T4_OFF_SHIELD@1", "T4_OFF_SHIELD@2"]
+    assert body["enchanted_variants"] == ["T4_OFF_SHIELD@1", "T4_OFF_SHIELD@2"]
 
 
 async def test_resource_style_enchanted_keys_share_the_same_variant_family(
@@ -197,7 +197,7 @@ async def test_resource_style_enchanted_keys_share_the_same_variant_family(
     response = await cliente_autenticado.get("/items/T4_PLANKS_LEVEL1@1/recipe")
 
     assert response.status_code == 200, response.text
-    assert response.json()["variantes_encantadas"] == [
+    assert response.json()["enchanted_variants"] == [
         "T4_PLANKS_LEVEL1@1",
         "T4_PLANKS_LEVEL2@2",
     ]

@@ -16,9 +16,10 @@ router = APIRouter(prefix="/items", tags=["prices"])
     "/{item_id}/prices",
     response_model=ItemPricesOut,
     description=(
-        "Consulta observações parciais globais (`scope=all`) ou limita as combinações às "
-        "fontes de mercado que o usuário autenticado coletou (`scope=mine`). Livro e histórico "
-        "têm coberturas independentes; `limit`, `offset` e `location_id` controlam o recorte."
+        "Global partial observations (`scope=all`), or the combinations limited to the market "
+        "sources the authenticated user collected (`scope=mine`). Book and history have "
+        "independent coverage; `limit`, `offset` and `location_id` control the slice. The book "
+        "sides are `sell` (game offers, the ask) and `buy` (game requests, the bid)."
     ),
 )
 async def read_item_prices(
@@ -48,8 +49,9 @@ async def read_item_prices(
     "/{item_id}/demand",
     response_model=DemandOut,
     description=(
-        "Consulta a visão global de demanda da plataforma. Este endpoint não aceita `scope`; "
-        "a cobertura por usuário aplica-se somente ao endpoint de preços."
+        "Platform-wide demand view. This endpoint takes no `scope`; per-user coverage applies "
+        "only to the prices endpoint. `book` is demand parked in the request side, `sold` is "
+        "real turnover over three windows, `series_6h` is the raw series for a trend plot."
     ),
 )
 async def read_item_demand(

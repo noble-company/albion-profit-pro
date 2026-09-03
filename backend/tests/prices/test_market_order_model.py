@@ -1,5 +1,5 @@
 """
-MarketOrder não tem mais user_id (task 27) — é o estado atual do livro, uma tabela-fato
+MarketOrder não tem mais user_id (task 27) — é o estado atual do book, uma tabela-fato
 global, não amarrada a quem coletou.
 """
 

@@ -14,7 +14,7 @@ class RecipeIngredientOut(RecipeItemOut):
     position: int
     count: int
     enchantment_level: int
-    tem_receita_propria: bool
+    has_own_recipe: bool
 
 
 class RecipeUpgradeResourceOut(RecipeItemOut):
@@ -30,4 +30,4 @@ class RecipeOut(BaseModel):
     craft_time: Decimal
     ingredients: list[RecipeIngredientOut]
     upgrade_resource: RecipeUpgradeResourceOut | None
-    variantes_encantadas: list[str]
+    enchanted_variants: list[str]

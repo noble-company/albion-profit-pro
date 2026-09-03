@@ -13,7 +13,7 @@ function ItemLabel({ item }: { item: CatalogItem }) {
         {item.tier ? ` · T${item.tier}` : ''}
         {item.enchantment_level ? `.${item.enchantment_level}` : ''}
       </span>
-      {!item.tem_receita && (
+      {!item.has_recipe && (
         <span className="ml-2 rounded bg-stone-700 px-1.5 py-0.5 text-xs text-stone-300">
           sem receita
         </span>

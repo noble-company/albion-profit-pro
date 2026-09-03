@@ -1,6 +1,6 @@
 """
 Cobertura da task 31 — rollup diário/mensal (média ponderada por volume, idempotência),
-poda por retenção, e o endpoint de demanda com livro vazio.
+poda por retenção, e o endpoint de demanda com book vazio.
 """
 
 import uuid
@@ -310,19 +310,19 @@ async def test_demand_endpoint_with_empty_book_returns_zeroed_fields_not_null(cl
     body = resp.json()
     assert body["server"] == "west"
     empty_side = {
-        "melhor_preco": None,
-        "unidades_observadas": 0,
-        "ordens_observadas": 0,
-        "observado_em": None,
-        "idade_segundos": None,
+        "best_price": None,
+        "observed_units": 0,
+        "observed_orders": 0,
+        "observed_at": None,
+        "age_seconds": None,
     }
-    assert body["livro"]["venda"] == empty_side
-    assert body["livro"]["compra"] == empty_side
-    assert body["livro"]["cobertura"] == "parcial"
-    assert body["livro"]["janela_frescor_segundos"] == 6 * 60 * 60
-    assert body["vendido"]["ultimas_24h"] == {"unidades": 0, "preco_medio": None}
-    assert body["vendido"]["ultimos_7d"] == {"unidades": 0, "preco_medio": None}
-    assert body["vendido"]["ultimos_30d"] == {"unidades": 0, "preco_medio": None}
-    assert body["serie_6h"] == []
-    assert body["item"] == {"unique_name": item_id, "nome": None}
+    assert body["book"]["sell"] == empty_side
+    assert body["book"]["buy"] == empty_side
+    assert body["book"]["coverage"] == "parcial"
+    assert body["book"]["freshness_window_seconds"] == 6 * 60 * 60
+    assert body["sold"]["last_24h"] == {"units": 0, "average_price": None}
+    assert body["sold"]["last_7d"] == {"units": 0, "average_price": None}
+    assert body["sold"]["last_30d"] == {"units": 0, "average_price": None}
+    assert body["series_6h"] == []
+    assert body["item"] == {"unique_name": item_id, "name": None}
     assert body["location_id"] == "1002"

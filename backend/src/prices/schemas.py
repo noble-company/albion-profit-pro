@@ -7,85 +7,85 @@ from pydantic import BaseModel
 from src.prices.constants import AlbionServer
 
 
-class LadoDoLivro(BaseModel):
-    """Um lado do livro de ofertas — venda (`offer`) ou compra (`request`). São universos de
-    preço separados (no algodão T2 real, venda ficou 37-39 e compra 1-35 — nunca
-    devem se misturar num preço só)."""
+class BookSide(BaseModel):
+    """One side of the order book — ``sell`` (game ``offer``, the ask) or ``buy`` (game
+    ``request``, the bid). Separate price universes: in real T2 cotton the sell side sat at
+    37-39 and the buy side at 1-35 — they must never be collapsed into a single price."""
 
-    melhor_preco: Decimal | None = None
-    unidades_observadas: int = 0
-    ordens_observadas: int = 0
-    observado_em: datetime | None = None
-    idade_segundos: int | None = None
-
-
-class VolumeVendido(BaseModel):
-    """Giro real nas últimas 24h, vindo de `markethistories.ingest` (preço realmente
-    transacionado — diferente do que alguém está pedindo no livro)."""
-
-    unidades: int
-    preco_medio: Decimal | None = None
+    best_price: Decimal | None = None
+    observed_units: int = 0
+    observed_orders: int = 0
+    observed_at: datetime | None = None
+    age_seconds: int | None = None
 
 
-class PrecoPorLocal(BaseModel):
+class SoldVolume(BaseModel):
+    """Real turnover, from ``markethistories.ingest`` — the price actually transacted, not what
+    someone is asking for in the book."""
+
+    units: int
+    average_price: Decimal | None = None
+
+
+class LocationPrice(BaseModel):
     location_id: str
     quality_level: int
     enchantment_level: int
-    venda: LadoDoLivro
-    compra: LadoDoLivro
-    vendido_24h: VolumeVendido | None = None
-    cobertura: Literal["parcial"]
-    janela_frescor_segundos: int
+    sell: BookSide
+    buy: BookSide
+    sold_24h: SoldVolume | None = None
+    coverage: Literal["parcial"]
+    freshness_window_seconds: int
 
 
 class ItemPricesOut(BaseModel):
-    """Preços globais ou combinações cobertas pelo usuário, conforme `scope`.
+    """Global partial observations, or the combinations covered by the user, per ``scope``.
 
-    Em `mine`, a cobertura de livro e a de histórico são independentes.
+    Under ``mine`` the book coverage and the history coverage are independent.
     """
 
     server: AlbionServer
     item_id: str
     scope: Literal["all", "mine"]
-    prices: list[PrecoPorLocal]
+    prices: list[LocationPrice]
     total: int
     limit: int
     offset: int
 
 
-class ItemResumo(BaseModel):
+class ItemSummary(BaseModel):
     unique_name: str
-    nome: str | None = None
+    name: str | None = None
 
 
-class LivroOut(BaseModel):
-    venda: LadoDoLivro
-    compra: LadoDoLivro
-    cobertura: Literal["parcial"]
-    janela_frescor_segundos: int
+class BookOut(BaseModel):
+    sell: BookSide
+    buy: BookSide
+    coverage: Literal["parcial"]
+    freshness_window_seconds: int
 
 
-class VendidoOut(BaseModel):
-    ultimas_24h: VolumeVendido
-    ultimos_7d: VolumeVendido
-    ultimos_30d: VolumeVendido
+class SoldOut(BaseModel):
+    last_24h: SoldVolume
+    last_7d: SoldVolume
+    last_30d: SoldVolume
 
 
-class PontoSerie6h(BaseModel):
-    inicio: datetime
-    unidades: int
-    preco_medio: Decimal | None = None
+class Series6hPoint(BaseModel):
+    start: datetime
+    units: int
+    average_price: Decimal | None = None
 
 
 class DemandOut(BaseModel):
-    """Responde "quanta gente está comprando isso agora": `livro` é demanda
-    parada esperando no livro de ofertas, `vendido` é giro real transacionado em 3 janelas,
-    `serie_6h` é a série bruta pra quem quiser plotar tendência. A visão é global e não
-    herda o `scope` do endpoint de preços."""
+    """Answers "how many people are buying this right now": ``book`` is demand parked in the
+    request side of the order book, ``sold`` is real turnover over three windows, ``series_6h``
+    is the raw series for plotting a trend. The view is global and does not inherit the
+    ``scope`` of the prices endpoint."""
 
     server: AlbionServer
-    item: ItemResumo
+    item: ItemSummary
     location_id: str
-    livro: LivroOut
-    vendido: VendidoOut
-    serie_6h: list[PontoSerie6h]
+    book: BookOut
+    sold: SoldOut
+    series_6h: list[Series6hPoint]

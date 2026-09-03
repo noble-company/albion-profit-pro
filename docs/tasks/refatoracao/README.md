@@ -111,7 +111,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 04 — Contrato único de resultado
 - [x] 05 — Núcleo de cálculo único
 - [x] 06 — Rate limit e hardening de leitura
-- [ ] 07 — Idioma único da API
+- [x] 07 — Idioma único da API
 - [ ] 08 — Decisão do pub/sub de preço
 - [ ] 09 — Classificação de refino
 - [ ] 10 — Antifraude de mercado *(adiada por decisão de produto)*
@@ -146,6 +146,9 @@ o estado real e receber confirmação explícita antes de alterar código.
 - Nenhuma cor literal em componente após a task 12. Só tokens.
 - Toda task de performance (02, 03, 15, 17) registra **medição antes/depois** no mesmo dataset,
   no bloco "Estado da implementação".
+- **Contrato HTTP em inglês** (task 07). Todo campo de request/response é inglês; o único
+  desvio são os schemas de ingest (`*In`, espelham o wire do client Go). `sell` = ofertas
+  (ask), `buy` = procuras (bid). Verificado por `backend/tests/test_api_language.py`.
 
 ## Achados da fase
 
@@ -153,3 +156,4 @@ o estado real e receber confirmação explícita antes de alterar código.
 |---|---|---|
 | `W1` | A task 2.5/01 (`R03`) deu o baseline Git por resolvido, mas a Fase 3 inteira voltou a ficar untracked. O critério de pronto era "existe commit e remote", não "a árvore está limpa". | Task 01 redefine o critério e adiciona verificação recorrente |
 | `W2` | `backend/.dockerignore` não exclui `world.json` / `items.json` / `ITEM DUMP.json`. O `Dockerfile` faz `COPY . .`, então um build feito na máquina de dev embute ~60 MB de dado estático não-licenciado na imagem, que pode ir para um registry. Fora do escopo da task 01 (versionamento), registrado ao ignorá-los no Git. | Task própria: 1 linha por arquivo no `.dockerignore` |
+| `W3` | `ApiTokenPublic` (`/auth/tokens` GET) ainda expõe `token_sufixo`, `nome`, `ultimo_uso_em` em português. Ficou fora da task 07 porque o schema-gêmeo `ClientIdentity` (`GET /client/me`) é parseado pelo client Go — renomear `token_sufixo` tocaria o client. Também há labels de query e docstrings em PT em `prices/service.py` (internos, não vazam pro contrato). | Task própria, coordenada com o client Go |

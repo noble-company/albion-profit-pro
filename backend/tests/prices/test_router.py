@@ -46,7 +46,7 @@ def _order(item_id: str, auction_type: str, price, amount: int) -> MarketOrder:
         amount=amount,
         auction_type=auction_type,
         # relativo a "agora", não uma data fixa — a task 29 passou a filtrar
-        # `expires > now()` de verdade na profundidade do livro.
+        # `expires > now()` de verdade na profundidade do book.
         expires=datetime.now(timezone.utc) + timedelta(days=30),
     )
 
@@ -134,12 +134,12 @@ async def test_scope_all_separates_venda_and_compra(client, db_session):
     assert resp.status_code == 200, resp.text
     assert resp.json()["server"] == "west"
     match = _match(resp.json())
-    assert Decimal(match["venda"]["melhor_preco"]) == Decimal("39")
-    assert Decimal(match["compra"]["melhor_preco"]) == Decimal("1")
-    assert match["cobertura"] == "parcial"
-    assert match["janela_frescor_segundos"] == 6 * 60 * 60
-    assert match["venda"]["observado_em"] is not None
-    assert match["venda"]["idade_segundos"] >= 0
+    assert Decimal(match["sell"]["best_price"]) == Decimal("39")
+    assert Decimal(match["buy"]["best_price"]) == Decimal("1")
+    assert match["coverage"] == "parcial"
+    assert match["freshness_window_seconds"] == 6 * 60 * 60
+    assert match["sell"]["observed_at"] is not None
+    assert match["sell"]["age_seconds"] >= 0
 
 
 async def test_prices_requires_canonical_server(client):
@@ -215,7 +215,7 @@ async def test_scope_mine_empty_for_user_without_coverage_even_with_hot_cache(cl
             }
         ]
     }
-    # dono varre de verdade (via ingest): grava a ordem, a cobertura em market_scan E
+    # dono varre de verdade (via ingest): grava a ordem, a coverage em market_scan E
     # aquece o cache Redis pra essa combinação — o cenário exato do furo do C5.
     await save_market_orders(async_session_maker, get_redis(), payload, "west", str(owner_id))
 
@@ -233,7 +233,7 @@ async def test_scope_mine_empty_for_user_without_coverage_even_with_hot_cache(cl
 
 async def test_scope_mine_returns_data_for_user_with_coverage(client):
     """Mesmo cenário acima, mas consultado pelo próprio dono da varredura — `scope=mine`
-    reflete o acervo global (mesmo valor de `scope=all`), só recortado pela cobertura dele."""
+    reflete o acervo global (mesmo valor de `scope=all`), só recortado pela coverage dele."""
     item_id = _unique_item_id()
     owner_id, owner_token = await registrar_e_logar(client)
 
@@ -265,7 +265,7 @@ async def test_scope_mine_returns_data_for_user_with_coverage(client):
     )
     assert resp.status_code == 200, resp.text
     match = _match(resp.json())
-    assert Decimal(match["venda"]["melhor_preco"]) == Decimal("250")
+    assert Decimal(match["sell"]["best_price"]) == Decimal("250")
 
 
 async def test_scope_mine_history_scan_does_not_grant_book_coverage(client, db_session):
@@ -293,15 +293,15 @@ async def test_scope_mine_history_scan_does_not_grant_book_coverage(client, db_s
     )
     assert resp.status_code == 200, resp.text
     match = _match(resp.json())
-    assert match["venda"] == {
-        "melhor_preco": None,
-        "unidades_observadas": 0,
-        "ordens_observadas": 0,
-        "observado_em": None,
-        "idade_segundos": None,
+    assert match["sell"] == {
+        "best_price": None,
+        "observed_units": 0,
+        "observed_orders": 0,
+        "observed_at": None,
+        "age_seconds": None,
     }
-    assert match["vendido_24h"]["unidades"] == 10
-    assert Decimal(match["vendido_24h"]["preco_medio"]) == Decimal("10")
+    assert match["sold_24h"]["units"] == 10
+    assert Decimal(match["sold_24h"]["average_price"]) == Decimal("10")
 
 
 async def test_scope_mine_book_scan_does_not_grant_history_coverage(client, db_session):
@@ -329,8 +329,8 @@ async def test_scope_mine_book_scan_does_not_grant_history_coverage(client, db_s
     )
     assert resp.status_code == 200, resp.text
     match = _match(resp.json())
-    assert Decimal(match["venda"]["melhor_preco"]) == Decimal("250")
-    assert match["vendido_24h"] is None
+    assert Decimal(match["sell"]["best_price"]) == Decimal("250")
+    assert match["sold_24h"] is None
 
 
 async def test_scope_mine_combines_sources_only_for_their_collector(client, db_session):
@@ -354,8 +354,8 @@ async def test_scope_mine_combines_sources_only_for_their_collector(client, db_s
     )
     assert owner_resp.status_code == 200, owner_resp.text
     owner_match = _match(owner_resp.json())
-    assert Decimal(owner_match["venda"]["melhor_preco"]) == Decimal("250")
-    assert owner_match["vendido_24h"]["unidades"] == 10
+    assert Decimal(owner_match["sell"]["best_price"]) == Decimal("250")
+    assert owner_match["sold_24h"]["units"] == 10
 
     outsider_resp = await client.get(
         f"/items/{item_id}/prices",
@@ -406,7 +406,7 @@ async def test_scope_all_returns_data_from_any_collector(client):
     )
     assert resp.status_code == 200, resp.text
     match = _match(resp.json())
-    assert Decimal(match["venda"]["melhor_preco"]) == Decimal("250")
+    assert Decimal(match["sell"]["best_price"]) == Decimal("250")
 
 
 async def test_cache_hit_is_preferred_over_postgres_fallback(client, db_session):
@@ -428,24 +428,24 @@ async def test_cache_hit_is_preferred_over_postgres_fallback(client, db_session)
         1,
         0,
         {
-            "venda": {
-                "melhor_preco": "111",
-                "unidades_observadas": 7,
-                "ordens_observadas": 1,
-                "observado_em": None,
-                "idade_segundos": None,
+            "sell": {
+                "best_price": "111",
+                "observed_units": 7,
+                "observed_orders": 1,
+                "observed_at": None,
+                "age_seconds": None,
             },
-            "compra": {
-                "melhor_preco": None,
-                "unidades_observadas": 0,
-                "ordens_observadas": 0,
-                "observado_em": None,
-                "idade_segundos": None,
+            "buy": {
+                "best_price": None,
+                "observed_units": 0,
+                "observed_orders": 0,
+                "observed_at": None,
+                "age_seconds": None,
             },
-            "vendido_24h": None,
-            "cobertura": "parcial",
-            "janela_frescor_segundos": 6 * 60 * 60,
-            "fontes": {"livro": True, "historico": False},
+            "sold_24h": None,
+            "coverage": "parcial",
+            "freshness_window_seconds": 6 * 60 * 60,
+            "sources": {"book": True, "history": False},
             "atualizado_em": datetime.now(timezone.utc).isoformat(),
         },
     )
@@ -457,10 +457,10 @@ async def test_cache_hit_is_preferred_over_postgres_fallback(client, db_session)
     )
     assert resp.status_code == 200, resp.text
     match = _match(resp.json())
-    assert Decimal(match["venda"]["melhor_preco"]) == Decimal(
+    assert Decimal(match["sell"]["best_price"]) == Decimal(
         "111"
     )  # veio do cache, não do Postgres (999)
-    assert match["venda"]["unidades_observadas"] == 7
+    assert match["sell"]["observed_units"] == 7
 
 
 async def test_orphaned_cache_entry_is_not_returned_without_database_combination(client):
@@ -474,24 +474,24 @@ async def test_orphaned_cache_entry_is_not_returned_without_database_combination
         1,
         0,
         {
-            "venda": {
-                "melhor_preco": "999",
-                "unidades_observadas": 1,
-                "ordens_observadas": 1,
-                "observado_em": datetime.now(timezone.utc).isoformat(),
-                "idade_segundos": 0,
+            "sell": {
+                "best_price": "999",
+                "observed_units": 1,
+                "observed_orders": 1,
+                "observed_at": datetime.now(timezone.utc).isoformat(),
+                "age_seconds": 0,
             },
-            "compra": {
-                "melhor_preco": None,
-                "unidades_observadas": 0,
-                "ordens_observadas": 0,
-                "observado_em": None,
-                "idade_segundos": None,
+            "buy": {
+                "best_price": None,
+                "observed_units": 0,
+                "observed_orders": 0,
+                "observed_at": None,
+                "age_seconds": None,
             },
-            "vendido_24h": None,
-            "cobertura": "parcial",
-            "janela_frescor_segundos": 6 * 60 * 60,
-            "fontes": {"livro": True, "historico": False},
+            "sold_24h": None,
+            "coverage": "parcial",
+            "freshness_window_seconds": 6 * 60 * 60,
+            "sources": {"book": True, "history": False},
             "atualizado_em": datetime.now(timezone.utc).isoformat(),
         },
     )
@@ -533,5 +533,5 @@ async def test_cache_is_recomputed_when_book_source_disappears_but_history_remai
     )
     assert resp.status_code == 200, resp.text
     match = _match(resp.json())
-    assert match["venda"]["melhor_preco"] is None
-    assert match["vendido_24h"]["unidades"] == 10
+    assert match["sell"]["best_price"] is None
+    assert match["sold_24h"]["units"] == 10

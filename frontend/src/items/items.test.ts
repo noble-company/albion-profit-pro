@@ -18,7 +18,7 @@ test('busca envia filtros do catálogo e aceita resultado encantado', async () =
           enchantment_level: 2,
           shop_category: 'recurso',
           shop_subcategory: null,
-          tem_receita: false,
+          has_recipe: false,
         },
       ])
     }),

@@ -80,11 +80,11 @@ def _build_side(
     now: datetime,
 ) -> dict:
     return {
-        "melhor_preco": str(best_price) if best_price is not None else None,
-        "unidades_observadas": int(observed_units or 0),
-        "ordens_observadas": int(observed_orders or 0),
-        "observado_em": observed_at.isoformat() if observed_at is not None else None,
-        "idade_segundos": _observation_age_seconds(observed_at, now),
+        "best_price": str(best_price) if best_price is not None else None,
+        "observed_units": int(observed_units or 0),
+        "observed_orders": int(observed_orders or 0),
+        "observed_at": observed_at.isoformat() if observed_at is not None else None,
+        "age_seconds": _observation_age_seconds(observed_at, now),
     }
 
 
@@ -102,14 +102,14 @@ def _build_book_payload(
     policy = policy or get_market_book_policy()
     now = now or datetime.now(timezone.utc)
     if row is not None:
-        venda = _build_side(
+        sell = _build_side(
             row.menor_venda,
             row.venda_unidades,
             row.venda_qtd,
             row.venda_observada_em,
             now,
         )
-        compra = _build_side(
+        buy = _build_side(
             row.maior_compra,
             row.compra_unidades,
             row.compra_qtd,
@@ -117,36 +117,36 @@ def _build_book_payload(
             now,
         )
     else:
-        venda = _empty_side(now)
-        compra = _empty_side(now)
+        sell = _empty_side(now)
+        buy = _empty_side(now)
 
-    vendido_24h = None
+    sold_24h = None
     if turnover is not None:
-        vendido_24h = {
-            "unidades": turnover["unidades"],
-            "preco_medio": str(turnover["preco_medio"])
-            if turnover["preco_medio"] is not None
+        sold_24h = {
+            "units": turnover["units"],
+            "average_price": str(turnover["average_price"])
+            if turnover["average_price"] is not None
             else None,
         }
 
     return {
-        "venda": venda,
-        "compra": compra,
-        "vendido_24h": vendido_24h,
-        "cobertura": policy.coverage,
-        "janela_frescor_segundos": policy.freshness_seconds,
-        "fontes": sources or {"livro": row is not None, "historico": turnover is not None},
-        "atualizado_em": now.isoformat(),
+        "sell": sell,
+        "buy": buy,
+        "sold_24h": sold_24h,
+        "coverage": policy.coverage,
+        "freshness_window_seconds": policy.freshness_seconds,
+        "sources": sources or {"book": row is not None, "history": turnover is not None},
+        "updated_at": now.isoformat(),
     }
 
 
 def _refresh_cached_ages(payload: dict, now: datetime) -> dict:
-    """Atualiza a idade derivada sem alterar o instante autoritativo observado no cache."""
-    for side_name in ("venda", "compra"):
+    """Refresh the derived age without touching the authoritative observed instant in the cache."""
+    for side_name in ("sell", "buy"):
         side = payload[side_name]
-        observed_raw = side.get("observado_em")
+        observed_raw = side.get("observed_at")
         observed_at = datetime.fromisoformat(observed_raw) if observed_raw else None
-        side["idade_segundos"] = _observation_age_seconds(observed_at, now)
+        side["age_seconds"] = _observation_age_seconds(observed_at, now)
     return payload
 
 
@@ -477,11 +477,11 @@ async def query_24h_turnover(
     result = await session.execute(stmt)
     turnover = {}
     for r in result:
-        unidades = int(r.unidades or 0)
-        preco_medio = (r.silver_total / unidades) if unidades else None
+        units = int(r.unidades or 0)
+        average_price = (r.silver_total / units) if units else None
         turnover[(r.unique_name, r.location_id, r.quality_level)] = {
-            "unidades": unidades,
-            "preco_medio": preco_medio,
+            "units": units,
+            "average_price": average_price,
         }
     return turnover
 
@@ -518,8 +518,8 @@ async def recompute_and_cache_book(
                 "location_id": loc,
                 "quality_level": q,
                 "enchantment_level": e,
-                "venda": payload["venda"],
-                "compra": payload["compra"],
+                "sell": payload["sell"],
+                "buy": payload["buy"],
             },
         )
 
@@ -584,9 +584,9 @@ async def _turnover_window(
         )
     )
     row = (await session.execute(stmt)).one()
-    unidades = int(row.unidades or 0)
-    preco_medio = (row.silver_total / unidades) if unidades else None
-    return {"unidades": unidades, "preco_medio": preco_medio}
+    units = int(row.unidades or 0)
+    average_price = (row.silver_total / units) if units else None
+    return {"units": units, "average_price": average_price}
 
 
 async def _serie_6h(
@@ -618,9 +618,9 @@ async def _serie_6h(
     result = await session.execute(stmt)
     return [
         {
-            "inicio": r.bucket_start,
-            "unidades": int(r.item_amount),
-            "preco_medio": (r.silver_amount / r.item_amount) if r.item_amount else None,
+            "start": r.bucket_start,
+            "units": int(r.item_amount),
+            "average_price": (r.silver_amount / r.item_amount) if r.item_amount else None,
         }
         for r in result
     ]
@@ -648,10 +648,10 @@ async def get_item_demand(
     row = depth_rows.get(combo)
 
     if row is not None:
-        venda = _build_side(
+        sell = _build_side(
             row.menor_venda, row.venda_unidades, row.venda_qtd, row.venda_observada_em, now
         )
-        compra = _build_side(
+        buy = _build_side(
             row.maior_compra,
             row.compra_unidades,
             row.compra_qtd,
@@ -659,19 +659,19 @@ async def get_item_demand(
             now,
         )
     else:
-        venda = _empty_side(now)
-        compra = _empty_side(now)
+        sell = _empty_side(now)
+        buy = _empty_side(now)
 
-    ultimas_24h = await _turnover_window(
+    last_24h = await _turnover_window(
         session, server_id, item_id, location_id, quality_level, 3600, now - timedelta(hours=24)
     )
-    ultimos_7d = await _turnover_window(
+    last_7d = await _turnover_window(
         session, server_id, item_id, location_id, quality_level, 21600, now - timedelta(days=7)
     )
-    ultimos_30d = await _turnover_window(
+    last_30d = await _turnover_window(
         session, server_id, item_id, location_id, quality_level, 21600, now - timedelta(days=30)
     )
-    serie_6h = await _serie_6h(
+    series_6h = await _serie_6h(
         session, server_id, item_id, location_id, quality_level, now - timedelta(days=30)
     )
 
@@ -679,20 +679,20 @@ async def get_item_demand(
 
     return {
         "server": server_id,
-        "item": {"unique_name": item_id, "nome": item_row.name_pt if item_row else None},
+        "item": {"unique_name": item_id, "name": item_row.name_pt if item_row else None},
         "location_id": location_id,
-        "livro": {
-            "venda": venda,
-            "compra": compra,
-            "cobertura": policy.coverage,
-            "janela_frescor_segundos": policy.freshness_seconds,
+        "book": {
+            "sell": sell,
+            "buy": buy,
+            "coverage": policy.coverage,
+            "freshness_window_seconds": policy.freshness_seconds,
         },
-        "vendido": {
-            "ultimas_24h": ultimas_24h,
-            "ultimos_7d": ultimos_7d,
-            "ultimos_30d": ultimos_30d,
+        "sold": {
+            "last_24h": last_24h,
+            "last_7d": last_7d,
+            "last_30d": last_30d,
         },
-        "serie_6h": serie_6h,
+        "series_6h": series_6h,
     }
 
 
@@ -719,7 +719,7 @@ async def get_item_prices(
     )
     combos = [(loc, q, e) for loc, q, e, _, _ in observed_combos]
     sources = {
-        (loc, q, e): {"livro": has_book, "historico": has_history}
+        (loc, q, e): {"book": has_book, "history": has_history}
         for loc, q, e, has_book, has_history in observed_combos
     }
 
@@ -727,7 +727,7 @@ async def get_item_prices(
     if scope != "mine":
         cached = await mget_book_depths(get_redis(), server_id, item_id, combos)
         for combo, payload in cached.items():
-            if payload is not None and payload.get("fontes") != sources[combo]:
+            if payload is not None and payload.get("sources") != sources[combo]:
                 cached[combo] = None
 
     missing = [c for c in combos if cached.get(c) is None]
@@ -772,11 +772,11 @@ async def get_item_prices(
                 "location_id": loc,
                 "quality_level": q,
                 "enchantment_level": e,
-                "venda": payload["venda"],
-                "compra": payload["compra"],
-                "vendido_24h": payload["vendido_24h"],
-                "cobertura": payload["cobertura"],
-                "janela_frescor_segundos": payload["janela_frescor_segundos"],
+                "sell": payload["sell"],
+                "buy": payload["buy"],
+                "sold_24h": payload["sold_24h"],
+                "coverage": payload["coverage"],
+                "freshness_window_seconds": payload["freshness_window_seconds"],
             }
         )
     return {"prices": results, "total": total, "limit": limit, "offset": offset}

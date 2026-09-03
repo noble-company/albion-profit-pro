@@ -373,7 +373,7 @@ export interface paths {
     }
     /**
      * Read Item Prices
-     * @description Consulta observações parciais globais (`scope=all`) ou limita as combinações às fontes de mercado que o usuário autenticado coletou (`scope=mine`). Livro e histórico têm coberturas independentes; `limit`, `offset` e `location_id` controlam o recorte.
+     * @description Global partial observations (`scope=all`), or the combinations limited to the market sources the authenticated user collected (`scope=mine`). Book and history have independent coverage; `limit`, `offset` and `location_id` control the slice. The book sides are `sell` (game offers, the ask) and `buy` (game requests, the bid).
      */
     get: operations['read_item_prices_items__item_id__prices_get']
     put?: never
@@ -393,7 +393,7 @@ export interface paths {
     }
     /**
      * Read Item Demand
-     * @description Consulta a visão global de demanda da plataforma. Este endpoint não aceita `scope`; a cobertura por usuário aplica-se somente ao endpoint de preços.
+     * @description Platform-wide demand view. This endpoint takes no `scope`; per-user coverage applies only to the prices endpoint. `book` is demand parked in the request side, `sold` is real turnover over three windows, `series_6h` is the raw series for a trend plot.
      */
     get: operations['read_item_demand_items__item_id__demand_get']
     put?: never
@@ -634,6 +634,42 @@ export interface components {
        * Format: password
        */
       client_secret?: string | null
+    }
+    /** BookOut */
+    BookOut: {
+      sell: components['schemas']['BookSide']
+      buy: components['schemas']['BookSide']
+      /**
+       * Coverage
+       * @constant
+       */
+      coverage: 'parcial'
+      /** Freshness Window Seconds */
+      freshness_window_seconds: number
+    }
+    /**
+     * BookSide
+     * @description One side of the order book — ``sell`` (game ``offer``, the ask) or ``buy`` (game
+     *     ``request``, the bid). Separate price universes: in real T2 cotton the sell side sat at
+     *     37-39 and the buy side at 1-35 — they must never be collapsed into a single price.
+     */
+    BookSide: {
+      /** Best Price */
+      best_price?: string | null
+      /**
+       * Observed Units
+       * @default 0
+       */
+      observed_units: number
+      /**
+       * Observed Orders
+       * @default 0
+       */
+      observed_orders: number
+      /** Observed At */
+      observed_at?: string | null
+      /** Age Seconds */
+      age_seconds?: number | null
     }
     /** CategoryOut */
     CategoryOut: {
@@ -960,20 +996,20 @@ export interface components {
       | 'ordem_nao_garantida'
     /**
      * DemandOut
-     * @description Responde "quanta gente está comprando isso agora": `livro` é demanda
-     *     parada esperando no livro de ofertas, `vendido` é giro real transacionado em 3 janelas,
-     *     `serie_6h` é a série bruta pra quem quiser plotar tendência. A visão é global e não
-     *     herda o `scope` do endpoint de preços.
+     * @description Answers "how many people are buying this right now": ``book`` is demand parked in the
+     *     request side of the order book, ``sold`` is real turnover over three windows, ``series_6h``
+     *     is the raw series for plotting a trend. The view is global and does not inherit the
+     *     ``scope`` of the prices endpoint.
      */
     DemandOut: {
       server: components['schemas']['AlbionServer']
-      item: components['schemas']['ItemResumo']
+      item: components['schemas']['ItemSummary']
       /** Location Id */
       location_id: string
-      livro: components['schemas']['LivroOut']
-      vendido: components['schemas']['VendidoOut']
-      /** Serie 6H */
-      serie_6h: components['schemas']['PontoSerie6h'][]
+      book: components['schemas']['BookOut']
+      sold: components['schemas']['SoldOut']
+      /** Series 6H */
+      series_6h: components['schemas']['Series6hPoint'][]
     }
     /** ErrorModel */
     ErrorModel: {
@@ -1054,14 +1090,14 @@ export interface components {
       shop_subcategory2: string | null
       /** Shop Subcategory3 */
       shop_subcategory3: string | null
-      /** Tem Receita */
-      tem_receita: boolean
+      /** Has Recipe */
+      has_recipe: boolean
     }
     /**
      * ItemPricesOut
-     * @description Preços globais ou combinações cobertas pelo usuário, conforme `scope`.
+     * @description Global partial observations, or the combinations covered by the user, per ``scope``.
      *
-     *     Em `mine`, a cobertura de livro e a de histórico são independentes.
+     *     Under ``mine`` the book coverage and the history coverage are independent.
      */
     ItemPricesOut: {
       server: components['schemas']['AlbionServer']
@@ -1073,7 +1109,7 @@ export interface components {
        */
       scope: 'all' | 'mine'
       /** Prices */
-      prices: components['schemas']['PrecoPorLocal'][]
+      prices: components['schemas']['LocationPrice'][]
       /** Total */
       total: number
       /** Limit */
@@ -1081,48 +1117,12 @@ export interface components {
       /** Offset */
       offset: number
     }
-    /** ItemResumo */
-    ItemResumo: {
+    /** ItemSummary */
+    ItemSummary: {
       /** Unique Name */
       unique_name: string
-      /** Nome */
-      nome?: string | null
-    }
-    /**
-     * LadoDoLivro
-     * @description Um lado do livro de ofertas — venda (`offer`) ou compra (`request`). São universos de
-     *     preço separados (no algodão T2 real, venda ficou 37-39 e compra 1-35 — nunca
-     *     devem se misturar num preço só).
-     */
-    LadoDoLivro: {
-      /** Melhor Preco */
-      melhor_preco?: string | null
-      /**
-       * Unidades Observadas
-       * @default 0
-       */
-      unidades_observadas: number
-      /**
-       * Ordens Observadas
-       * @default 0
-       */
-      ordens_observadas: number
-      /** Observado Em */
-      observado_em?: string | null
-      /** Idade Segundos */
-      idade_segundos?: number | null
-    }
-    /** LivroOut */
-    LivroOut: {
-      venda: components['schemas']['LadoDoLivro']
-      compra: components['schemas']['LadoDoLivro']
-      /**
-       * Cobertura
-       * @constant
-       */
-      cobertura: 'parcial'
-      /** Janela Frescor Segundos */
-      janela_frescor_segundos: number
+      /** Name */
+      name?: string | null
     }
     /** LocationOut */
     LocationOut: {
@@ -1136,6 +1136,25 @@ export interface components {
       kind: string
       /** Is Royal City */
       is_royal_city: boolean
+    }
+    /** LocationPrice */
+    LocationPrice: {
+      /** Location Id */
+      location_id: string
+      /** Quality Level */
+      quality_level: number
+      /** Enchantment Level */
+      enchantment_level: number
+      sell: components['schemas']['BookSide']
+      buy: components['schemas']['BookSide']
+      sold_24h?: components['schemas']['SoldVolume'] | null
+      /**
+       * Coverage
+       * @constant
+       */
+      coverage: 'parcial'
+      /** Freshness Window Seconds */
+      freshness_window_seconds: number
     }
     /**
      * ManualPriceOverride
@@ -1325,37 +1344,6 @@ export interface components {
       immediate_sale: components['schemas']['MarketQuoteOut']
       sell_order: components['schemas']['MarketQuoteOut']
     }
-    /** PontoSerie6h */
-    PontoSerie6h: {
-      /**
-       * Inicio
-       * Format: date-time
-       */
-      inicio: string
-      /** Unidades */
-      unidades: number
-      /** Preco Medio */
-      preco_medio?: string | null
-    }
-    /** PrecoPorLocal */
-    PrecoPorLocal: {
-      /** Location Id */
-      location_id: string
-      /** Quality Level */
-      quality_level: number
-      /** Enchantment Level */
-      enchantment_level: number
-      venda: components['schemas']['LadoDoLivro']
-      compra: components['schemas']['LadoDoLivro']
-      vendido_24h?: components['schemas']['VolumeVendido'] | null
-      /**
-       * Cobertura
-       * @constant
-       */
-      cobertura: 'parcial'
-      /** Janela Frescor Segundos */
-      janela_frescor_segundos: number
-    }
     /** QuoteLevelOut */
     QuoteLevelOut: {
       /** Unit Price */
@@ -1400,8 +1388,8 @@ export interface components {
       count: number
       /** Enchantment Level */
       enchantment_level: number
-      /** Tem Receita Propria */
-      tem_receita_propria: boolean
+      /** Has Own Recipe */
+      has_own_recipe: boolean
     }
     /** RecipeItemOut */
     RecipeItemOut: {
@@ -1430,8 +1418,8 @@ export interface components {
       /** Ingredients */
       ingredients: components['schemas']['RecipeIngredientOut'][]
       upgrade_resource: components['schemas']['RecipeUpgradeResourceOut'] | null
-      /** Variantes Encantadas */
-      variantes_encantadas: string[]
+      /** Enchanted Variants */
+      enchanted_variants: string[]
     }
     /** RecipeSimulationOut */
     RecipeSimulationOut: {
@@ -1472,6 +1460,35 @@ export interface components {
      * @enum {string}
      */
     SaleMode: 'immediate' | 'sell_order'
+    /** Series6hPoint */
+    Series6hPoint: {
+      /**
+       * Start
+       * Format: date-time
+       */
+      start: string
+      /** Units */
+      units: number
+      /** Average Price */
+      average_price?: string | null
+    }
+    /** SoldOut */
+    SoldOut: {
+      last_24h: components['schemas']['SoldVolume']
+      last_7d: components['schemas']['SoldVolume']
+      last_30d: components['schemas']['SoldVolume']
+    }
+    /**
+     * SoldVolume
+     * @description Real turnover, from ``markethistories.ingest`` — the price actually transacted, not what
+     *     someone is asking for in the book.
+     */
+    SoldVolume: {
+      /** Units */
+      units: number
+      /** Average Price */
+      average_price?: string | null
+    }
     /** UpgradeStepOut */
     UpgradeStepOut: {
       /** From Level */
@@ -1563,23 +1580,6 @@ export interface components {
       input?: unknown
       /** Context */
       ctx?: Record<string, never>
-    }
-    /** VendidoOut */
-    VendidoOut: {
-      ultimas_24h: components['schemas']['VolumeVendido']
-      ultimos_7d: components['schemas']['VolumeVendido']
-      ultimos_30d: components['schemas']['VolumeVendido']
-    }
-    /**
-     * VolumeVendido
-     * @description Giro real nas últimas 24h, vindo de `markethistories.ingest` (preço realmente
-     *     transacionado — diferente do que alguém está pedindo no livro).
-     */
-    VolumeVendido: {
-      /** Unidades */
-      unidades: number
-      /** Preco Medio */
-      preco_medio?: string | null
     }
   }
   responses: never

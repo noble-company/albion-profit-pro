@@ -81,7 +81,7 @@ async def get_recipe_detail(session: AsyncSession, unique_name: str) -> dict:
             RecipeIngredient,
             ingredient_item.name_pt,
             ingredient_item.name_en,
-            has_own_recipe.label("tem_receita_propria"),
+            has_own_recipe.label("has_own_recipe"),
         )
         .outerjoin(
             ingredient_item,
@@ -99,9 +99,9 @@ async def get_recipe_detail(session: AsyncSession, unique_name: str) -> dict:
             "name_en": name_en,
             "count": ingredient.count,
             "enchantment_level": ingredient.enchantment_level,
-            "tem_receita_propria": tem_receita_propria,
+            "has_own_recipe": has_own_recipe,
         }
-        for ingredient, name_pt, name_en, tem_receita_propria in ingredient_rows
+        for ingredient, name_pt, name_en, has_own_recipe in ingredient_rows
     ]
 
     upgrade_resource = None
@@ -143,5 +143,5 @@ async def get_recipe_detail(session: AsyncSession, unique_name: str) -> dict:
         "craft_time": recipe.craft_time,
         "ingredients": ingredients,
         "upgrade_resource": upgrade_resource,
-        "variantes_encantadas": list(variants),
+        "enchanted_variants": list(variants),
     }

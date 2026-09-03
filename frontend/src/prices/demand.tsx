@@ -104,12 +104,12 @@ export function DemandaItem({
     )
   if (error) return <EstadoErro title="Não foi possível carregar a demanda" />
   if (!data) return <Carregando label="Carregando demanda…" />
-  const points = data.serie_6h.map((point) => ({
-    hora: new Date(point.inicio).toLocaleTimeString('pt-BR', {
+  const points = data.series_6h.map((point) => ({
+    hora: new Date(point.start).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
       minute: '2-digit',
     }),
-    unidades: point.unidades,
+    unidades: point.units,
   }))
   return (
     <section className="mt-10">
@@ -121,28 +121,28 @@ export function DemandaItem({
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card
           title="Livro atual · venda"
-          units={data.livro.venda.unidades_observadas}
-          price={data.livro.venda.melhor_preco}
+          units={data.book.sell.observed_units}
+          price={data.book.sell.best_price}
         />
         <Card
           title="Livro atual · compra"
-          units={data.livro.compra.unidades_observadas}
-          price={data.livro.compra.melhor_preco}
+          units={data.book.buy.observed_units}
+          price={data.book.buy.best_price}
         />
         <Card
           title="Vendido · 24 h"
-          units={data.vendido.ultimas_24h.unidades}
-          price={data.vendido.ultimas_24h.preco_medio}
+          units={data.sold.last_24h.units}
+          price={data.sold.last_24h.average_price}
         />
         <Card
           title="Vendido · 7 d"
-          units={data.vendido.ultimos_7d.unidades}
-          price={data.vendido.ultimos_7d.preco_medio}
+          units={data.sold.last_7d.units}
+          price={data.sold.last_7d.average_price}
         />
         <Card
           title="Vendido · 30 d"
-          units={data.vendido.ultimos_30d.unidades}
-          price={data.vendido.ultimos_30d.preco_medio}
+          units={data.sold.last_30d.units}
+          price={data.sold.last_30d.average_price}
         />
       </div>
       <h3 className="mt-8 text-lg font-semibold">

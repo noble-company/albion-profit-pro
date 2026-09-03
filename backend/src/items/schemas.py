@@ -14,7 +14,7 @@ class ItemCatalogOut(BaseModel):
     shop_subcategory: str | None
     shop_subcategory2: str | None
     shop_subcategory3: str | None
-    tem_receita: bool
+    has_recipe: bool
 
 
 class LocationOut(BaseModel):

@@ -73,12 +73,12 @@ async def test_process_market_orders_inserts_batch_and_updates_cache(db_session)
         ("1002", 1, 0)
     ]
     assert cached is not None
-    # profundidade recalculada do Postgres (task 29, achado C4): melhor_preco é o MENOR
-    # preço de venda do livro inteiro pra essa combinação (100), não o primeiro/último
+    # profundidade recalculada do Postgres (task 29, achado C4): best_price is the LOWEST
+    # sell price across the whole book pra essa combinação (100), não o primeiro/último
     # do lote (120) — e soma as duas ordens na quantidade total.
-    assert Decimal(cached["venda"]["melhor_preco"]) == Decimal("100")
-    assert cached["venda"]["unidades_observadas"] == 60
-    assert cached["venda"]["ordens_observadas"] == 2
+    assert Decimal(cached["sell"]["best_price"]) == Decimal("100")
+    assert cached["sell"]["observed_units"] == 60
+    assert cached["sell"]["observed_orders"] == 2
 
 
 async def test_process_market_orders_with_empty_list_does_nothing():
