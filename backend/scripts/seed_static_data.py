@@ -83,7 +83,7 @@ class DatasetManifest(BaseModel):
     schema_version: int = Field(ge=2, le=2)
     dataset_name: str = Field(min_length=1, max_length=64)
     version: str = Field(min_length=1, max_length=128)
-    transform_revision: str = Field(min_length=1, max_length=64)
+    transform_revision: str = Field(min_length=1, max_length=128)
     source: SourceManifest
     files: FilesManifest
     locations: LocationsManifest

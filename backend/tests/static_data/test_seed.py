@@ -48,6 +48,7 @@ def _write_dataset(tmp_path: Path, *, expected_overrides: dict | None = None):
                         {
                             "@uniquename": "ZZSEED_CLOTH",
                             "@tier": "2",
+                            "@shopsubcategory1": "refinedresources",
                             "craftingrequirements": {
                                 "@amountcrafted": "1",
                                 "craftresource": [
@@ -246,6 +247,10 @@ async def test_nova_revisao_de_transformacao_reaplica_dataset(tmp_path, db_sessi
         "ZZSEED_FIBER",
         "ZZSEED_CATALYST",
     ]
+    # B11: a coluna derivada production_kind é recalculada na reaplicação (ZZSEED_CLOTH é
+    # simpleitem = refino).
+    recipe = await db_session.scalar(select(Recipe))
+    assert recipe.production_kind == "refining"
 
 
 async def test_seed_rejeita_revisao_de_transformacao_desconhecida(tmp_path):

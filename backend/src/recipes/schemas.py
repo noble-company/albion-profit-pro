@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -24,6 +25,7 @@ class RecipeUpgradeResourceOut(RecipeItemOut):
 class RecipeOut(BaseModel):
     output: RecipeItemOut
     enchantment_level: int
+    production_kind: Literal["refining", "crafting"]
     silver_cost: int
     crafting_focus: int
     amount_crafted: int

@@ -125,6 +125,7 @@ def build_recipe(
     not_found: list[str],
     skipped_multi_recipe: list[str],
     prefer_standard_refining_route: bool = False,
+    production_kind: str = "crafting",
 ) -> Recipe | None:
     """Monta uma Recipe (+ ingredientes) pra uma combinação (item, nível de
     encantamento). Retorna None se `requirements` for uma lista (receita
@@ -157,6 +158,7 @@ def build_recipe(
         crafting_focus=int(requirements.get("@craftingfocus", 0)),
         amount_crafted=int(requirements.get("@amountcrafted", 1)),
         craft_time=float(requirements.get("@time", 0)),
+        production_kind=production_kind,
     )
     if upgrade_resource is not None:
         upgrade_unique_name = upgrade_resource["@uniquename"]
@@ -192,7 +194,11 @@ def prepare_recipe_import(
 
     for entry, requirements in iter_craftable_items(dump_items):
         base_unique_name = entry["@uniquename"]
+        # `B11`: refino x fabricação vem do `@shopsubcategory1 == "refinedresources"` do dump
+        # (o mesmo sinal já usado para a rota de refino padrão), não de substring em tempo de
+        # consulta. Recursos refinados (barra, tábua, tecido, couro, bloco) são o único caso.
         is_refined_resource = entry.get("@shopsubcategory1") == REFINED_RESOURCE_SUBCATEGORY
+        production_kind = "refining" if is_refined_resource else "crafting"
 
         base_recipe = build_recipe(
             base_unique_name,
@@ -203,6 +209,7 @@ def prepare_recipe_import(
             not_found=not_found,
             skipped_multi_recipe=skipped_multi_recipe,
             prefer_standard_refining_route=is_refined_resource,
+            production_kind=production_kind,
         )
         if base_recipe is not None:
             recipes.append(base_recipe)
@@ -234,6 +241,7 @@ def prepare_recipe_import(
                 not_found=not_found,
                 skipped_multi_recipe=skipped_multi_recipe,
                 prefer_standard_refining_route=is_refined_resource,
+                production_kind=production_kind,
             )
             if level_recipe is not None:
                 recipes.append(level_recipe)

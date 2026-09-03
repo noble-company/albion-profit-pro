@@ -48,3 +48,63 @@ Tasks 01 e 03 (a tabela de ranking já deve existir para receber a coluna nova).
 
 Comparar as duas listas (heurística antiga x classificação nova) e revisar as diferenças item a
 item com o dump do jogo em mãos.
+
+## Estado da implementação
+
+Concluída em 2026-08-31.
+
+### Sinal escolhido
+
+**`@shopsubcategory1 == "refinedresources"`** no `ITEM DUMP.json` — o mesmo sinal que o import
+já usava pra `select_standard_refining_requirements`. `simpleitem` foi descartado como sinal:
+essa categoria é um saco de gato (molho de peixe, trade packs, poções-base…), classificaria
+1.100 receitas erradas.
+
+### O que foi feito
+
+1. `scripts/import_recipes.py`: `production_kind = "refining" if is_refined_resource else
+   "crafting"`, gravado por receita (base e cada nível de encantamento). Sem mudança em
+   `_dumps.py` (o sinal já estava na entrada).
+2. **`Recipe.production_kind`** — `String(16)`, `CHECK IN ('refining','crafting')`, índice
+   `ix_recipe_production_kind`. Migração `e6a1b2c3d4e5` (server_default `'crafting'` — seguro:
+   nada aparece como refino por engano num install que não reseeda).
+3. Bump de `STATIC_TRANSFORM_REVISION` (`…-production-kind-v1`) **e** do `transform_revision` no
+   manifesto → o SHA-256 do manifesto muda → `apply_dataset` não vê `unchanged` → **reseeda e
+   recalcula a coluna** em instalações já semeadas (caminho ciente do `W2`). `max_length` do
+   campo subiu de 64 → 128.
+4. `ranking_service.rebuild_ranking` lê `Recipe.production_kind` (`output_kind` dict); removido
+   `_is_refining_category`. `RecipeRanking.is_refining` continua gravado, agora do dado.
+5. `RecipeOut` ganha `production_kind` (detalhe de receita); `schema.d.ts` regenerado.
+6. `docs/02-dados-de-receita.md`: seção nova documentando o sinal e a contagem.
+
+### `B11` / índice — já resolvido pela task 03
+
+O `ilike '%...%'` sem índice que o `B11` cita (`_refining_item_filter`) foi **removido na task
+03** junto com o `recipe_opportunities` antigo. A leitura do ranking já filtra
+`RecipeRanking.is_refining` por igualdade indexada (`ix_recipe_ranking_order`,
+`ix_recipe_ranking_filters`). Esta task tira a última substring que sobrava — no **job**
+(`rebuild_ranking`), não no request. `EXPLAIN` da leitura inalterado (medido na task 03:
+`~0,6 ms`, top-N heapsort).
+
+### Reclassificação (spec ponto 5)
+
+Contra o dump real (revisão `5cf2e8e9…`, 5.633 receitas):
+
+| | Heurística antiga (substring) | Nova (`refinedresources`) |
+|---|---|---|
+| `refining` | 150 | **110** |
+| `crafting` | 5.483 | 5.523 |
+
+**40 receitas (0,7%) mudam** — todas de `refining`→`crafting`, todas falsos-positivos da
+substring `resource` (recursos crus `T5_WOOD`/`T5_ROCK`/… com receita de yield de gathering).
+Nenhuma receita de refino real sai da lista (0 mudam de `crafting`→`refining`).
+
+### Testes
+
+- `uv run pytest tests/ -q` → **334 passed**. `uv run ruff check .` → limpo.
+- `tests/static_data/test_production_kind.py` (novo): recurso refinado com `shop_category` fora
+  do padrão de substring → `refining`; arma com "material" na subcategoria → `crafting`.
+- `tests/static_data/test_seed.py::test_nova_revisao_de_transformacao_reaplica_dataset`:
+  assert de que a coluna é recalculada na reaplicação.
+- Testes de ranking/craft atualizados para passar `production_kind` no `Recipe(...)` dos seeds.
+- Frontend `lint`/`typecheck`/`test` → 0 erros, 24 verdes.

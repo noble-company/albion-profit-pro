@@ -137,6 +137,7 @@ async def get_recipe_detail(session: AsyncSession, unique_name: str) -> dict:
             "name_en": output_item.name_en,
         },
         "enchantment_level": recipe.enchantment_level,
+        "production_kind": recipe.production_kind,
         "silver_cost": recipe.silver_cost,
         "crafting_focus": recipe.crafting_focus,
         "amount_crafted": recipe.amount_crafted,

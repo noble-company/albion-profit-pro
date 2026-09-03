@@ -1,6 +1,14 @@
 import uuid
 
-from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
@@ -10,6 +18,12 @@ class Recipe(Base):
     """Uma receita = como craftar/refinar UM item (o output)."""
 
     __tablename__ = "recipe"
+    __table_args__ = (
+        CheckConstraint(
+            "production_kind IN ('refining', 'crafting')", name="ck_recipe_production_kind"
+        ),
+        Index("ix_recipe_production_kind", "production_kind"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
 
@@ -34,6 +48,11 @@ class Recipe(Base):
     silver_cost: Mapped[int] = mapped_column(default=0)  # @silver
     crafting_focus: Mapped[int] = mapped_column(default=0)  # @craftingfocus
     amount_crafted: Mapped[int] = mapped_column(default=1)  # @amountcrafted
+
+    # `refining` sse o output veio da categoria `simpleitem` do ITEM DUMP.json; `crafting` pro
+    # resto (equipment/weapon/consumable). Deriva do dado no import, não de substring da
+    # categoria da loja em tempo de consulta (`B11`, task 3.5/09).
+    production_kind: Mapped[str] = mapped_column(String(16), default="crafting")
     craft_time: Mapped[float] = mapped_column(
         Numeric(10, 5), default=0
     )  # @time (unidade não confirmada, ver docs/02)

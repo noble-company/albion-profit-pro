@@ -165,6 +165,23 @@ Vale a pena o script de import (`backend/scripts/import_recipes.py`) já popular
 - `@weight` — peso (relevante se formos calcular custo de transporte/fast travel depois)
 - `@shopcategory` / `@shopsubcategory1` / `@shopsubcategory2` — categoria (ex: `crafting` / `refinedresources` / `cloth`) — útil pra filtros na UI da calculadora
 
+## Refino x fabricação — `production_kind` (`Recipe`, task 3.5/09, `B11`)
+
+A distinção **refino x fabricação** vem de **`@shopsubcategory1 == "refinedresources"`** na
+entrada do item no `ITEM DUMP.json` — o mesmo sinal já usado pra escolher a rota de refino
+padrão (`select_standard_refining_requirements`). É gravado como `Recipe.production_kind`
+(`"refining"` / `"crafting"`) no import, não decidido por substring (`resource`/`refin`/
+`material`) na categoria em tempo de consulta.
+
+- No dump real (revisão `5cf2e8e9…`): **110 receitas** são `refining` (barra, tábua, tecido,
+  couro, bloco — base + níveis de encantamento), **5.523** são `crafting`.
+- A `simpleitem` **não** serve como sinal: além de recursos refinados, ela contém molho de
+  peixe, trade packs, poções-base, etc.
+- Vs. a heurística antiga (substring na `shop_category`): **40 receitas** mudam de classificação
+  (0,7%) — todas eram falsos-refino (`T5_WOOD`, `T5_ROCK` e afins, recursos crus com receita de
+  yield de gathering que a substring `resource` pegava). Nenhuma receita de refino real sai da
+  lista.
+
 ## Pendências
 - ~~**Criar a tabela `item`**~~ — feito na task 28: `src/items/models.py` + `scripts/import_items.py`,
   **12.062 de 12.071** itens do `items.json` importados (9 pulados por excederem `String(64)` —

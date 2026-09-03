@@ -237,7 +237,11 @@ async def test_refining_ranking_reads_materialized_table_with_projection(client,
         ]
     )
     recipe = Recipe(
-        output_item_unique_name=output_id, output_item_id=1, silver_cost=0, amount_crafted=1
+        output_item_unique_name=output_id,
+        output_item_id=1,
+        silver_cost=0,
+        amount_crafted=1,
+        production_kind="refining",
     )
     recipe.ingredients.append(
         RecipeIngredient(

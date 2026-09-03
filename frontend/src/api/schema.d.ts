@@ -1407,6 +1407,11 @@ export interface components {
       output: components['schemas']['RecipeItemOut']
       /** Enchantment Level */
       enchantment_level: number
+      /**
+       * Production Kind
+       * @enum {string}
+       */
+      production_kind: 'refining' | 'crafting'
       /** Silver Cost */
       silver_cost: number
       /** Crafting Focus */

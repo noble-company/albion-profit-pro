@@ -40,11 +40,6 @@ _ZERO = Decimal("0")
 _SENTINEL_USER = uuid.UUID(int=0)
 
 
-def _is_refining_category(shop_category: str | None, shop_subcategory: str | None) -> bool:
-    category = " ".join(v.lower() for v in (shop_category, shop_subcategory) if v)
-    return any(token in category for token in ("resource", "refin", "material"))
-
-
 def _min_dt(values: list[datetime | None]) -> datetime | None:
     real = [v for v in values if v is not None]
     return min(real) if real else None
@@ -156,6 +151,12 @@ async def rebuild_ranking(session: AsyncSession, server: str) -> RecipeRankingRu
             )
         )
     }
+    output_kind = {
+        output_item: kind
+        for output_item, kind in await session.execute(
+            select(Recipe.output_item_unique_name, Recipe.production_kind).distinct()
+        )
+    }
     ingredient_names = {
         unique_name: (name_pt or name_en)
         for unique_name, name_pt, name_en in await session.execute(
@@ -227,7 +228,7 @@ async def rebuild_ranking(session: AsyncSession, server: str) -> RecipeRankingRu
                 "output_quality": output_quality,
                 "enchantment_level": item.enchantment_level or 0,
                 "tier": item.tier,
-                "is_refining": _is_refining_category(item.shop_category, item.shop_subcategory),
+                "is_refining": output_kind.get(output_item) == "refining",
                 "recipe_silver_cost": components.recipe_silver_cost,
                 "crafting_focus": components.crafting_focus,
                 "amount_crafted": components.amount_crafted,

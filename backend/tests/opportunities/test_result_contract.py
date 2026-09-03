@@ -92,9 +92,16 @@ async def _seed_all_kinds(db_session) -> dict:
             ),
         ]
     )
-    for out_name, in_name in ((refine_out, refine_in), (craft_out, craft_in)):
+    for out_name, in_name, kind in (
+        (refine_out, refine_in, "refining"),
+        (craft_out, craft_in, "crafting"),
+    ):
         recipe = Recipe(
-            output_item_unique_name=out_name, output_item_id=1, silver_cost=0, amount_crafted=1
+            output_item_unique_name=out_name,
+            output_item_id=1,
+            silver_cost=0,
+            amount_crafted=1,
+            production_kind=kind,
         )
         recipe.ingredients.append(
             RecipeIngredient(
