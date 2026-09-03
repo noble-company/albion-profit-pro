@@ -18,6 +18,11 @@ const LazyHome = lazy(() => Promise.resolve({ default: MarketFlipPage }))
 const LazyItems = lazy(() => Promise.resolve({ default: BuscaItem }))
 const LazyItem = lazy(() => Promise.resolve({ default: ItemPricesPage }))
 const LazyCalculator = lazy(() => Promise.resolve({ default: CalculadoraPage }))
+// Rota temporária da task 3.5/11 — demo dos primitivos shadcn/ui. Lazy pra não pesar o bundle
+// principal com um arquivo que importa todos os componentes de uma vez.
+const LazyUiPreview = lazy(() =>
+  import('@/components/ui/Preview').then((m) => ({ default: m.UiPreview })),
+)
 function Boundary({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={<p role="status">Carregando…</p>}>{children}</Suspense>
@@ -67,6 +72,14 @@ export function App() {
           <Route path="/refino" element={<RefiningRankingPage />} />
           <Route path="/craft" element={<CraftingRankingPage />} />
           <Route path="/tokens" element={<TokensPage />} />
+          <Route
+            path="/ui"
+            element={
+              <Boundary>
+                <LazyUiPreview />
+              </Boundary>
+            }
+          />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -115,7 +115,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 08 — Decisão do pub/sub de preço *(Opção B — pub/sub removido)*
 - [x] 09 — Classificação de refino
 - [ ] 10 — Antifraude de mercado *(adiada por decisão de produto)*
-- [ ] 11 — shadcn/ui de verdade
+- [x] 11 — shadcn/ui de verdade
 - [ ] 12 — Tokens de design
 - [ ] 13 — Tema claro/escuro real
 - [ ] 14 — Linguagem visual do produto

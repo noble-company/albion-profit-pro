@@ -1,3 +1,4 @@
+import { Menu } from 'lucide-react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { REALMS, useServer } from '@/app/ServerContext'
@@ -28,7 +29,7 @@ export function AppShell() {
             className="rounded border border-stone-700 px-3 py-1 md:hidden"
             onClick={() => setOpen(!open)}
           >
-            ☰
+            <Menu className="size-5" aria-hidden="true" />
           </button>
           <nav
             className={`${open ? 'block' : 'hidden'} absolute left-0 right-0 top-14 z-40 border-b border-stone-700 bg-stone-900 p-4 md:static md:block md:border-0 md:p-0`}

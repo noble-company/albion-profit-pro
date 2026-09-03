@@ -44,4 +44,12 @@ export default tseslint.config(
       'react-refresh/only-export-components': 'off',
     },
   },
+  {
+    // Componentes shadcn/ui vendorizados: exportam o componente + a função de variantes cva
+    // no mesmo arquivo (padrão da lib). Regra desligada só nessa pasta.
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 )

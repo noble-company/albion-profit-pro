@@ -1,3 +1,4 @@
+import { ArrowLeftRight } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { RequireRealm } from '@/components/AppShell'
@@ -382,8 +383,8 @@ function DashboardContent() {
       )}
       {!result.loading && !result.error && rows.length === 0 && (
         <div className="rounded-2xl border border-dashed border-stone-700/80 bg-gradient-to-b from-stone-900/40 to-stone-950 px-6 py-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-stone-700 bg-stone-900 text-xl text-stone-400">
-            ⇄
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-stone-700 bg-stone-900 text-stone-400">
+            <ArrowLeftRight className="size-5" aria-hidden="true" />
           </div>
           <h2 className="mt-4 font-bold text-stone-200">
             Nenhuma oportunidade encontrada

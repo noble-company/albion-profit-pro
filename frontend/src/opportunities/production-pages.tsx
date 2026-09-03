@@ -1,3 +1,4 @@
+import { TrendingUp, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
@@ -417,8 +418,8 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       )}
       {!result.loading && !result.error && rows.length === 0 && (
         <div className="rounded-2xl border border-dashed border-stone-700/80 bg-gradient-to-b from-stone-900/40 to-stone-950 px-6 py-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-stone-700 bg-stone-900 text-xl text-stone-400">
-            ↗
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-stone-700 bg-stone-900 text-stone-400">
+            <TrendingUp className="size-5" aria-hidden="true" />
           </div>
           <h2 className="mt-4 font-bold text-stone-200">
             Nenhuma oportunidade encontrada
@@ -666,11 +667,11 @@ function DetailDrawer({
           </div>
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-700 bg-stone-950 text-lg text-stone-400 transition hover:border-stone-500 hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-700 bg-stone-950 text-stone-400 transition hover:border-stone-500 hover:text-white"
             onClick={onClose}
             aria-label="Fechar análise"
           >
-            ×
+            <X className="size-4" aria-hidden="true" />
           </button>
         </div>
         {loading && <Carregando label="Calculando quatro cenários…" />}

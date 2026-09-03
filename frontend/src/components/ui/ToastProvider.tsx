@@ -1,33 +1,21 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  type PropsWithChildren,
-} from 'react'
-type ToastContextValue = { toast: (message: string) => void }
-const ToastContext = createContext<ToastContextValue | null>(null)
+import type { PropsWithChildren } from 'react'
+import { toast as sonnerToast } from 'sonner'
+
+import { Toaster } from '@/components/ui/sonner'
+
+/**
+ * Wrapper fino sobre o `sonner`. Mantém a API `useToast().toast(mensagem)` que o resto do
+ * app já usa; a fila, o empilhamento e a acessibilidade vêm do primitivo.
+ */
 export function ToastProvider({ children }: PropsWithChildren) {
-  const [message, setMessage] = useState<string | null>(null)
   return (
-    <ToastContext.Provider value={{ toast: setMessage }}>
+    <>
       {children}
-      {message && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-4 right-4 z-50 rounded-lg bg-stone-800 px-4 py-3 text-sm text-white shadow-xl"
-        >
-          <span>{message}</span>
-          <button className="ml-3 underline" onClick={() => setMessage(null)}>
-            Fechar
-          </button>
-        </div>
-      )}
-    </ToastContext.Provider>
+      <Toaster position="bottom-right" richColors closeButton />
+    </>
   )
 }
+
 export function useToast() {
-  const value = useContext(ToastContext)
-  if (!value) throw new Error('useToast deve ser usado dentro de ToastProvider')
-  return value
+  return { toast: (message: string) => sonnerToast(message) }
 }
