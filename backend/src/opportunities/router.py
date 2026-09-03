@@ -9,9 +9,16 @@ from src.opportunities.cache import get_cached, set_cached
 from src.opportunities.schemas import OpportunityPage
 from src.opportunities.service import flip_opportunities, recipe_opportunities
 from src.prices.constants import AlbionServer
+from src.rate_limit import rate_limited_user
+
+# Endpoint de leitura mais caro do produto. Limite por usuário (não por IP) e por rota — a chave
+# do rate limit já inclui o path. fail-open: a queda do cache não deve derrubar a leitura.
+_opportunities_rate_limit = Depends(rate_limited_user("rl:opportunities", limit=60, seconds=60))
 
 router = APIRouter(
-    prefix="/opportunities", tags=["opportunities"], dependencies=[Depends(current_active_user)]
+    prefix="/opportunities",
+    tags=["opportunities"],
+    dependencies=[Depends(current_active_user), _opportunities_rate_limit],
 )
 
 

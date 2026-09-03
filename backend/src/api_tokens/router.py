@@ -6,7 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api_tokens.dependencies import rate_limited_api_token
 from src.api_tokens.models import ApiToken
 from src.api_tokens.schemas import ApiTokenCreated, ApiTokenPublic, ClientIdentity
-from src.api_tokens.service import create_token, list_tokens_for_user, revoke_token
+from src.api_tokens.service import (
+    MAX_ACTIVE_TOKENS_PER_USER,
+    TokenLimitReached,
+    create_token,
+    list_tokens_for_user,
+    revoke_token,
+)
 from src.auth.dependencies import current_active_user
 from src.auth.models import User
 from src.database import get_session
@@ -48,7 +54,16 @@ async def create_api_token(
     session: AsyncSession = Depends(get_session),
 ):
     """Gera um novo token pro usuário logado colar no config.yaml do client Go."""
-    return await create_token(session, user.id)
+    try:
+        return await create_token(session, user.id)
+    except TokenLimitReached:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Limite de {MAX_ACTIVE_TOKENS_PER_USER} tokens ativos atingido. "
+                "Revogue um token que você não usa mais antes de criar outro."
+            ),
+        ) from None
 
 
 @router.get("", response_model=list[ApiTokenPublic])

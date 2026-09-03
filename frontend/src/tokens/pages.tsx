@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ApiError } from '@/api'
 import { EstadoErro, EstadoVazio, Carregando } from '@/components/ui/states'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useCreateToken, useRevokeToken, useTokens } from './hooks'
@@ -108,8 +109,12 @@ export function TokensPage() {
   const generate = async () => {
     try {
       setCreated(await create.mutateAsync())
-    } catch {
-      toast('Não foi possível criar o token.')
+    } catch (error) {
+      const detail =
+        error instanceof ApiError && typeof error.detail === 'string'
+          ? error.detail
+          : 'Não foi possível criar o token.'
+      toast(detail)
     }
   }
   const revokeOne = async (id: string) => {

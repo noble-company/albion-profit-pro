@@ -3,7 +3,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api_tokens.models import ApiToken
@@ -11,6 +11,25 @@ from src.api_tokens.models import ApiToken
 # Granularidade do update de `ultimo_uso_em` — token de API é usado a cada request de
 # ingest; escrever a cada uma tornaria isso o gargalo do caminho quente.
 ULTIMO_USO_GRANULARIDADE = timedelta(hours=1)
+
+# Teto de tokens ativos por usuário. Um jogador precisa de um por máquina que roda o client;
+# 10 cobre qualquer uso legítimo e impede geração indefinida.
+MAX_ACTIVE_TOKENS_PER_USER = 10
+
+
+class TokenLimitReached(Exception):
+    """O usuário já tem MAX_ACTIVE_TOKENS_PER_USER tokens ativos."""
+
+
+async def count_active_tokens_for_user(session: AsyncSession, user_id: uuid.UUID) -> int:
+    return int(
+        await session.scalar(
+            select(func.count())
+            .select_from(ApiToken)
+            .where(ApiToken.user_id == user_id, ApiToken.revoked_at.is_(None))
+        )
+        or 0
+    )
 
 
 def generate_token() -> str:
@@ -24,7 +43,12 @@ def hash_token(cru: str) -> str:
 async def create_token(session: AsyncSession, user_id: uuid.UUID) -> ApiToken:
     """Devolve a instância com o valor cru acessível via `.token` — atributo Python comum,
     não uma coluna mapeada, então nunca é persistido. É a única vez que esse valor existe
-    fora da memória do processo que gerou."""
+    fora da memória do processo que gerou.
+
+    Levanta ``TokenLimitReached`` quando o usuário já tem ``MAX_ACTIVE_TOKENS_PER_USER`` ativos.
+    """
+    if await count_active_tokens_for_user(session, user_id) >= MAX_ACTIVE_TOKENS_PER_USER:
+        raise TokenLimitReached
     raw = generate_token()
     token = ApiToken(user_id=user_id, token_hash=hash_token(raw), token_sufixo=raw[-4:])
     session.add(token)

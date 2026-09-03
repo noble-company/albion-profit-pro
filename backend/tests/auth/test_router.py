@@ -4,7 +4,7 @@ from fastapi import HTTPException
 
 from src.api_tokens.dependencies import require_api_token
 from src.database import async_session_maker
-from tests.conftest import unique_email
+from tests.conftest import registrar_e_logar, unique_email
 
 
 async def test_full_auth_and_token_flow(client):
@@ -65,6 +65,37 @@ async def test_full_auth_and_token_flow(client):
     # revogar um token que não existe -> 404 de verdade
     resp = await client.delete(f"/auth/tokens/{uuid.uuid4()}", headers=auth_header)
     assert resp.status_code == 404, resp.text
+
+
+async def test_api_token_cap_per_user(client):
+    """S05: um usuário não gera tokens indefinidamente. O teto devolve erro claro e os
+    tokens que ele já tem seguem válidos."""
+    from src.api_tokens.service import MAX_ACTIVE_TOKENS_PER_USER
+
+    _, access_token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    created_ids = []
+    for _ in range(MAX_ACTIVE_TOKENS_PER_USER):
+        resp = await client.post("/auth/tokens", headers=headers)
+        assert resp.status_code == 201, resp.text
+        created_ids.append(resp.json()["id"])
+
+    over = await client.post("/auth/tokens", headers=headers)
+    assert over.status_code == 409
+    assert "Revogue" in over.json()["detail"]
+
+    # Os tokens existentes continuam listados e ativos.
+    listed = (await client.get("/auth/tokens", headers=headers)).json()
+    assert len(listed) == MAX_ACTIVE_TOKENS_PER_USER
+    assert all(row["revoked_at"] is None for row in listed)
+
+    # Revogar um libera espaço para criar outro.
+    assert (
+        await client.delete(f"/auth/tokens/{created_ids[0]}", headers=headers)
+    ).status_code == 204
+    again = await client.post("/auth/tokens", headers=headers)
+    assert again.status_code == 201, again.text
 
 
 async def test_register_rate_limit_returns_429_after_the_limit(client):

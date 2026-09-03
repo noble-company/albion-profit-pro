@@ -54,3 +54,66 @@ Task 01. Independente de 02-05; pode avançar em paralelo.
 
 Rodar o laço de requisições contra a API atrás do Traefik real e conferir os 429, junto de
 `SCAN rl:*` no Redis, confirmando que nenhuma chave contém identidade sensível.
+
+## Estado da implementação
+
+Concluída em 2026-08-31.
+
+### 1–2. Rate limit dos endpoints caros
+
+`rate_limited_user(bucket, limit, seconds)` em `src/rate_limit.py` — resolve `current_active_user`
+e identifica por `user:{id}` (não por IP; mesmo racional do ingest). A chave de
+`enforce_rate_limit` já inclui o path, então cada rota tem bucket próprio por usuário.
+
+- `/opportunities/{flips,refining,crafting}` — `rl:opportunities`, **60 / 60s** por usuário por
+  rota (dependency no router).
+- `/craft/{simulate,compare}` — `rl:craft`, **30 / 60s** por usuário por rota.
+- **`fail-open`**: a autenticação (Postgres) já aconteceu; uma queda do Redis não deve derrubar a
+  leitura, e o limite existe para cortar loop sustentado. Registrado explicitamente na
+  assinatura de `rate_limited_user`.
+
+### 3. Validador de `cors_origins`
+
+`field_validator` em `Settings.cors_origins`: com `environment != "development"`, rejeita `"*"` e
+qualquer entrada sem esquema `http(s)://` ou sem host. Em desenvolvimento continua permissivo.
+`.env.example` atualizado.
+
+### 4. Teto de tokens de API
+
+`MAX_ACTIVE_TOKENS_PER_USER = 10` em `src/api_tokens/service.py`. `create_token` conta os ativos
+(`revoked_at IS NULL`) e levanta `TokenLimitReached`; o router devolve **409** com mensagem
+orientando a revogar antes de criar outro. O frontend (`tokens/pages.tsx`) passa a exibir o
+`detail` da API no toast. Revogar um token libera espaço imediatamente.
+
+### 5. Decisão `S03` — transporte do JWT
+
+**Mantido em `sessionStorage`**, migração para cookie `httpOnly` adiada para o pré-lançamento
+(junto da task 10), pelos motivos:
+
+- O frontend inteiro é reescrito no BLOCO 4; refazer o fluxo de auth agora seria trabalho
+  perdido, e a task 16 (restauração de sessão) já vai mexer nessa camada.
+- Cookie `httpOnly` traz CSRF de volta como problema — precisa de `SameSite` + double-submit ou
+  token de CSRF, o que é uma mudança de escopo maior do que "trocar o storage".
+
+**Mitigações vigentes enquanto continua em `sessionStorage`:**
+
+- `sessionStorage` (não `localStorage`): o token some ao fechar a aba, não persiste entre
+  sessões nem é compartilhado entre abas.
+- App React sem `dangerouslySetInnerHTML` e sem renderização de HTML cru de terceiros — o vetor
+  clássico de XSS que leria o storage.
+- Sem dependências de terceiros injetando script em runtime (bundle fechado por Vite).
+- **Pendência pré-lançamento**: header CSP restritivo no serving (task 19) e revisão de
+  dependências. A reavaliação cookie vs. storage acontece com a task 10.
+
+### Testes
+
+- `uv run pytest tests/ -q` → **331 passed**. `uv run ruff check .` → limpo.
+- `tests/opportunities/test_rate_limit.py` (novo): 429 em `/opportunities/flips` **não executa**
+  a query · buckets por usuário · chave nova tem TTL · anônimo recebe 401 antes do 429.
+- `tests/test_config.py`: `CORS_ORIGINS=["*"]`/sem-esquema + `environment=production` falha no
+  `Settings`; origem completa passa; `*` continua ok em desenvolvimento.
+- `tests/auth/test_router.py::test_api_token_cap_per_user`: 11º token → 409 claro, os 10 seguem
+  ativos, revogar um libera espaço.
+- `test_incremento_concorrente_sempre_cria_ttl` (pré-existente) cobre o TTL sob concorrência do
+  mecanismo compartilhado.
+- Frontend `npm run lint && npm run typecheck && npm run test` → 0 erros, 24 verdes.

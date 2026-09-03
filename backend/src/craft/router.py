@@ -11,9 +11,14 @@ from src.craft.schemas import (
 )
 from src.craft.service import InvalidOverrideError, simulate_craft
 from src.database import get_session
+from src.rate_limit import rate_limited_user
 from src.recipes.service import ItemNotFoundError, RecipeUnavailableError
 
-router = APIRouter(prefix="/craft", tags=["craft"])
+# Simulação/comparação são interativas mas fazem várias queries por chamada. Limite por usuário,
+# fail-open (o cálculo exige Postgres de qualquer forma).
+_craft_rate_limit = Depends(rate_limited_user("rl:craft", limit=30, seconds=60))
+
+router = APIRouter(prefix="/craft", tags=["craft"], dependencies=[_craft_rate_limit])
 
 
 @router.post("/simulate", response_model=CraftSimulationOut)

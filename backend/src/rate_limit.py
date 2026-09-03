@@ -12,7 +12,7 @@ from functools import lru_cache
 from typing import Literal
 
 import structlog
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from starlette.status import HTTP_429_TOO_MANY_REQUESTS, HTTP_503_SERVICE_UNAVAILABLE
@@ -139,6 +139,35 @@ def rate_limit(
             request,
             bucket_key=bucket_key,
             identifier=await identifier(request),
+            limit=limit,
+            seconds=seconds,
+            redis_failure=redis_failure,
+        )
+
+    return dependency
+
+
+def rate_limited_user(
+    bucket_key: str,
+    limit: int,
+    seconds: int,
+    *,
+    redis_failure: RedisFailureMode = "open",
+):
+    """Dependency para endpoints de leitura caros, autenticados por JWT.
+
+    Identifica pelo ``user.id`` (nao por IP): varios jogadores legitimos podem sair do mesmo
+    NAT — mesmo racional do ingest. A chave inclui o path, entao cada rota tem bucket proprio.
+    ``fail-open`` por default: a autenticacao ja aconteceu; uma queda do cache nao deve derrubar
+    a leitura, e o limite existe para cortar um loop sustentado, nao um blip.
+    """
+    from src.auth.dependencies import current_active_user
+
+    async def dependency(request: Request, user=Depends(current_active_user)) -> None:
+        await enforce_rate_limit(
+            request,
+            bucket_key=bucket_key,
+            identifier=f"user:{user.id}",
             limit=limit,
             seconds=seconds,
             redis_failure=redis_failure,

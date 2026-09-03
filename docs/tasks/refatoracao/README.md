@@ -110,7 +110,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 03 — Ranking de produção materializado
 - [x] 04 — Contrato único de resultado
 - [x] 05 — Núcleo de cálculo único
-- [ ] 06 — Rate limit e hardening de leitura
+- [x] 06 — Rate limit e hardening de leitura
 - [ ] 07 — Idioma único da API
 - [ ] 08 — Decisão do pub/sub de preço
 - [ ] 09 — Classificação de refino

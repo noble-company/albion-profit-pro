@@ -1,7 +1,8 @@
 from functools import lru_cache
 from ipaddress import ip_network
+from urllib.parse import urlparse
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -48,6 +49,23 @@ class Settings(BaseSettings):
             network = ip_network(value, strict=False)
             if network.prefixlen == 0:
                 raise ValueError("trusted_proxy_cidrs nao pode confiar em toda a Internet")
+        return values
+
+    @field_validator("cors_origins")
+    @classmethod
+    def validate_cors_origins(cls, values: list[str], info: ValidationInfo) -> list[str]:
+        """Fora de desenvolvimento, `CORSMiddleware` roda com `allow_credentials=True`: um `*`
+        ou origem sem esquema vira eco de origem com credenciais. Mesmo espírito do validador
+        de CIDR — a segurança não pode depender de ninguém errar o `.env`."""
+        if info.data.get("environment", "development") == "development":
+            return values
+        for value in values:
+            parsed = urlparse(value)
+            if value == "*" or parsed.scheme not in ("http", "https") or not parsed.netloc:
+                raise ValueError(
+                    f"cors_origins invalido fora de desenvolvimento: {value!r} "
+                    "(use uma origem completa, ex: https://app.exemplo.com)"
+                )
         return values
 
     @property
