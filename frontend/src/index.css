@@ -1,19 +1,25 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
+/* Nenhuma classe dark: existe hoje em src/, mas a variante fica pronta caso
+   surja: casa com qualquer tema resolvido que não seja explicitamente claro
+   (padrão = escuro), acompanhando o mecanismo de data-theme da task 13. */
+@custom-variant dark (&:where(:root:not([data-theme='light']) *));
 
 /* ==========================================================================
-   Tokens de design — task 3.5/12 (F02)
+   Tokens de design — task 3.5/12 (F02) + tema claro/escuro real — task 3.5/13
+   (F03)
 
    Uma escala semântica só, nomeada por PAPEL e não por cor. Trocar um valor
    aqui muda a identidade do produto inteiro; nenhum componente carrega
    hexadecimal, rgb() ou classe de cor bruta do Tailwind.
 
-   Os valores abaixo são a paleta ESCURA de hoje (escala Tailwind, em oklch).
-   A task 13 ("tema claro/escuro real") acrescenta a variação clara sobre
-   ESTES MESMOS nomes — é por isso que a primitiva mora em :root e o
-   @theme inline só referencia var(--...).
+   Escuro é o padrão do produto (é um app de jogo) e mora no :root sem
+   qualificador. O claro é o bloco :root[data-theme='light'] logo abaixo —
+   redefine TODAS as primitivas de cor, nenhum token existe só num tema
+   (verificado em src/test/contrast.test.ts). O ThemeContext grava
+   data-theme no <html>; um script inline em index.html aplica o valor
+   salvo/do SO antes da primeira pintura, para não haver flash.
    ========================================================================== */
 :root {
   /* --- neutros --- */
@@ -42,8 +48,38 @@
   --buy-side: oklch(74.6% 0.16 232.661); /* compra / bid — = info/sky */
   --sell-side: oklch(70.2% 0.183 293.541); /* venda / ask — violet-400 */
 
-  /* --- forma --- */
+  /* --- forma (não muda por tema) --- */
   --radius: 0.625rem;
+
+  color-scheme: dark;
+}
+
+/* Tema claro. amber-400/emerald-400/sky-400 não cumprem AA sobre branco
+   (2,2:1 o âmbar) — os tons de texto/ícone aqui são um degrau mais escuros
+   na escala Tailwind (-600/-700), todos verificados em contrast.test.ts. */
+:root[data-theme='light'] {
+  --background: oklch(1 0 0); /* white */
+  --surface: oklch(98.5% 0.001 106.423); /* stone-50 */
+  --surface-raised: oklch(97% 0.001 106.424); /* stone-100 */
+  --border: oklch(92.3% 0.003 48.717); /* stone-200 */
+  --border-strong: oklch(86.9% 0.005 56.366); /* stone-300 */
+  --foreground: oklch(21.6% 0.006 56.043); /* stone-900 */
+  --foreground-muted: oklch(44.4% 0.011 73.639); /* stone-600 */
+  --foreground-subtle: oklch(55.3% 0.013 58.071); /* stone-500 */
+  --on-primary: oklch(100% 0 0); /* white sobre --primary/--danger */
+
+  --primary: oklch(55.5% 0.163 48.998); /* amber-700 */
+  --primary-hover: oklch(47.3% 0.137 46.201); /* amber-800 */
+  --success: oklch(50.8% 0.118 165.612); /* emerald-700 */
+  --warning: oklch(55.5% 0.163 48.998); /* amber-700 (= marca) */
+  --danger: oklch(57.7% 0.245 27.325); /* red-600 */
+  --info: oklch(50% 0.134 242.749); /* sky-700 */
+
+  --profit: oklch(50.8% 0.118 165.612); /* = success/emerald-700 */
+  --buy-side: oklch(50% 0.134 242.749); /* = info/sky-700 */
+  --sell-side: oklch(49.1% 0.27 292.581); /* violet-700 */
+
+  color-scheme: light;
 }
 
 @theme inline {
@@ -105,7 +141,6 @@
 
 :root {
   font-family: var(--font-sans);
-  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }

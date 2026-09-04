@@ -8,6 +8,26 @@
       content="Calculadora de crafting e refino para Albion Online"
     />
     <title>Albion Profit Pro</title>
+    <script>
+      // Aplica o tema antes da 1ª pintura (evita flash escuro→claro ou vice-versa).
+      // Mantido em sincronia com a lógica de src/app/ThemeContext.tsx.
+      ;(function () {
+        try {
+          var KEY = 'albion-profit-pro:theme'
+          var saved = localStorage.getItem(KEY)
+          var theme =
+            saved === 'light' || saved === 'dark'
+              ? saved
+              : window.matchMedia &&
+                  window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          var root = document.documentElement
+          root.dataset.theme = theme
+          root.style.colorScheme = theme
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

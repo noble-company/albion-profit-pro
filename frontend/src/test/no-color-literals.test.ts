@@ -49,12 +49,19 @@ const sources: Record<string, string> = import.meta.glob('/src/**/*.{ts,tsx}', {
   eager: true,
 })
 
+/** Remove comentário `//` e `/* ... *\/` de uma linha, pra prosa que mencione sintaxe CSS
+ * (ex.: "jsdom reserializa oklch(...)") não contar como literal de verdade no código. */
+function stripComment(line: string): string {
+  return line.replace(/\/\*.*?\*\//g, '').replace(/\/\/.*/, '')
+}
+
 test('nenhum literal de cor em src/ — só tokens de design', () => {
   const offenders: string[] = []
   for (const [path, text] of Object.entries(sources)) {
     if (path.endsWith('no-color-literals.test.ts')) continue
     const lines = text.split('\n')
-    lines.forEach((line, index) => {
+    lines.forEach((rawLine, index) => {
+      const line = stripComment(rawLine)
       const where = `${path}:${index + 1}`
       if (RAW_TAILWIND_COLOR.test(line)) {
         offenders.push(`${where} — classe de cor bruta do Tailwind`)

@@ -117,7 +117,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [ ] 10 — Antifraude de mercado *(adiada por decisão de produto)*
 - [x] 11 — shadcn/ui de verdade
 - [x] 12 — Tokens de design
-- [ ] 13 — Tema claro/escuro real
+- [x] 13 — Tema claro/escuro real
 - [ ] 14 — Linguagem visual do produto
 - [ ] 15 — Migração para TanStack Query
 - [ ] 16 — Restauração de sessão
