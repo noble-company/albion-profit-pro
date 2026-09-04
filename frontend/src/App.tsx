@@ -23,6 +23,12 @@ const LazyCalculator = lazy(() => Promise.resolve({ default: CalculadoraPage }))
 const LazyUiPreview = lazy(() =>
   import('@/components/ui/Preview').then((m) => ({ default: m.UiPreview })),
 )
+// Rota de desenvolvimento da task 3.5/14 — referência viva de docs/13-linguagem-visual.md.
+const LazyLinguagemVisual = lazy(() =>
+  import('@/design/LinguagemVisualPage').then((m) => ({
+    default: m.LinguagemVisualPage,
+  })),
+)
 function Boundary({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={<p role="status">Carregando…</p>}>{children}</Suspense>
@@ -77,6 +83,14 @@ export function App() {
             element={
               <Boundary>
                 <LazyUiPreview />
+              </Boundary>
+            }
+          />
+          <Route
+            path="/estilo"
+            element={
+              <Boundary>
+                <LazyLinguagemVisual />
               </Boundary>
             }
           />

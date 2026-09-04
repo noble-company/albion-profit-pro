@@ -118,7 +118,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 11 — shadcn/ui de verdade
 - [x] 12 — Tokens de design
 - [x] 13 — Tema claro/escuro real
-- [ ] 14 — Linguagem visual do produto
+- [x] 14 — Linguagem visual do produto
 - [ ] 15 — Migração para TanStack Query
 - [ ] 16 — Restauração de sessão
 - [ ] 17 — Ordenação e paginação no servidor
