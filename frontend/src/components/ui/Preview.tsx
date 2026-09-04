@@ -83,6 +83,26 @@ function Section({
   )
 }
 
+const TOKENS = [
+  'background',
+  'surface',
+  'surface-raised',
+  'border',
+  'border-strong',
+  'foreground',
+  'foreground-muted',
+  'foreground-subtle',
+  'primary',
+  'primary-hover',
+  'success',
+  'warning',
+  'danger',
+  'info',
+  'profit',
+  'buy-side',
+  'sell-side',
+] as const
+
 export function UiPreview() {
   const { toast } = useToast()
   const [checked, setChecked] = useState(true)
@@ -91,9 +111,26 @@ export function UiPreview() {
       <div>
         <h1 className="text-2xl font-bold">Componentes base</h1>
         <p className="text-sm text-muted-foreground">
-          Rota temporária (task 11). Teste foco, teclado e os dois temas.
+          Rota temporária (tasks 11–12). Teste foco, teclado e os dois temas.
         </p>
       </div>
+
+      <Section title="Tokens de design (task 12)">
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {TOKENS.map((token) => (
+            <div
+              key={token}
+              className="flex items-center gap-2 rounded-md border border-border p-2 text-xs"
+            >
+              <span
+                className="size-6 shrink-0 rounded border border-border-strong"
+                style={{ background: `var(--color-${token})` }}
+              />
+              <code className="truncate">--color-{token}</code>
+            </div>
+          ))}
+        </div>
+      </Section>
 
       <Section title="Button">
         <Button>Padrão</Button>

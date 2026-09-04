@@ -11,8 +11,8 @@ const PREFS = 'albion-profit-pro:calculator:v1'
 function Result({ result }: { result: CraftResult }) {
   return (
     <section className="mt-8">
-      <div className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
-        <p className="text-sm uppercase tracking-widest text-amber-300">
+      <div className="rounded-xl border border-primary/40 bg-primary/10 p-4">
+        <p className="text-sm uppercase tracking-widest text-primary">
           Cenário pessimista imediato
         </p>
         <p className="mt-2 text-2xl font-bold">
@@ -25,7 +25,7 @@ function Result({ result }: { result: CraftResult }) {
         {result.scenarios.map((scenario, index) => (
           <article
             key={`${scenario.acquisition_mode}-${scenario.sale_mode}`}
-            className="rounded-xl border border-stone-800 bg-stone-900 p-4"
+            className="rounded-xl border border-border bg-surface p-4"
           >
             <h3 className="font-semibold">
               {index === 0 ? 'Pessimista · ' : ''}
@@ -66,7 +66,7 @@ function Result({ result }: { result: CraftResult }) {
               </div>
             </dl>
             {scenario.warnings.length > 0 && (
-              <ul className="mt-3 space-y-1 text-xs text-amber-200">
+              <ul className="mt-3 space-y-1 text-xs text-primary">
                 {scenario.warnings.map((w) => (
                   <li key={w}>Aviso: {w}</li>
                 ))}
@@ -75,7 +75,7 @@ function Result({ result }: { result: CraftResult }) {
           </article>
         ))}
       </div>
-      <p className="mt-5 text-sm text-stone-400">
+      <p className="mt-5 text-sm text-foreground-muted">
         Produção: {result.produced_quantity} · Execuções: {result.executions} ·
         Sobra: {result.surplus_quantity} · Foco: {result.focus_consumed}
       </p>
@@ -84,7 +84,7 @@ function Result({ result }: { result: CraftResult }) {
         {result.ingredients.map((ingredient) => (
           <li
             key={`${ingredient.position}-${ingredient.unique_name}`}
-            className="rounded border border-stone-800 p-3"
+            className="rounded border border-border p-3"
           >
             <span className="font-medium">{ingredient.unique_name}</span> ·
             bruto {ingredient.gross_quantity} · efetivo{' '}
@@ -170,22 +170,20 @@ export function CalculadoraPage() {
   }
   return (
     <section>
-      <p className="text-sm uppercase tracking-widest text-amber-400">
-        {realm}
-      </p>
+      <p className="text-sm uppercase tracking-widest text-primary">{realm}</p>
       <h1 className="mt-2 text-3xl font-bold">Calculadora de craft</h1>
       <form
-        className="mt-6 grid gap-4 rounded-xl border border-stone-800 bg-stone-900 p-5 md:grid-cols-3"
+        className="mt-6 grid gap-4 rounded-xl border border-border bg-surface p-5 md:grid-cols-3"
         onSubmit={(e) => void handleSubmit(submit)(e)}
       >
         <label>
           Item canônico
           <input
-            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
             {...register('output_item', { required: 'Informe o item' })}
           />
           {errors.output_item && (
-            <small className="text-red-300">{errors.output_item.message}</small>
+            <small className="text-danger">{errors.output_item.message}</small>
           )}
         </label>
         <label>
@@ -193,7 +191,7 @@ export function CalculadoraPage() {
           <input
             type="number"
             min="1"
-            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
             {...register('quantity', {
               valueAsNumber: true,
               min: { value: 1, message: 'Mínimo 1' },
@@ -203,7 +201,7 @@ export function CalculadoraPage() {
         <label>
           Cidade
           <select
-            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
             {...register('location_id', { required: 'Selecione a cidade' })}
           >
             <option value="">Selecionar</option>
@@ -217,7 +215,7 @@ export function CalculadoraPage() {
         <label>
           Qualidade
           <select
-            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
             {...register('output_quality', { valueAsNumber: true })}
           >
             {[1, 2, 3, 4, 5].map((v) => (
@@ -230,7 +228,7 @@ export function CalculadoraPage() {
         <label>
           Escopo
           <select
-            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
             {...register('scope')}
           >
             <option value="all">Toda plataforma</option>
@@ -244,7 +242,7 @@ export function CalculadoraPage() {
             step="0.01"
             min="0"
             max="1"
-            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
             {...register('return_rate')}
           />
         </label>
@@ -254,7 +252,7 @@ export function CalculadoraPage() {
             type="number"
             step="0.01"
             min="0"
-            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
             {...register('station_cost_per_execution')}
           />
         </label>
@@ -265,7 +263,7 @@ export function CalculadoraPage() {
           <input type="checkbox" {...register('premium')} /> Premium
         </label>
         <button
-          className="rounded bg-amber-400 px-4 py-2 font-semibold text-stone-950 md:col-span-3"
+          className="rounded bg-primary px-4 py-2 font-semibold text-on-primary md:col-span-3"
           disabled={loading}
           type="submit"
         >

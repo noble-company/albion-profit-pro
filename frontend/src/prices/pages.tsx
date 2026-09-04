@@ -65,9 +65,7 @@ export function ItemPricesPage() {
     locationId
   return (
     <section>
-      <p className="text-sm uppercase tracking-widest text-amber-400">
-        {realm}
-      </p>
+      <p className="text-sm uppercase tracking-widest text-primary">{realm}</p>
       <h1 className="mt-2 break-all text-3xl font-bold">{uniqueName}</h1>
       <div className="mt-5 flex flex-wrap gap-3">
         <label>
@@ -76,7 +74,7 @@ export function ItemPricesPage() {
             aria-label="Escopo"
             value={scope}
             onChange={(e) => update('scope', e.target.value)}
-            className="ml-2 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+            className="ml-2 rounded border border-border-strong bg-background px-2 py-1"
           >
             <option value="all">Toda plataforma</option>
             <option value="mine">Minha cobertura</option>
@@ -88,7 +86,7 @@ export function ItemPricesPage() {
             aria-label="Cidade"
             value={selectedLocation}
             onChange={(e) => update('location_id', e.target.value)}
-            className="ml-2 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+            className="ml-2 rounded border border-border-strong bg-background px-2 py-1"
           >
             <option value="">Todas</option>
             {data.places.map((place) => (
@@ -104,7 +102,7 @@ export function ItemPricesPage() {
             aria-label="Qualidade"
             value={selectedQuality}
             onChange={(e) => update('quality', e.target.value)}
-            className="ml-2 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+            className="ml-2 rounded border border-border-strong bg-background px-2 py-1"
           >
             <option value="">Todas</option>
             {[1, 2, 3, 4, 5].map((q) => (
@@ -120,7 +118,7 @@ export function ItemPricesPage() {
             aria-label="Encantamento"
             value={selectedEnchant}
             onChange={(e) => update('enchantment', e.target.value)}
-            className="ml-2 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+            className="ml-2 rounded border border-border-strong bg-background px-2 py-1"
           >
             <option value="">Todos</option>
             {[0, 1, 2, 3, 4].map((e) => (
@@ -132,14 +130,14 @@ export function ItemPricesPage() {
         </label>
       </div>
       {scope === 'mine' && (
-        <p className="mt-3 text-sm text-stone-400">
+        <p className="mt-3 text-sm text-foreground-muted">
           “Minha cobertura” mostra somente combinações coletadas por esta conta;
           livro e histórico têm cobertura independente.
         </p>
       )}
-      <div className="mt-6 overflow-x-auto rounded-xl border border-stone-800">
+      <div className="mt-6 overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-left text-sm">
-          <thead className="bg-stone-900">
+          <thead className="bg-surface">
             <tr>
               <th className="p-3">Cidade</th>
               <th className="p-3">Qual./Enc.</th>
@@ -152,7 +150,7 @@ export function ItemPricesPage() {
             {rows.map((row) => (
               <tr
                 key={`${row.location_id}-${row.quality_level}-${row.enchantment_level}`}
-                className="border-t border-stone-800"
+                className="border-t border-border"
               >
                 <td className="p-3">{locationLabel(row.location_id)}</td>
                 <td className="p-3">
@@ -163,7 +161,7 @@ export function ItemPricesPage() {
                     ? formatarSilver(row.sell.best_price)
                     : 'Sem cobertura'}
                   <br />
-                  <span className="text-xs text-stone-500">
+                  <span className="text-xs text-foreground-subtle">
                     {formatarIdade(row.sell.observed_at)}
                   </span>
                 </td>
@@ -172,7 +170,7 @@ export function ItemPricesPage() {
                     ? formatarSilver(row.buy.best_price)
                     : 'Sem cobertura'}
                   <br />
-                  <span className="text-xs text-stone-500">
+                  <span className="text-xs text-foreground-subtle">
                     {formatarIdade(row.buy.observed_at)}
                   </span>
                 </td>
@@ -203,11 +201,11 @@ export function ItemPricesPage() {
               ]),
             )
           }
-          className="rounded border border-stone-700 px-3 py-2 disabled:opacity-40"
+          className="rounded border border-border-strong px-3 py-2 disabled:opacity-40"
         >
           Anterior
         </button>
-        <span className="py-2 text-sm text-stone-400">
+        <span className="py-2 text-sm text-foreground-muted">
           {offset + 1}–{Math.min(offset + limit, data.data?.total ?? 0)} de{' '}
           {data.data?.total ?? 0}
         </span>
@@ -221,7 +219,7 @@ export function ItemPricesPage() {
               ]),
             )
           }
-          className="rounded border border-stone-700 px-3 py-2 disabled:opacity-40"
+          className="rounded border border-border-strong px-3 py-2 disabled:opacity-40"
         >
           Próxima
         </button>

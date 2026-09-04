@@ -116,7 +116,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 09 — Classificação de refino
 - [ ] 10 — Antifraude de mercado *(adiada por decisão de produto)*
 - [x] 11 — shadcn/ui de verdade
-- [ ] 12 — Tokens de design
+- [x] 12 — Tokens de design
 - [ ] 13 — Tema claro/escuro real
 - [ ] 14 — Linguagem visual do produto
 - [ ] 15 — Migração para TanStack Query

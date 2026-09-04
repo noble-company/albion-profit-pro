@@ -63,13 +63,13 @@ function Card({
   price: string | null | undefined
 }) {
   return (
-    <article className="rounded-xl border border-stone-800 bg-stone-900 p-4">
-      <h3 className="text-sm text-stone-400">{title}</h3>
+    <article className="rounded-xl border border-border bg-surface p-4">
+      <h3 className="text-sm text-foreground-muted">{title}</h3>
       <p className="mt-2 text-xl font-semibold">
         {units.toLocaleString('pt-BR')} unidades
       </p>
       {price && (
-        <p className="mt-1 text-sm text-stone-400">
+        <p className="mt-1 text-sm text-foreground-muted">
           Médio: {formatarSilver(price)}
         </p>
       )}
@@ -114,7 +114,7 @@ export function DemandaItem({
   return (
     <section className="mt-10">
       <h2 className="text-2xl font-bold">Demanda e histórico</h2>
-      <p className="mt-2 text-sm text-stone-400">
+      <p className="mt-2 text-sm text-foreground-muted">
         Os dados representam unidades, ordens e volume agregado; não identificam
         pessoas compradoras.
       </p>
@@ -161,7 +161,7 @@ export function DemandaItem({
                 <Line
                   type="monotone"
                   dataKey="unidades"
-                  stroke="#fbbf24"
+                  stroke="var(--color-primary)"
                   name="Unidades"
                 />
               </LineChart>
@@ -179,7 +179,7 @@ export function DemandaItem({
             </thead>
             <tbody>
               {points.map((point) => (
-                <tr key={point.hora} className="border-t border-stone-800">
+                <tr key={point.hora} className="border-t border-border">
                   <td className="p-2">{point.hora}</td>
                   <td className="p-2">{point.unidades}</td>
                 </tr>

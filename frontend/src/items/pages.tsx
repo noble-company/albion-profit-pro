@@ -8,13 +8,13 @@ function ItemLabel({ item }: { item: CatalogItem }) {
   return (
     <>
       <span>{item.name_pt ?? item.name_en ?? item.unique_name}</span>
-      <span className="ml-2 text-xs text-stone-500">
+      <span className="ml-2 text-xs text-foreground-subtle">
         {item.unique_name}
         {item.tier ? ` · T${item.tier}` : ''}
         {item.enchantment_level ? `.${item.enchantment_level}` : ''}
       </span>
       {!item.has_recipe && (
-        <span className="ml-2 rounded bg-stone-700 px-1.5 py-0.5 text-xs text-stone-300">
+        <span className="ml-2 rounded bg-surface-raised px-1.5 py-0.5 text-xs text-foreground">
           sem receita
         </span>
       )}
@@ -47,7 +47,7 @@ export function BuscaItem() {
   return (
     <section>
       <h1 className="text-3xl font-bold">Busca de itens</h1>
-      <p className="mt-2 text-stone-400">
+      <p className="mt-2 text-foreground-muted">
         Pesquise em português, inglês ou pelo identificador do item.
       </p>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -72,7 +72,7 @@ export function BuscaItem() {
               }
             }}
             placeholder="Ex.: algodão, cotton, T4_CLOTH"
-            className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-border-strong bg-background px-3 py-2"
           />
         </label>
         <label>
@@ -81,7 +81,7 @@ export function BuscaItem() {
             aria-label="Filtrar por tier"
             value={tier}
             onChange={(event) => setTier(event.target.value)}
-            className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-border-strong bg-background px-3 py-2"
           >
             <option value="">Todos</option>
             {[1, 2, 3, 4, 5, 6, 7, 8].map((value) => (
@@ -97,7 +97,7 @@ export function BuscaItem() {
             aria-label="Filtrar por encantamento"
             value={enchantment}
             onChange={(event) => setEnchantment(event.target.value)}
-            className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-border-strong bg-background px-3 py-2"
           >
             <option value="">Todos</option>
             {[0, 1, 2, 3, 4].map((value) => (
@@ -113,7 +113,7 @@ export function BuscaItem() {
             aria-label="Filtrar por categoria"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
-            className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-border-strong bg-background px-3 py-2"
           />
         </label>
       </div>
@@ -131,10 +131,10 @@ export function BuscaItem() {
             id="resultados-itens"
             role="listbox"
             aria-label="Resultados de itens"
-            className="absolute z-20 mt-2 max-h-80 w-full overflow-auto rounded-xl border border-stone-700 bg-stone-900 p-2 shadow-xl"
+            className="absolute z-20 mt-2 max-h-80 w-full overflow-auto rounded-xl border border-border-strong bg-surface p-2 shadow-xl"
           >
             {result.isLoading && (
-              <p role="status" className="p-3 text-stone-400">
+              <p role="status" className="p-3 text-foreground-muted">
                 Buscando…
               </p>
             )}
@@ -147,7 +147,7 @@ export function BuscaItem() {
                 role="option"
                 aria-label={item.name_pt ?? item.name_en ?? item.unique_name}
                 key={item.unique_name}
-                className="block w-full rounded-lg p-3 text-left hover:bg-stone-800 focus:bg-stone-800 focus:outline-none"
+                className="block w-full rounded-lg p-3 text-left hover:bg-surface-raised focus:bg-surface-raised focus:outline-none"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => select(item)}
               >
@@ -157,7 +157,7 @@ export function BuscaItem() {
           </div>
         )}
         {result.needsMore && (
-          <p className="mt-2 text-sm text-stone-500">
+          <p className="mt-2 text-sm text-foreground-subtle">
             Digite pelo menos 2 caracteres.
           </p>
         )}

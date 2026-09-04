@@ -4,7 +4,9 @@ import { Link, useSearchParams } from 'react-router'
 
 import { useServer } from '@/app/ServerContext'
 import { RequireRealm } from '@/components/AppShell'
+import { Button } from '@/components/ui/button'
 import { Carregando, EstadoErro } from '@/components/ui/states'
+import { Switch } from '@/components/ui/switch'
 import { simulateCraft, type CraftResult } from '@/craft/service'
 import {
   formatarIdade,
@@ -18,6 +20,13 @@ import { getLocations, type Location } from '@/prices/service'
 
 import { useProductionOpportunities } from './hooks'
 import type { Opportunity, ProductionKind } from './service'
+
+// Chrome dos campos de filtro. O CSS à mão que vivia em index.css saiu na task 12; até as
+// telas serem refeitas (tasks 21–24) o estilo mora aqui, em tokens.
+const fieldLabel =
+  'flex flex-col gap-1.5 text-xs font-bold uppercase tracking-wide text-foreground-subtle'
+const fieldControl =
+  'min-h-11 rounded-lg border border-border-strong bg-background/75 px-3 py-2 text-sm font-medium normal-case tracking-normal text-foreground outline-none transition hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/30'
 
 const warningLabels: Record<string, string> = {
   dado_velho: 'Preço desatualizado',
@@ -172,18 +181,20 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
     <section className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary">
             {config.eyebrow} · {realm}
           </p>
           <h1 className="mt-2 max-w-3xl text-3xl font-black tracking-tight sm:text-4xl">
             {config.title}
           </h1>
-          <p className="mt-2 max-w-2xl text-stone-400">{config.description}</p>
+          <p className="mt-2 max-w-2xl text-foreground-muted">
+            {config.description}
+          </p>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-3 py-1.5 text-xs font-medium text-emerald-300 shadow-lg shadow-emerald-950/20">
+        <div className="flex items-center gap-2 rounded-full border border-profit/20 bg-profit/5 px-3 py-1.5 text-xs font-medium text-profit shadow-lg shadow-black/20">
           <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-profit opacity-50" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-profit" />
           </span>
           Atualização automática · 30s
         </div>
@@ -193,12 +204,12 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
         <Kpi
           label="Oportunidades encontradas"
           value={String(result.data?.total ?? '—')}
-          tone="amber"
+          tone="primary"
         />
         <Kpi
           label="Melhor lucro"
           value={formatarSilver(best?.profit ?? null)}
-          tone="emerald"
+          tone="profit"
         />
         <Kpi
           label="Última observação"
@@ -207,14 +218,16 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
               ? formatarIdade(best.oldest_observed_at)
               : '—'
           }
-          tone="sky"
+          tone="info"
         />
       </div>
 
       {result.data?.coverage && (
         <p
           className={`text-xs ${
-            result.data.coverage.stale ? 'text-amber-400' : 'text-stone-500'
+            result.data.coverage.stale
+              ? 'text-primary'
+              : 'text-foreground-subtle'
           }`}
         >
           Ranking cobre {result.data.coverage.priced_recipes} receitas com preço
@@ -227,33 +240,34 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
         </p>
       )}
 
-      <div className="opportunity-filters overflow-hidden rounded-2xl border border-stone-800 bg-stone-900/70 shadow-2xl shadow-black/20">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800 px-5 py-4">
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface/70 shadow-2xl shadow-black/20">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
-            <h2 className="font-bold text-stone-100">Configure seu cenário</h2>
-            <p className="mt-0.5 text-xs text-stone-500">
+            <h2 className="font-bold text-foreground">Configure seu cenário</h2>
+            <p className="mt-0.5 text-xs text-foreground-subtle">
               Os resultados são recalculados com os valores escolhidos abaixo.
             </p>
           </div>
-          <button
-            type="button"
-            className="rounded-lg border border-stone-700 bg-stone-950/50 px-3 py-2 text-sm font-semibold text-stone-300 transition hover:border-amber-400/60 hover:text-amber-300"
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setParams(new URLSearchParams())}
           >
             Limpar filtros
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-6 p-5">
           <fieldset>
-            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-              <span className="h-px w-5 bg-amber-400/60" /> Mercado
+            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-foreground-subtle">
+              <span className="h-px w-5 bg-primary/60" /> Mercado
             </legend>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-              <label className="filter-field">
+              <label className={fieldLabel}>
                 Cidade
                 <select
                   aria-label="Cidade"
+                  className={fieldControl}
                   value={query.locations[0] ?? ''}
                   onChange={(event) => set('location_id', event.target.value)}
                 >
@@ -300,10 +314,11 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
                 options={['1', '2', '6', '12', '24']}
                 suffix="h"
               />
-              <label className="filter-field">
+              <label className={fieldLabel}>
                 Retorno de recurso (%)
                 <input
                   aria-label="Retorno de recurso (%)"
+                  className={fieldControl}
                   inputMode="decimal"
                   value={params.get('return_rate') ?? '0'}
                   onChange={(event) => set('return_rate', event.target.value)}
@@ -312,44 +327,48 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
             </div>
           </fieldset>
 
-          <fieldset className="border-t border-stone-800 pt-5">
-            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-              <span className="h-px w-5 bg-sky-400/60" /> Custos e metas
+          <fieldset className="border-t border-border pt-5">
+            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-foreground-subtle">
+              <span className="h-px w-5 bg-buy-side/60" /> Custos e metas
             </legend>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="filter-field">
+              <label className={fieldLabel}>
                 Estação por execução
                 <input
                   aria-label="Estação por execução"
+                  className={fieldControl}
                   inputMode="decimal"
                   value={params.get('station_cost') ?? '0'}
                   onChange={(event) => set('station_cost', event.target.value)}
                 />
               </label>
-              <label className="filter-field">
+              <label className={fieldLabel}>
                 Lucro mínimo
                 <input
                   aria-label="Lucro mínimo"
+                  className={fieldControl}
                   inputMode="decimal"
                   value={params.get('min_profit') ?? ''}
                   onChange={(event) => set('min_profit', event.target.value)}
                   placeholder="0"
                 />
               </label>
-              <label className="filter-field">
+              <label className={fieldLabel}>
                 ROI mínimo
                 <input
                   aria-label="ROI mínimo"
+                  className={fieldControl}
                   inputMode="decimal"
                   value={params.get('min_roi') ?? ''}
                   onChange={(event) => set('min_roi', event.target.value)}
                   placeholder="0%"
                 />
               </label>
-              <label className="filter-field">
+              <label className={fieldLabel}>
                 Ordenar por
                 <select
                   aria-label="Ordenar por"
+                  className={fieldControl}
                   value={query.sort}
                   onChange={(event) => set('sort', event.target.value)}
                 >
@@ -368,24 +387,24 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
             </div>
           </fieldset>
 
-          <fieldset className="border-t border-stone-800 pt-5">
-            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-              <span className="h-px w-5 bg-violet-400/60" /> Preferências
+          <fieldset className="border-t border-border pt-5">
+            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-foreground-subtle">
+              <span className="h-px w-5 bg-sell-side/60" /> Preferências
             </legend>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Checkbox
+              <Toggle
                 label="Conta Premium"
                 description="Imposto de venda reduzido para 4%"
                 checked={query.premium}
                 onChange={(checked) => set('premium', checked ? '' : 'false')}
               />
-              <Checkbox
+              <Toggle
                 label="Usar foco"
                 description="Inclui o consumo de foco da receita"
                 checked={query.useFocus}
                 onChange={(checked) => set('focus', checked ? 'true' : '')}
               />
-              <Checkbox
+              <Toggle
                 label="Cobertura completa"
                 description="Oculta resultados com dados parciais"
                 checked={query.requireComplete}
@@ -393,7 +412,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
                   set('coverage', checked ? 'complete' : '')
                 }
               />
-              <Checkbox
+              <Toggle
                 label="Apenas com lucro"
                 description="Remove resultados com lucro negativo"
                 checked={query.profitOnly}
@@ -417,14 +436,14 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
         />
       )}
       {!result.loading && !result.error && rows.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-stone-700/80 bg-gradient-to-b from-stone-900/40 to-stone-950 px-6 py-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-stone-700 bg-stone-900 text-stone-400">
+        <div className="rounded-2xl border border-dashed border-border-strong/80 bg-gradient-to-b from-surface/40 to-background px-6 py-12 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border-strong bg-surface text-foreground-muted">
             <TrendingUp className="size-5" aria-hidden="true" />
           </div>
-          <h2 className="mt-4 font-bold text-stone-200">
+          <h2 className="mt-4 font-bold text-foreground">
             Nenhuma oportunidade encontrada
           </h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-stone-500">
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-foreground-subtle">
             Não há receita com preços suficientes para estes filtros. Isso não
             representa lucro zero. Experimente aumentar o frescor ou limpar os
             filtros.
@@ -435,9 +454,10 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
         <ProductionTable rows={rows} onOpen={(row) => void openDetail(row)} />
       )}
       {(result.data?.total ?? 0) > 0 && (
-        <div className="flex items-center justify-between rounded-xl border border-stone-800 bg-stone-900/40 px-3 py-2 text-sm text-stone-400">
-          <button
-            className="button"
+        <div className="flex items-center justify-between rounded-xl border border-border bg-surface/40 px-3 py-2 text-sm text-foreground-muted">
+          <Button
+            variant="outline"
+            size="sm"
             disabled={query.offset === 0}
             onClick={() =>
               setParams(
@@ -450,12 +470,13 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
             }
           >
             Anterior
-          </button>
+          </Button>
           <span>
             Página {page} · {result.data?.total ?? 0} oportunidades
           </span>
-          <button
-            className="button"
+          <Button
+            variant="outline"
+            size="sm"
             disabled={
               !result.data || query.offset + query.limit >= result.data.total
             }
@@ -470,7 +491,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
             }
           >
             Próxima
-          </button>
+          </Button>
         </div>
       )}
 
@@ -495,22 +516,22 @@ function ProductionTable({
   onOpen: (row: Opportunity) => void
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-stone-800 bg-stone-950 shadow-2xl shadow-black/20">
-      <div className="flex items-center justify-between border-b border-stone-800 bg-stone-900/70 px-5 py-3">
+    <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-2xl shadow-black/20">
+      <div className="flex items-center justify-between border-b border-border bg-surface/70 px-5 py-3">
         <div>
-          <h2 className="text-sm font-bold text-stone-200">Ranking atual</h2>
-          <p className="mt-0.5 text-xs text-stone-500">
+          <h2 className="text-sm font-bold text-foreground">Ranking atual</h2>
+          <p className="mt-0.5 text-xs text-foreground-subtle">
             Cenário mais lucrativo encontrado para cada receita
           </p>
         </div>
-        <span className="rounded-full bg-stone-800 px-2.5 py-1 text-xs font-semibold text-stone-400">
+        <span className="rounded-full bg-surface-raised px-2.5 py-1 text-xs font-semibold text-foreground-muted">
           {rows.length} nesta página
         </span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1120px] text-left text-sm">
           <caption className="sr-only">Ranking de produção</caption>
-          <thead className="bg-stone-900/80 text-[0.68rem] uppercase tracking-[0.12em] text-stone-500">
+          <thead className="bg-surface/80 text-[0.68rem] uppercase tracking-[0.12em] text-foreground-subtle">
             <tr>
               <th className="p-4">Saída</th>
               <th className="p-4">Entradas</th>
@@ -529,13 +550,13 @@ function ProductionTable({
             {rows.map((row) => (
               <tr
                 key={`${row.kind}-${row.item}-${row.quality_level}-${row.buy_location}`}
-                className="border-t border-stone-800 transition-colors hover:bg-stone-900"
+                className="border-t border-border transition-colors hover:bg-surface"
               >
                 <td className="p-4">
-                  <strong className="text-stone-100">
+                  <strong className="text-foreground">
                     {formatarNomeJogador(row.item_name, row.item)}
                   </strong>
-                  <div className="mt-1 text-xs text-stone-500">
+                  <div className="mt-1 text-xs text-foreground-subtle">
                     {formatarQualidade(row.quality_level)}
                   </div>
                   {(row.warnings ?? []).length > 0 && (
@@ -543,7 +564,7 @@ function ProductionTable({
                       {row.warnings?.map((warning) => (
                         <span
                           key={warning}
-                          className="rounded bg-amber-400/10 px-2 py-0.5 text-xs text-amber-200"
+                          className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary"
                         >
                           {warningLabels[warning] ?? warning}
                         </span>
@@ -564,17 +585,17 @@ function ProductionTable({
                       ))
                     : '—'}
                 </td>
-                <td className="p-4 font-medium text-sky-300">
+                <td className="p-4 font-medium text-buy-side">
                   {formatarLocalidade(row.buy_location)}
                 </td>
-                <td className="p-4 text-xs text-stone-300">
+                <td className="p-4 text-xs text-foreground">
                   {modeLabels[row.acquisition_mode ?? ''] ?? '—'} →{' '}
                   {modeLabels[row.sale_mode ?? ''] ?? '—'}
                 </td>
-                <td className="p-4 font-semibold text-stone-200">
+                <td className="p-4 font-semibold text-foreground">
                   {formatarSilver(row.total_cost)}
                 </td>
-                <td className="p-4 font-semibold text-sky-200">
+                <td className="p-4 font-semibold text-buy-side">
                   {formatarSilver(row.gross_revenue)}
                 </td>
                 <td className="p-4 text-xs">
@@ -603,15 +624,15 @@ function ProductionTable({
                 </td>
                 <td className="p-4">{formatarSilver(row.station_cost)}</td>
                 <td className="p-4">
-                  <strong className="whitespace-nowrap rounded-lg border border-emerald-400/10 bg-emerald-400/10 px-2.5 py-1.5 text-emerald-300">
+                  <strong className="whitespace-nowrap rounded-lg border border-profit/10 bg-profit/10 px-2.5 py-1.5 text-profit">
                     {formatarSilver(row.profit)}
                   </strong>
                 </td>
-                <td className="p-4 text-emerald-300">{formatarPct(row.roi)}</td>
+                <td className="p-4 text-profit">{formatarPct(row.roi)}</td>
                 <td className="p-4">
                   <button
                     type="button"
-                    className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-200 transition hover:border-amber-300 hover:bg-amber-400/20"
+                    className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-bold text-primary transition hover:border-primary hover:bg-primary/20"
                     onClick={() => onOpen(row)}
                   >
                     Analisar
@@ -649,25 +670,25 @@ function DetailDrawer({
         aria-label="Análise detalhada"
         role="dialog"
         aria-modal="true"
-        className="h-full w-full max-w-2xl overflow-y-auto border-l border-stone-700 bg-gradient-to-b from-stone-900 to-stone-950 p-5 shadow-2xl shadow-black sm:p-7"
+        className="h-full w-full max-w-2xl overflow-y-auto border-l border-border-strong bg-gradient-to-b from-surface to-background p-5 shadow-2xl shadow-black sm:p-7"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-widest text-amber-400">
+            <p className="text-xs uppercase tracking-widest text-primary">
               Análise detalhada
             </p>
             <h2 className="mt-2 text-2xl font-bold">
               {formatarNomeJogador(row.item_name, row.item)}
             </h2>
-            <p className="text-sm text-stone-400">
+            <p className="text-sm text-foreground-muted">
               {formatarLocalidade(row.buy_location)} ·{' '}
               {formatarQualidade(row.quality_level)}
             </p>
           </div>
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-700 bg-stone-950 text-stone-400 transition hover:border-stone-500 hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border-strong bg-background text-foreground-muted transition hover:border-border-strong hover:text-foreground"
             onClick={onClose}
             aria-label="Fechar análise"
           >
@@ -680,7 +701,7 @@ function DetailDrawer({
         )}
         {result && <DetailResult result={result} />}
         <Link
-          className="mt-6 inline-flex items-center rounded-lg bg-amber-300 px-4 py-2.5 text-sm font-bold text-stone-950 transition hover:bg-amber-200"
+          className="mt-6 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary transition hover:bg-primary-hover"
           to={`/calculadora?item=${encodeURIComponent(row.item)}`}
         >
           Abrir na calculadora
@@ -697,7 +718,7 @@ function DetailResult({ result }: { result: CraftResult }) {
         {result.scenarios.map((scenario) => (
           <article
             key={`${scenario.acquisition_mode}-${scenario.sale_mode}`}
-            className="rounded-xl border border-stone-800 bg-stone-900 p-4"
+            className="rounded-xl border border-border bg-surface p-4"
           >
             <h3 className="font-semibold">
               {modeLabels[scenario.acquisition_mode]} →{' '}
@@ -716,7 +737,7 @@ function DetailResult({ result }: { result: CraftResult }) {
               <Line label="ROI" value={formatarPct(scenario.roi)} />
             </dl>
             {scenario.warnings.length > 0 && (
-              <p className="mt-3 text-xs text-amber-200">
+              <p className="mt-3 text-xs text-primary">
                 {scenario.warnings
                   .map((warning) => warningLabels[warning] ?? warning)
                   .join(' · ')}
@@ -731,12 +752,12 @@ function DetailResult({ result }: { result: CraftResult }) {
           {result.ingredients.map((ingredient) => (
             <li
               key={`${ingredient.position}-${ingredient.unique_name}`}
-              className="rounded border border-stone-800 p-3"
+              className="rounded border border-border p-3"
             >
               <strong>
                 {formatarNomeJogador(null, ingredient.unique_name)}
               </strong>
-              <div className="mt-1 text-stone-400">
+              <div className="mt-1 text-foreground-muted">
                 Bruto {ingredient.gross_quantity} · retorno esperado{' '}
                 {String(ingredient.expected_return_quantity)} · comprar{' '}
                 {ingredient.purchase_quantity}
@@ -745,7 +766,7 @@ function DetailResult({ result }: { result: CraftResult }) {
           ))}
         </ul>
       </section>
-      <p className="text-sm text-stone-400">
+      <p className="text-sm text-foreground-muted">
         Produção {result.produced_quantity} · execuções {result.executions} ·
         foco consumido {result.focus_consumed}
       </p>
@@ -768,25 +789,25 @@ function Kpi({
 }: {
   label: string
   value: string
-  tone: 'amber' | 'emerald' | 'sky'
+  tone: 'primary' | 'profit' | 'info'
 }) {
   const tones = {
-    amber: 'from-amber-400/15 text-amber-200 before:bg-amber-400',
-    emerald: 'from-emerald-400/15 text-emerald-200 before:bg-emerald-400',
-    sky: 'from-sky-400/15 text-sky-200 before:bg-sky-400',
+    primary: 'from-primary/15 text-primary before:bg-primary',
+    profit: 'from-profit/15 text-profit before:bg-profit',
+    info: 'from-info/15 text-info before:bg-info',
   }
   return (
     <article
-      className={`relative overflow-hidden rounded-2xl border border-stone-800 bg-gradient-to-br ${tones[tone]} to-stone-900/80 p-5 shadow-lg shadow-black/10 before:absolute before:inset-y-0 before:left-0 before:w-1`}
+      className={`relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br ${tones[tone]} to-surface/80 p-5 shadow-lg shadow-black/10 before:absolute before:inset-y-0 before:left-0 before:w-1`}
     >
-      <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-stone-500">
+      <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-foreground-subtle">
         {label}
       </p>
       <p className="mt-2 text-2xl font-black tracking-tight">{value}</p>
     </article>
   )
 }
-function Checkbox({
+function Toggle({
   label,
   description,
   checked,
@@ -798,18 +819,13 @@ function Checkbox({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label className={`filter-toggle ${checked ? 'filter-toggle-active' : ''}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span className="toggle-track" aria-hidden="true">
-        <span className="toggle-thumb" />
-      </span>
+    <label
+      className={`flex min-h-[4.5rem] cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${checked ? 'border-primary/45 bg-primary/10' : 'border-surface-raised bg-background/55 hover:border-border-strong'}`}
+    >
+      <Switch checked={checked} onCheckedChange={onChange} />
       <span className="min-w-0">
-        <strong className="block text-sm text-stone-100">{label}</strong>
-        <span className="mt-0.5 block text-xs font-normal leading-snug text-stone-500">
+        <strong className="block text-sm text-foreground">{label}</strong>
+        <span className="mt-0.5 block text-xs font-normal leading-snug text-foreground-subtle">
           {description}
         </span>
       </span>
@@ -832,10 +848,11 @@ function Select({
   labels?: string[]
 }) {
   return (
-    <label className="filter-field">
+    <label className={fieldLabel}>
       {label}
       <select
         aria-label={label}
+        className={fieldControl}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >

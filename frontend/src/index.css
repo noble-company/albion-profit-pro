@@ -1,82 +1,105 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-/* shadcn/ui — new-york / neutral. Tokens de design são formalizados na task 12; tema
-   claro/escuro real na task 13. Aqui só entra a fundação. */
 @custom-variant dark (&:is(.dark *));
 
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-}
+/* ==========================================================================
+   Tokens de design — task 3.5/12 (F02)
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+   Uma escala semântica só, nomeada por PAPEL e não por cor. Trocar um valor
+   aqui muda a identidade do produto inteiro; nenhum componente carrega
+   hexadecimal, rgb() ou classe de cor bruta do Tailwind.
+
+   Os valores abaixo são a paleta ESCURA de hoje (escala Tailwind, em oklch).
+   A task 13 ("tema claro/escuro real") acrescenta a variação clara sobre
+   ESTES MESMOS nomes — é por isso que a primitiva mora em :root e o
+   @theme inline só referencia var(--...).
+   ========================================================================== */
+:root {
+  /* --- neutros --- */
+  --background: oklch(14.7% 0.004 49.25); /* stone-950 */
+  --surface: oklch(21.6% 0.006 56.043); /* stone-900 */
+  --surface-raised: oklch(26.8% 0.007 34.298); /* stone-800 */
+  --border: oklch(26.8% 0.007 34.298); /* stone-800 */
+  --border-strong: oklch(37.4% 0.01 67.558); /* stone-700 */
+  --foreground: oklch(97% 0.001 106.424); /* stone-100 — texto base */
+  --foreground-muted: oklch(70.9% 0.01 56.259); /* stone-400 — 2º nível */
+  /* rótulos/legendas: stone-500 puro fica em 3.6:1 sobre surface (sub-AA);
+     clareado até cumprir AA 4.5:1. */
+  --foreground-subtle: oklch(63.5% 0.012 57);
+  --on-primary: oklch(14.7% 0.004 49.25); /* stone-950 sobre --primary */
+
+  /* --- marca e papéis de estado --- */
+  --primary: oklch(82.8% 0.189 84.429); /* amber-400 */
+  --primary-hover: oklch(87.9% 0.169 91.605); /* amber-300 */
+  --success: oklch(76.5% 0.177 163.223); /* emerald-400 */
+  --warning: oklch(82.8% 0.189 84.429); /* amber-400 (= marca) */
+  --danger: oklch(70.4% 0.191 22.216); /* red-400 */
+  --info: oklch(74.6% 0.16 232.661); /* sky-400 */
+
+  /* --- papéis de domínio: a cor SIGNIFICA algo no jogo, não é estética --- */
+  --profit: oklch(76.5% 0.177 163.223); /* lucro — = success/emerald */
+  --buy-side: oklch(74.6% 0.16 232.661); /* compra / bid — = info/sky */
+  --sell-side: oklch(70.2% 0.183 293.541); /* venda / ask — violet-400 */
+
+  /* --- forma --- */
+  --radius: 0.625rem;
 }
 
 @theme inline {
   --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* escala semântica exposta como utilitários: bg-surface, text-profit,
+     border-border-strong, from-buy-side/15, ... */
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border-strong: var(--border-strong);
   --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-subtle: var(--foreground-subtle);
+  --color-on-primary: var(--on-primary);
   --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
+  --color-primary-hover: var(--primary-hover);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-profit: var(--profit);
+  --color-buy-side: var(--buy-side);
+  --color-sell-side: var(--sell-side);
+
+  /* aliases que os componentes shadcn/ui consomem, reconciliados com a escala
+     acima — um sistema só, não dois */
   --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+  --color-input: var(--border-strong);
+  --color-ring: var(--primary);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--surface-raised);
+  --color-popover-foreground: var(--foreground);
+  --color-primary-foreground: var(--on-primary);
+  --color-secondary: var(--surface-raised);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--surface);
+  --color-muted-foreground: var(--foreground-muted);
+  --color-accent: var(--surface-raised);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--on-primary);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }
 
@@ -96,128 +119,4 @@ body {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
-}
-
-.opportunity-filters .filter-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  color: #a8a29e;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.opportunity-filters .filter-field input:not([type='checkbox']),
-.opportunity-filters .filter-field select {
-  min-height: 2.75rem;
-  border: 1px solid #44403c;
-  border-radius: 0.7rem;
-  background: rgb(12 10 9 / 75%);
-  padding: 0.6rem 0.75rem;
-  color: #fafaf9;
-  outline: none;
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: normal;
-  text-transform: none;
-  transition:
-    border-color 150ms ease,
-    background-color 150ms ease,
-    box-shadow 150ms ease;
-}
-
-.opportunity-filters .filter-field input:not([type='checkbox']):hover,
-.opportunity-filters .filter-field select:hover {
-  border-color: #57534e;
-  background: #0c0a09;
-}
-
-.opportunity-filters .filter-field input:not([type='checkbox']):focus,
-.opportunity-filters .filter-field select:focus {
-  border-color: #fbbf24;
-  box-shadow: 0 0 0 2px rgb(251 191 36 / 20%);
-}
-
-.filter-toggle {
-  display: flex;
-  min-height: 4.5rem;
-  cursor: pointer;
-  align-items: center;
-  gap: 0.8rem;
-  border: 1px solid #292524;
-  border-radius: 0.8rem;
-  background: rgb(12 10 9 / 55%);
-  padding: 0.8rem;
-  transition:
-    border-color 150ms ease,
-    background-color 150ms ease;
-}
-
-.filter-toggle:hover {
-  border-color: #57534e;
-  background: rgb(28 25 23 / 85%);
-}
-
-.filter-toggle-active {
-  border-color: rgb(251 191 36 / 45%);
-  background: rgb(251 191 36 / 6%);
-}
-
-.filter-toggle input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
-}
-
-.toggle-track {
-  position: relative;
-  width: 2.4rem;
-  height: 1.35rem;
-  flex: none;
-  border-radius: 999px;
-  background: #44403c;
-  transition: background-color 150ms ease;
-}
-
-.toggle-thumb {
-  position: absolute;
-  top: 0.2rem;
-  left: 0.2rem;
-  width: 0.95rem;
-  height: 0.95rem;
-  border-radius: 999px;
-  background: #d6d3d1;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 50%);
-  transition:
-    transform 150ms ease,
-    background-color 150ms ease;
-}
-
-.filter-toggle input:focus-visible + .toggle-track {
-  outline: 2px solid #fbbf24;
-  outline-offset: 2px;
-}
-
-.filter-toggle input:checked + .toggle-track {
-  background: #fbbf24;
-}
-
-.filter-toggle input:checked + .toggle-track .toggle-thumb {
-  transform: translateX(1.05rem);
-  background: #1c1917;
-}
-
-.button {
-  border: 1px solid #44403c;
-  border-radius: 0.6rem;
-  padding: 0.5rem 0.8rem;
-}
-
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
 }

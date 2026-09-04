@@ -2,7 +2,9 @@ import { ArrowLeftRight } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { RequireRealm } from '@/components/AppShell'
+import { Button } from '@/components/ui/button'
 import { Carregando, EstadoErro } from '@/components/ui/states'
+import { Switch } from '@/components/ui/switch'
 import { useServer } from '@/app/ServerContext'
 import {
   formatarCategoria,
@@ -15,6 +17,13 @@ import {
 } from '@/lib/formatters'
 import { useFlipOpportunities } from './hooks'
 import { getCategories, type Category } from './service'
+
+// Chrome dos campos de filtro. O CSS à mão que vivia em index.css saiu na task 12; até as
+// telas serem refeitas (tasks 21–24) o estilo mora aqui, em tokens.
+const fieldLabel =
+  'flex flex-col gap-1.5 text-xs font-bold uppercase tracking-wide text-foreground-subtle'
+const fieldControl =
+  'min-h-11 rounded-lg border border-border-strong bg-background/75 px-3 py-2 text-sm font-medium normal-case tracking-normal text-foreground outline-none transition hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/30'
 
 const cities = [
   { ids: ['3005'], name: 'Caerleon' },
@@ -124,20 +133,20 @@ function DashboardContent() {
     <section className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary">
             Market Flip · {realm}
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
             Encontre o próximo lucro
           </h1>
-          <p className="mt-2 text-stone-400">
+          <p className="mt-2 text-foreground-muted">
             Compre barato em uma cidade. Venda caro em outra.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-3 py-1.5 text-xs font-medium text-emerald-300 shadow-lg shadow-emerald-950/20">
+        <div className="flex items-center gap-2 rounded-full border border-profit/20 bg-profit/5 px-3 py-1.5 text-xs font-medium text-profit shadow-lg shadow-black/20">
           <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-profit opacity-50" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-profit" />
           </span>
           Atualização automática · 30s
         </div>
@@ -146,12 +155,12 @@ function DashboardContent() {
         <Kpi
           label="Lucro na página"
           value={formatarSilver(String(totalProfit))}
-          tone="emerald"
+          tone="profit"
         />
         <Kpi
           label="Ofertas encontradas"
           value={String(result.data?.total ?? '—')}
-          tone="amber"
+          tone="primary"
         />
         <Kpi
           label="Última observação"
@@ -160,32 +169,28 @@ function DashboardContent() {
               ? formatarIdade(rows[0].oldest_observed_at)
               : '—'
           }
-          tone="sky"
+          tone="info"
         />
       </div>
-      <div className="opportunity-filters overflow-hidden rounded-2xl border border-stone-800 bg-stone-900/70 shadow-2xl shadow-black/20">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800 px-5 py-4">
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface/70 shadow-2xl shadow-black/20">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
-            <h2 className="font-bold text-stone-100">
+            <h2 className="font-bold text-foreground">
               Encontre sua rota de lucro
             </h2>
-            <p className="mt-0.5 text-xs text-stone-500">
+            <p className="mt-0.5 text-xs text-foreground-subtle">
               Filtre o mercado e compare compra, venda, taxas e volume
               disponível.
             </p>
           </div>
-          <button
-            type="button"
-            className="rounded-lg border border-stone-700 bg-stone-950/50 px-3 py-2 text-sm font-semibold text-stone-300 transition hover:border-amber-400/60 hover:text-amber-300"
-            onClick={clearFilters}
-          >
+          <Button variant="outline" size="sm" onClick={clearFilters}>
             Limpar filtros
-          </button>
+          </Button>
         </div>
         <div className="space-y-6 p-5">
           <fieldset>
-            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-              <span className="h-px w-5 bg-amber-400/60" /> Item
+            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-foreground-subtle">
+              <span className="h-px w-5 bg-primary/60" /> Item
             </legend>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <CategorySelect
@@ -263,35 +268,38 @@ function DashboardContent() {
               />
             </div>
           </fieldset>
-          <fieldset className="border-t border-stone-800 pt-5">
-            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-              <span className="h-px w-5 bg-sky-400/60" /> Mercado e resultado
+          <fieldset className="border-t border-border pt-5">
+            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-foreground-subtle">
+              <span className="h-px w-5 bg-buy-side/60" /> Mercado e resultado
             </legend>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="filter-field">
+              <label className={fieldLabel}>
                 Lucro mínimo
                 <input
                   aria-label="Lucro mínimo"
+                  className={fieldControl}
                   inputMode="decimal"
                   value={params.get('min_profit') ?? ''}
                   onChange={(e) => set('min_profit', e.target.value)}
                   placeholder="0"
                 />
               </label>
-              <label className="filter-field">
+              <label className={fieldLabel}>
                 ROI mínimo
                 <input
                   aria-label="ROI mínimo"
+                  className={fieldControl}
                   inputMode="decimal"
                   value={params.get('min_roi') ?? ''}
                   onChange={(e) => set('min_roi', e.target.value)}
                   placeholder="0%"
                 />
               </label>
-              <label className="filter-field sm:col-span-2">
+              <label className={`${fieldLabel} sm:col-span-2`}>
                 Ordenar por
                 <select
                   aria-label="Ordenar por"
+                  className={fieldControl}
                   value={query.sort}
                   onChange={(e) => set('sort', e.target.value)}
                 >
@@ -309,7 +317,7 @@ function DashboardContent() {
               </label>
             </div>
             <div className="mt-5">
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-stone-500">
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-foreground-subtle">
                 Cidades observadas
               </p>
               <div className="flex flex-wrap gap-2">
@@ -323,7 +331,7 @@ function DashboardContent() {
                       type="button"
                       aria-pressed={selected}
                       onClick={() => toggleCity(ids)}
-                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${selected ? 'border-amber-300 bg-amber-300 text-stone-950 shadow-lg shadow-amber-950/20' : 'border-stone-700 bg-stone-950/50 text-stone-300 hover:border-amber-300/70 hover:text-amber-200'}`}
+                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${selected ? 'border-primary bg-primary text-on-primary shadow-lg shadow-black/20' : 'border-border-strong bg-background/50 text-foreground hover:border-primary/70 hover:text-primary'}`}
                     >
                       {name}
                     </button>
@@ -332,30 +340,30 @@ function DashboardContent() {
               </div>
             </div>
           </fieldset>
-          <fieldset className="border-t border-stone-800 pt-5">
-            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-              <span className="h-px w-5 bg-violet-400/60" /> Estratégia
+          <fieldset className="border-t border-border pt-5">
+            <legend className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-foreground-subtle">
+              <span className="h-px w-5 bg-sell-side/60" /> Estratégia
             </legend>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <Checkbox
+              <Toggle
                 label="Conta Premium"
                 description="Imposto de venda reduzido para 4%"
                 checked={query.premium}
                 onChange={(checked) => set('premium', checked ? '' : 'false')}
               />
-              <Checkbox
+              <Toggle
                 label="Pedido de compra"
                 description="Inclui 2,5% para criar a ordem"
                 checked={query.buyOrder}
                 onChange={(checked) => set('buy_order', checked ? 'true' : '')}
               />
-              <Checkbox
+              <Toggle
                 label="Pedido de venda"
                 description="Inclui 2,5% para criar a ordem"
                 checked={query.sellOrder}
                 onChange={(checked) => set('sell_order', checked ? 'true' : '')}
               />
-              <Checkbox
+              <Toggle
                 label="Cobertura completa"
                 description="Oculta livros observados parcialmente"
                 checked={query.requireComplete}
@@ -363,7 +371,7 @@ function DashboardContent() {
                   set('coverage', checked ? 'complete' : '')
                 }
               />
-              <Checkbox
+              <Toggle
                 label="Apenas com lucro"
                 description="Remove oportunidades negativas"
                 checked={query.profitOnly}
@@ -382,14 +390,14 @@ function DashboardContent() {
         <EstadoErro title="Não foi possível carregar o Market Flip" />
       )}
       {!result.loading && !result.error && rows.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-stone-700/80 bg-gradient-to-b from-stone-900/40 to-stone-950 px-6 py-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-stone-700 bg-stone-900 text-stone-400">
+        <div className="rounded-2xl border border-dashed border-border-strong/80 bg-gradient-to-b from-surface/40 to-background px-6 py-12 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border-strong bg-surface text-foreground-muted">
             <ArrowLeftRight className="size-5" aria-hidden="true" />
           </div>
-          <h2 className="mt-4 font-bold text-stone-200">
+          <h2 className="mt-4 font-bold text-foreground">
             Nenhuma oportunidade encontrada
           </h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-stone-500">
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-foreground-subtle">
             A ausência de dados não representa lucro zero. Ajuste os filtros,
             aumente o frescor ou aguarde novas coletas.
           </p>
@@ -397,9 +405,10 @@ function DashboardContent() {
       )}
       {rows.length > 0 && <OpportunityTable rows={rows} />}
       {(result.data?.total ?? 0) > 0 && (
-        <div className="flex items-center justify-between rounded-xl border border-stone-800 bg-stone-900/40 px-3 py-2 text-sm text-stone-400">
-          <button
-            className="button"
+        <div className="flex items-center justify-between rounded-xl border border-border bg-surface/40 px-3 py-2 text-sm text-foreground-muted">
+          <Button
+            variant="outline"
+            size="sm"
             disabled={query.offset === 0}
             onClick={() =>
               setParams(
@@ -412,12 +421,13 @@ function DashboardContent() {
             }
           >
             Anterior
-          </button>
+          </Button>
           <span>
             Página {page} · {result.data?.total ?? 0} oportunidades
           </span>
-          <button
-            className="button"
+          <Button
+            variant="outline"
+            size="sm"
             disabled={
               !result.data || query.offset + query.limit >= result.data.total
             }
@@ -432,7 +442,7 @@ function DashboardContent() {
             }
           >
             Próxima
-          </button>
+          </Button>
         </div>
       )}
     </section>
@@ -441,14 +451,14 @@ function DashboardContent() {
 
 function DashboardIntro() {
   return (
-    <section className="rounded-2xl border border-amber-400/20 bg-stone-900 p-8">
-      <p className="text-sm uppercase tracking-widest text-amber-400">
+    <section className="rounded-2xl border border-primary/20 bg-surface p-8">
+      <p className="text-sm uppercase tracking-widest text-primary">
         Market Flip
       </p>
       <h1 className="mt-2 text-3xl font-bold">
         Escolha um servidor para começar
       </h1>
-      <p className="mt-3 text-stone-400">
+      <p className="mt-3 text-foreground-muted">
         Selecione West, East ou Europa no menu superior para buscar
         oportunidades.
       </p>
@@ -462,25 +472,25 @@ function Kpi({
 }: {
   label: string
   value: string
-  tone: 'amber' | 'emerald' | 'sky'
+  tone: 'primary' | 'profit' | 'info'
 }) {
   const tones = {
-    amber: 'from-amber-400/15 text-amber-200 before:bg-amber-400',
-    emerald: 'from-emerald-400/15 text-emerald-200 before:bg-emerald-400',
-    sky: 'from-sky-400/15 text-sky-200 before:bg-sky-400',
+    primary: 'from-primary/15 text-primary before:bg-primary',
+    profit: 'from-profit/15 text-profit before:bg-profit',
+    info: 'from-info/15 text-info before:bg-info',
   }
   return (
     <article
-      className={`relative overflow-hidden rounded-2xl border border-stone-800 bg-gradient-to-br ${tones[tone]} to-stone-900/80 p-5 shadow-lg shadow-black/10 before:absolute before:inset-y-0 before:left-0 before:w-1`}
+      className={`relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br ${tones[tone]} to-surface/80 p-5 shadow-lg shadow-black/10 before:absolute before:inset-y-0 before:left-0 before:w-1`}
     >
-      <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-stone-500">
+      <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-foreground-subtle">
         {label}
       </p>
       <p className="mt-2 text-2xl font-black tracking-tight">{value}</p>
     </article>
   )
 }
-function Checkbox({
+function Toggle({
   label,
   description,
   checked,
@@ -492,18 +502,13 @@ function Checkbox({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label className={`filter-toggle ${checked ? 'filter-toggle-active' : ''}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span className="toggle-track" aria-hidden="true">
-        <span className="toggle-thumb" />
-      </span>
+    <label
+      className={`flex min-h-[4.5rem] cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${checked ? 'border-primary/45 bg-primary/10' : 'border-surface-raised bg-background/55 hover:border-border-strong'}`}
+    >
+      <Switch checked={checked} onCheckedChange={onChange} />
       <span className="min-w-0">
-        <strong className="block text-sm text-stone-100">{label}</strong>
-        <span className="mt-0.5 block text-xs font-normal leading-snug text-stone-500">
+        <strong className="block text-sm text-foreground">{label}</strong>
+        <span className="mt-0.5 block text-xs font-normal leading-snug text-foreground-subtle">
           {description}
         </span>
       </span>
@@ -526,10 +531,11 @@ function Select({
   labels?: string[]
 }) {
   return (
-    <label className="filter-field">
+    <label className={fieldLabel}>
       {label}
       <select
         aria-label={label}
+        className={fieldControl}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
@@ -555,10 +561,11 @@ function CategorySelect({
   options: string[]
 }) {
   return (
-    <label className="filter-field">
+    <label className={fieldLabel}>
       {label}
       <select
         aria-label={label}
+        className={fieldControl}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
@@ -580,24 +587,24 @@ function OpportunityTable({
   >['opportunities']
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-stone-800 bg-stone-950 shadow-2xl shadow-black/20">
-      <div className="flex items-center justify-between border-b border-stone-800 bg-stone-900/70 px-5 py-3">
+    <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-2xl shadow-black/20">
+      <div className="flex items-center justify-between border-b border-border bg-surface/70 px-5 py-3">
         <div>
-          <h2 className="text-sm font-bold text-stone-200">
+          <h2 className="text-sm font-bold text-foreground">
             Melhores oportunidades
           </h2>
-          <p className="mt-0.5 text-xs text-stone-500">
+          <p className="mt-0.5 text-xs text-foreground-subtle">
             Compra e venda calculadas com as taxas da estratégia selecionada
           </p>
         </div>
-        <span className="rounded-full bg-stone-800 px-2.5 py-1 text-xs font-semibold text-stone-400">
+        <span className="rounded-full bg-surface-raised px-2.5 py-1 text-xs font-semibold text-foreground-muted">
           {rows.length} nesta página
         </span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1120px] text-left text-sm">
           <caption className="sr-only">Oportunidades de Market Flip</caption>
-          <thead className="bg-stone-900/80 text-[0.68rem] uppercase tracking-[0.12em] text-stone-500">
+          <thead className="bg-surface/80 text-[0.68rem] uppercase tracking-[0.12em] text-foreground-subtle">
             <tr>
               <th className="p-4">Item</th>
               <th className="p-4">Qualidade</th>
@@ -615,36 +622,36 @@ function OpportunityTable({
             {rows.map((row) => (
               <tr
                 key={`${row.item}-${row.quality_level}-${row.buy_location}-${row.sell_location}`}
-                className="border-t border-stone-800 transition-colors hover:bg-stone-900"
+                className="border-t border-border transition-colors hover:bg-surface"
               >
                 <td className="p-4">
                   <Link
-                    className="font-bold text-stone-100 transition hover:text-amber-300"
+                    className="font-bold text-foreground transition hover:text-primary"
                     to={`/calculadora?item=${encodeURIComponent(row.item)}`}
                   >
                     {formatarNomeJogador(row.item_name, row.item)}
                   </Link>
                 </td>
-                <td className="p-4 font-medium text-stone-300">
+                <td className="p-4 font-medium text-foreground">
                   {formatarQualidade(row.quality_level)}
                 </td>
                 <td className="p-4">
-                  <strong className="text-stone-100">
+                  <strong className="text-foreground">
                     {formatarSilver(row.buy_price)}
                   </strong>
-                  <div className="mt-0.5 text-xs font-medium text-sky-300">
+                  <div className="mt-0.5 text-xs font-medium text-buy-side">
                     {formatarLocalidade(row.buy_location)}
                   </div>
                 </td>
                 <td className="p-4">
-                  <strong className="text-stone-100">
+                  <strong className="text-foreground">
                     {formatarSilver(row.sell_price)}
                   </strong>
-                  <div className="mt-0.5 text-xs font-medium text-violet-300">
+                  <div className="mt-0.5 text-xs font-medium text-sell-side">
                     {formatarLocalidade(row.sell_location)}
                   </div>
                 </td>
-                <td className="p-4 font-semibold text-amber-200">
+                <td className="p-4 font-semibold text-primary">
                   {formatarSilver(
                     row.total_cost ??
                       (row.buy_price
@@ -652,7 +659,7 @@ function OpportunityTable({
                         : null),
                   )}
                 </td>
-                <td className="p-4 font-semibold text-sky-200">
+                <td className="p-4 font-semibold text-buy-side">
                   {formatarSilver(
                     row.gross_revenue ??
                       (row.sell_price
@@ -660,18 +667,18 @@ function OpportunityTable({
                         : null),
                   )}
                 </td>
-                <td className="p-4 text-stone-400">
+                <td className="p-4 text-foreground-muted">
                   {formatarSilver(row.total_fees)}
                 </td>
-                <td className="p-4 font-semibold text-stone-300">
+                <td className="p-4 font-semibold text-foreground">
                   {row.quantity}
                 </td>
                 <td className="p-4">
-                  <strong className="whitespace-nowrap rounded-lg border border-emerald-400/10 bg-emerald-400/10 px-2.5 py-1.5 text-emerald-300">
+                  <strong className="whitespace-nowrap rounded-lg border border-profit/10 bg-profit/10 px-2.5 py-1.5 text-profit">
                     {formatarSilver(row.profit)}
                   </strong>
                 </td>
-                <td className="p-4 font-medium text-emerald-300">
+                <td className="p-4 font-medium text-profit">
                   {formatarPct(row.roi)}
                 </td>
               </tr>

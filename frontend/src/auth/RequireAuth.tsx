@@ -7,7 +7,7 @@ export function RequireAuth() {
   const location = useLocation()
   if (status === 'loading')
     return (
-      <p className="grid min-h-screen place-items-center bg-stone-950 text-stone-200">
+      <p className="grid min-h-screen place-items-center bg-background text-foreground">
         Carregando sessão…
       </p>
     )

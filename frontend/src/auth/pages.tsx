@@ -22,13 +22,13 @@ function AuthCard({
   subtitle: string
 }) {
   return (
-    <main className="grid min-h-screen place-items-center bg-stone-950 px-6 text-stone-100">
-      <section className="w-full max-w-md rounded-2xl border border-amber-400/20 bg-stone-900 p-8 shadow-2xl shadow-black/30">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-amber-400">
+    <main className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
+      <section className="w-full max-w-md rounded-2xl border border-primary/20 bg-surface p-8 shadow-2xl shadow-black/30">
+        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primary">
           Albion Profit Pro
         </p>
         <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-        <p className="mt-2 text-sm text-stone-400">{subtitle}</p>
+        <p className="mt-2 text-sm text-foreground-muted">{subtitle}</p>
         <div className="mt-7">{children}</div>
       </section>
     </main>
@@ -36,7 +36,9 @@ function AuthCard({
 }
 
 function FieldError({ message }: { message?: string }) {
-  return message ? <p className="mt-1 text-sm text-red-300">{message}</p> : null
+  return message ? (
+    <p className="mt-1 text-sm text-danger">{message}</p>
+  ) : null
 }
 
 export function LoginPage() {
@@ -65,7 +67,7 @@ export function LoginPage() {
       {sessionExpired && (
         <div
           role="alert"
-          className="mb-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-200"
+          className="mb-4 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm text-primary"
         >
           Sua sessão expirou. Entre novamente para continuar.{' '}
           <button className="ml-2 underline" onClick={clearSessionExpired}>
@@ -74,7 +76,7 @@ export function LoginPage() {
         </div>
       )}
       {form.formState.errors.root?.message && (
-        <p role="alert" className="mb-4 text-sm text-red-300">
+        <p role="alert" className="mb-4 text-sm text-danger">
           {form.formState.errors.root.message}
         </p>
       )}
@@ -91,7 +93,7 @@ export function LoginPage() {
             id="login-email"
             type="email"
             autoComplete="email"
-            className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-border-strong bg-background px-3 py-2"
             {...form.register('email')}
           />
           <FieldError message={form.formState.errors.email?.message} />
@@ -102,22 +104,22 @@ export function LoginPage() {
             id="login-password"
             type="password"
             autoComplete="current-password"
-            className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-border-strong bg-background px-3 py-2"
             {...form.register('password')}
           />
           <FieldError message={form.formState.errors.password?.message} />
         </label>
         <button
-          className="w-full rounded-lg bg-amber-400 px-4 py-2 font-semibold text-stone-950 disabled:opacity-50"
+          className="w-full rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary disabled:opacity-50"
           disabled={form.formState.isSubmitting}
           type="submit"
         >
           {form.formState.isSubmitting ? 'Entrando…' : 'Entrar'}
         </button>
       </form>
-      <p className="mt-6 text-center text-sm text-stone-400">
+      <p className="mt-6 text-center text-sm text-foreground-muted">
         Ainda não tem conta?{' '}
-        <Link className="text-amber-300 underline" to="/register">
+        <Link className="text-primary underline" to="/register">
           Criar conta
         </Link>
       </p>
@@ -145,7 +147,7 @@ export function RegisterPage() {
       subtitle="Use um e-mail e uma senha com pelo menos 10 caracteres."
     >
       {form.formState.errors.root?.message && (
-        <p role="alert" className="mb-4 text-sm text-red-300">
+        <p role="alert" className="mb-4 text-sm text-danger">
           {form.formState.errors.root.message}
         </p>
       )}
@@ -162,7 +164,7 @@ export function RegisterPage() {
             id="register-email"
             type="email"
             autoComplete="email"
-            className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-border-strong bg-background px-3 py-2"
             {...form.register('email')}
           />
           <FieldError message={form.formState.errors.email?.message} />
@@ -176,7 +178,7 @@ export function RegisterPage() {
             id="register-password"
             type="password"
             autoComplete="new-password"
-            className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-border-strong bg-background px-3 py-2"
             {...form.register('password')}
           />
           <FieldError message={form.formState.errors.password?.message} />
@@ -190,7 +192,7 @@ export function RegisterPage() {
             id="register-confirmation"
             type="password"
             autoComplete="new-password"
-            className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-border-strong bg-background px-3 py-2"
             {...form.register('passwordConfirmation')}
           />
           <FieldError
@@ -198,16 +200,16 @@ export function RegisterPage() {
           />
         </label>
         <button
-          className="w-full rounded-lg bg-amber-400 px-4 py-2 font-semibold text-stone-950 disabled:opacity-50"
+          className="w-full rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary disabled:opacity-50"
           disabled={form.formState.isSubmitting}
           type="submit"
         >
           {form.formState.isSubmitting ? 'Criando…' : 'Criar conta'}
         </button>
       </form>
-      <p className="mt-6 text-center text-sm text-stone-400">
+      <p className="mt-6 text-center text-sm text-foreground-muted">
         Já tem conta?{' '}
-        <Link className="text-amber-300 underline" to="/login">
+        <Link className="text-primary underline" to="/login">
           Entrar
         </Link>
       </p>

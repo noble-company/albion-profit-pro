@@ -15,14 +15,14 @@ function date(value: string | null) {
 }
 export function ConfigInstrucoes() {
   return (
-    <aside className="mt-8 rounded-xl border border-amber-400/30 bg-amber-400/10 p-5">
-      <h2 className="font-semibold text-amber-200">Configurar o client Go</h2>
-      <p className="mt-2 text-sm text-stone-300">
+    <aside className="mt-8 rounded-xl border border-primary/30 bg-primary/10 p-5">
+      <h2 className="font-semibold text-primary">Configurar o client Go</h2>
+      <p className="mt-2 text-sm text-foreground">
         Cole o segredo uma única vez no arquivo <code>config.yaml</code> ou use
         a flag <code>-token</code>. Não compartilhe este valor.
       </p>
-      <pre className="mt-3 overflow-x-auto rounded bg-stone-950 p-3 text-xs text-stone-200">{`token: apk_...\n# ou: albiondata-client -token apk_...`}</pre>
-      <p className="mt-3 text-sm text-stone-300">
+      <pre className="mt-3 overflow-x-auto rounded bg-background p-3 text-xs text-foreground">{`token: apk_...\n# ou: albiondata-client -token apk_...`}</pre>
+      <p className="mt-3 text-sm text-foreground">
         Depois de configurar, atravesse uma zona no jogo para o client iniciar a
         coleta. O último uso é aproximado (atualizado no máximo uma vez por
         hora).
@@ -62,25 +62,25 @@ function CreatedModal({
       aria-labelledby="token-created"
       className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
     >
-      <div className="w-full max-w-xl rounded-2xl border border-amber-400/40 bg-stone-900 p-6">
+      <div className="w-full max-w-xl rounded-2xl border border-primary/40 bg-surface p-6">
         <h2 id="token-created" className="text-xl font-bold">
           Token criado — copie agora
         </h2>
-        <p className="mt-2 text-sm text-amber-200">
+        <p className="mt-2 text-sm text-primary">
           Este segredo não será mostrado novamente.
         </p>
-        <code className="mt-4 block break-all rounded bg-stone-950 p-4 text-sm">
+        <code className="mt-4 block break-all rounded bg-background p-4 text-sm">
           {token.token}
         </code>
         <div className="mt-5 flex flex-wrap justify-end gap-3">
           <button
-            className="rounded border border-stone-600 px-4 py-2"
+            className="rounded border border-border-strong px-4 py-2"
             onClick={() => void copy()}
           >
             {copied ? 'Copiado' : 'Copiar segredo'}
           </button>
           <button
-            className="rounded bg-amber-400 px-4 py-2 font-semibold text-stone-950 disabled:opacity-50"
+            className="rounded bg-primary px-4 py-2 font-semibold text-on-primary disabled:opacity-50"
             disabled={!copied}
             onClick={onClose}
           >
@@ -129,16 +129,16 @@ export function TokensPage() {
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-widest text-amber-400">
+          <p className="text-sm uppercase tracking-widest text-primary">
             Client Go
           </p>
           <h1 className="mt-2 text-3xl font-bold">Tokens de API</h1>
-          <p className="mt-2 text-stone-400">
+          <p className="mt-2 text-foreground-muted">
             Gerencie as credenciais usadas pelo coletor AlbionData.
           </p>
         </div>
         <button
-          className="rounded-lg bg-amber-400 px-4 py-2 font-semibold text-stone-950"
+          className="rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary"
           onClick={() => void generate()}
           disabled={create.isPending}
         >
@@ -156,19 +156,19 @@ export function TokensPage() {
           {active.map((token) => (
             <li
               key={token.id}
-              className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-stone-800 bg-stone-900 p-4"
+              className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4"
             >
               <div>
                 <p className="font-medium">
                   Token <code>…{token.token_sufixo}</code>
                 </p>
-                <p className="text-sm text-stone-400">
+                <p className="text-sm text-foreground-muted">
                   Criado em {date(token.created_at)} · Último uso:{' '}
                   {date(token.ultimo_uso_em)}
                 </p>
               </div>
               <button
-                className="rounded border border-red-400/50 px-3 py-2 text-sm text-red-200"
+                className="rounded border border-danger/50 px-3 py-2 text-sm text-danger"
                 onClick={() => void revokeOne(token.id)}
                 disabled={revoke.isPending}
               >
