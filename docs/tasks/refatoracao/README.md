@@ -125,7 +125,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 18 — Módulo monetário e vetores dourados
 - [x] 19 — Fonte única de localizações e categorias
 - [x] 20 — Componentes compartilhados
-- [ ] 21 — Tela Market Flip
+- [x] 21 — Tela Market Flip
 - [ ] 22 — Telas de Refino e Craft
 - [ ] 23 — Camada "e se" no cliente
 - [ ] 24 — Demais telas

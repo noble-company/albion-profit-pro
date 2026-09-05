@@ -14,9 +14,10 @@ import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
 
+import { TabelaCarregando } from '@/components/opportunities/TabelaCarregando'
+
 import { ConfidenceBadge } from './ConfidenceBadge'
 import { DEMO_WARNINGS } from './confidence'
-import { TabelaCarregando } from './TabelaCarregando'
 
 /**
  * Página de referência da task 3.5/14 — rota /estilo, dev-only. Prova viva das decisões de

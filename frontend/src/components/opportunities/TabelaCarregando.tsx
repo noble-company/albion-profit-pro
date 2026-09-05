@@ -1,9 +1,9 @@
 import { Skeleton } from '@/components/ui/skeleton'
 
 /**
- * Demonstração da task 3.5/14 (docs/13-linguagem-visual.md §3) — skeleton no FORMATO da
- * tabela real (mesma altura de linha, mesmo número de colunas), não um spinner genérico.
- * A task 20 decide se isso vira parte de `OpportunityTable` ou fica um componente à parte.
+ * Skeleton no FORMATO da tabela (task 3.5/14 §3, task 3.5/21): mesma altura de linha `h-11`,
+ * mesmo número de colunas — não um spinner genérico. É o estado de carregando de
+ * `OpportunityTable`.
  */
 export function TabelaCarregando({
   columns = 6,
@@ -18,7 +18,7 @@ export function TabelaCarregando({
     <div
       role="status"
       aria-live="polite"
-      className="overflow-hidden rounded-lg border border-border"
+      className="overflow-hidden rounded-2xl border border-border bg-background"
     >
       <span className="sr-only">{label}</span>
       <div aria-hidden="true">

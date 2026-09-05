@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 
 import { useServer } from '@/app/ServerContext'
 import { RequireRealm } from '@/components/AppShell'
-import { Carregando, EstadoErro } from '@/components/ui/states'
+import { EstadoErro, EstadoVazio } from '@/components/ui/states'
 import {
   fieldControl,
   fieldLabel,
@@ -20,6 +20,7 @@ import {
   type OpportunityColumn,
 } from '@/components/opportunities/OpportunityTable'
 import { Pagination } from '@/components/opportunities/Pagination'
+import { WarningBadges } from '@/components/opportunities/WarningBadges'
 import { traduzirCategoria } from '@/i18n/categories'
 import {
   formatarIdade,
@@ -30,6 +31,7 @@ import {
 } from '@/lib/formatters'
 import { useLocationName, useMarketToggles } from '@/lib/locations'
 import * as money from '@/lib/money'
+import { usePageVisible } from '@/lib/usePageVisible'
 
 import { useCategories, useFlipOpportunities } from './hooks'
 import { useOpportunityParams } from './useOpportunityParams'
@@ -60,6 +62,7 @@ function DashboardContent() {
     reset,
   } = useOpportunityParams(readFlipExtra)
 
+  const pageVisible = usePageVisible()
   const result = useFlipOpportunities(realm, query)
   // O servidor já ordena e pagina sobre o conjunto completo (F08) — nada de reordenar a
   // página aqui.
@@ -84,80 +87,96 @@ function DashboardContent() {
     )
   }
 
+  // Hierarquia da task 14 §2: item + rota + lucro + ROI decidem em meio segundo; preço,
+  // qtd e investimento são secundários; taxas é contexto. As colunas de dinheiro ficam
+  // TODAS visíveis de propósito — dá pra reconciliar `faturamento − taxas − investimento =
+  // lucro` linha a linha e conferir o cálculo do servidor.
   const columns: OpportunityColumn[] = [
     {
       header: 'Item',
+      sticky: 'left',
+      width: '13rem',
+      className: 'whitespace-normal',
       cell: (row) => (
-        <Link
-          className="font-bold text-foreground transition hover:text-primary"
-          to={`/calculadora?item=${encodeURIComponent(row.item)}`}
-        >
-          {formatarNomeItem(row.item_name, row.item)}
-        </Link>
+        <>
+          <Link
+            className="font-semibold text-foreground transition hover:text-primary"
+            to={`/calculadora?item=${encodeURIComponent(row.item)}`}
+          >
+            {formatarNomeItem(row.item_name, row.item)}
+            <span className="mt-0.5 block text-xs font-normal text-foreground-subtle">
+              {formatarQualidade(row.quality_level)}
+            </span>
+          </Link>
+          <WarningBadges warnings={row.warnings} className="mt-1" />
+        </>
       ),
     },
     {
-      header: 'Qualidade',
-      cellClassName: 'p-4 font-medium text-foreground',
-      cell: (row) => formatarQualidade(row.quality_level),
+      header: 'Rota',
+      width: '11rem',
+      cell: (row) => (
+        <span className="flex items-center gap-1.5 text-foreground">
+          <span className="text-buy-side">
+            {locationName(row.buy_location)}
+          </span>
+          <ArrowLeftRight
+            className="size-3.5 shrink-0 text-foreground-subtle"
+            aria-hidden="true"
+          />
+          <span className="text-sell-side">
+            {locationName(row.sell_location)}
+          </span>
+        </span>
+      ),
     },
     {
       header: 'Compra unit.',
-      cell: (row) => (
-        <>
-          <strong className="text-foreground">
-            {formatarSilver(row.buy_price)}
-          </strong>
-          <div className="mt-0.5 text-xs font-medium text-buy-side">
-            {locationName(row.buy_location)}
-          </div>
-        </>
-      ),
+      numeric: true,
+      cell: (row) => formatarSilver(row.buy_price),
     },
     {
       header: 'Venda unit.',
-      cell: (row) => (
-        <>
-          <strong className="text-foreground">
-            {formatarSilver(row.sell_price)}
-          </strong>
-          <div className="mt-0.5 text-xs font-medium text-sell-side">
-            {locationName(row.sell_location)}
-          </div>
-        </>
-      ),
+      numeric: true,
+      cell: (row) => formatarSilver(row.sell_price),
+    },
+    {
+      header: 'Qtd.',
+      numeric: true,
+      cell: (row) => row.quantity,
     },
     {
       header: 'Investimento',
-      cellClassName: 'p-4 font-semibold text-primary',
+      numeric: true,
       cell: (row) => formatarSilver(row.total_cost),
     },
     {
       header: 'Faturamento',
-      cellClassName: 'p-4 font-semibold text-buy-side',
+      numeric: true,
       cell: (row) => formatarSilver(row.gross_revenue),
     },
     {
       header: 'Taxas',
-      cellClassName: 'p-4 text-foreground-muted',
+      numeric: true,
+      weight: 'tertiary',
       cell: (row) => formatarSilver(row.total_fees),
     },
     {
-      header: 'Qtd.',
-      cellClassName: 'p-4 font-semibold text-foreground',
-      cell: (row) => row.quantity,
-    },
-    {
       header: 'Lucro',
-      cell: (row) => (
-        <strong className="whitespace-nowrap rounded-lg border border-profit/10 bg-profit/10 px-2.5 py-1.5 text-profit">
-          {formatarSilver(row.profit)}
-        </strong>
-      ),
+      numeric: true,
+      weight: 'primary',
+      sticky: 'right',
+      width: '7rem',
+      className: 'text-profit',
+      cell: (row) => formatarSilver(row.profit),
     },
     {
       header: 'ROI',
-      cellClassName: 'p-4 font-medium text-profit',
+      numeric: true,
+      weight: 'primary',
+      sticky: 'right',
+      width: '5.5rem',
+      className: 'text-profit',
       cell: (row) => formatarPct(row.roi),
     },
   ]
@@ -176,13 +195,15 @@ function DashboardContent() {
             Compre barato em uma cidade. Venda caro em outra.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-profit/20 bg-profit/5 px-3 py-1.5 text-xs font-medium text-profit shadow-lg shadow-black/20">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-profit opacity-50" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-profit" />
-          </span>
-          Atualização automática · 30s
-        </div>
+        {pageVisible && (
+          <div className="flex items-center gap-2 rounded-full border border-profit/20 bg-profit/5 px-3 py-1.5 text-xs font-medium text-profit shadow-lg shadow-black/20">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-profit opacity-50" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-profit" />
+            </span>
+            Atualização automática · 30s
+          </div>
+        )}
       </header>
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiCard
@@ -373,33 +394,25 @@ function DashboardContent() {
           </div>
         </FilterFieldset>
       </FilterPanel>
-      {result.loading && !result.data && (
-        <Carregando label="Buscando oportunidades…" />
-      )}
-      {Boolean(result.error) && !result.data && (
+      {Boolean(result.error) && !result.data ? (
         <EstadoErro title="Não foi possível carregar o Market Flip" />
-      )}
-      {!result.loading && !result.error && rows.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border-strong/80 bg-gradient-to-b from-surface/40 to-background px-6 py-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border-strong bg-surface text-foreground-muted">
-            <ArrowLeftRight className="size-5" aria-hidden="true" />
-          </div>
-          <h2 className="mt-4 font-bold text-foreground">
-            Nenhuma oportunidade encontrada
-          </h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-foreground-subtle">
-            A ausência de dados não representa lucro zero. Ajuste os filtros,
-            aumente o frescor ou aguarde novas coletas.
-          </p>
-        </div>
-      )}
-      {rows.length > 0 && (
+      ) : !result.loading && rows.length === 0 ? (
+        <EstadoVazio
+          title="Nenhuma oportunidade encontrada"
+          icon={<ArrowLeftRight className="size-6" />}
+        >
+          A ausência de dados não representa lucro zero. Ajuste os filtros,
+          aumente o frescor ou aguarde novas coletas.
+        </EstadoVazio>
+      ) : (
         <OpportunityTable
           title="Melhores oportunidades"
           description="Compra e venda calculadas com as taxas da estratégia selecionada"
           caption="Oportunidades de Market Flip"
           rows={rows}
           columns={columns}
+          loading={result.loading && !result.data}
+          minWidth="72rem"
           rowKey={(row) =>
             `${row.item}-${row.quality_level}-${row.buy_location}-${row.sell_location}`
           }

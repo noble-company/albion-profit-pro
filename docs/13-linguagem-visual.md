@@ -58,7 +58,7 @@ sem exceção:
 
 | Estado | Padrão | Onde vive |
 |---|---|---|
-| **Carregando** | Skeleton com a **forma do conteúdo** — linhas de tabela fantasma (mesmas colunas, altura `h-11`), não um spinner nem o texto "Carregando…" sozinho. Texto vai para `sr-only` (leitor de tela lê, olho não). | `Carregando` (genérico) e `TabelaCarregando` (forma de linha) — a segunda é demonstrada em `/estilo`; a task 20 decide se ela vira parte de `OpportunityTable`. |
+| **Carregando** | Skeleton com a **forma do conteúdo** — linhas de tabela fantasma (mesmas colunas, altura `h-11`), não um spinner nem o texto "Carregando…" sozinho. Texto vai para `sr-only` (leitor de tela lê, olho não). | `Carregando` (genérico) e `TabelaCarregando` — a task 21 moveu esta para `components/opportunities/` e a plugou como o estado `loading` de `OpportunityTable`. |
 | **Vazio** | Ícone lucide neutro + título + 1 frase explicando que ausência de dado ≠ ausência de lucro (ver §5, microcópia). Nunca "Nenhum resultado" sozinho. | `EstadoVazio` (`components/ui/states.tsx`), já real. |
 | **Erro** | Cartão com borda `danger`, ícone de alerta, e ação de retry quando fizer sentido (não em toda ocorrência — só quando a operação é re-tentável). | `EstadoErro` (`components/ui/states.tsx`), já real. |
 | **Dado velho** (`stale`) | Não é um estado de tela — é uma anotação **na própria linha/badge** (ver §4). Frescor velho não impede a leitura, só marca a confiança mais baixa. |

@@ -119,8 +119,10 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
   const columns: OpportunityColumn[] = [
     {
       header: 'Saída',
+      sticky: 'left',
+      width: '13rem',
       cell: (row) => (
-        <>
+        <div className="whitespace-normal">
           <strong className="text-foreground">
             {formatarNomeItem(row.item_name, row.item)}
           </strong>
@@ -128,12 +130,12 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
             {formatarQualidade(row.quality_level)}
           </div>
           <WarningBadges warnings={row.warnings} className="mt-1" />
-        </>
+        </div>
       ),
     },
     {
       header: 'Entradas',
-      cellClassName: 'p-4 text-xs',
+      className: 'whitespace-normal text-xs',
       cell: (row) =>
         (row.ingredients ?? []).length > 0
           ? (row.ingredients ?? []).map((ingredient) => (
@@ -146,28 +148,28 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
     },
     {
       header: 'Cidade',
-      cellClassName: 'p-4 font-medium text-buy-side',
+      className: 'font-medium text-buy-side',
       cell: (row) => locationName(row.buy_location),
     },
     {
       header: 'Cenário',
-      cellClassName: 'p-4 text-xs text-foreground',
+      className: 'text-xs text-foreground',
       cell: (row) =>
         `${MODE_LABELS[row.acquisition_mode ?? ''] ?? '—'} → ${MODE_LABELS[row.sale_mode ?? ''] ?? '—'}`,
     },
     {
       header: 'Custo',
-      cellClassName: 'p-4 font-semibold text-foreground',
+      numeric: true,
       cell: (row) => formatarSilver(row.total_cost),
     },
     {
       header: 'Venda bruta',
-      cellClassName: 'p-4 font-semibold text-buy-side',
+      numeric: true,
       cell: (row) => formatarSilver(row.gross_revenue),
     },
     {
       header: 'Retorno',
-      cellClassName: 'p-4 text-xs',
+      className: 'whitespace-normal text-xs',
       cell: (row) =>
         (row.ingredients ?? []).some((ingredient) =>
           money.isPositive(ingredient.expected_return_quantity),
@@ -186,19 +188,21 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
     },
     {
       header: 'Estação',
+      numeric: true,
       cell: (row) => formatarSilver(row.station_cost),
     },
     {
       header: 'Lucro',
-      cell: (row) => (
-        <strong className="whitespace-nowrap rounded-lg border border-profit/10 bg-profit/10 px-2.5 py-1.5 text-profit">
-          {formatarSilver(row.profit)}
-        </strong>
-      ),
+      numeric: true,
+      weight: 'primary',
+      className: 'text-profit',
+      cell: (row) => formatarSilver(row.profit),
     },
     {
       header: 'ROI',
-      cellClassName: 'p-4 text-profit',
+      numeric: true,
+      weight: 'primary',
+      className: 'text-profit',
       cell: (row) => formatarPct(row.roi),
     },
     {
@@ -206,7 +210,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       cell: (row) => (
         <button
           type="button"
-          className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-bold text-primary transition hover:border-primary hover:bg-primary/20"
+          className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition hover:border-primary hover:bg-primary/20"
           onClick={() => openDetail(row)}
         >
           Analisar
