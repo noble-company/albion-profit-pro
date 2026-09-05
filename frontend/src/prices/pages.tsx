@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router'
 import { useServer } from '@/app/ServerContext'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { formatarIdade, formatarSilver } from '@/lib/formatters'
-import { useItemPrices } from './hooks'
+import { useItemPrices, useLocations } from './hooks'
 import { DemandaItem } from './demand'
 
 const LOCATION_LABELS: Record<string, string> = {
@@ -30,6 +30,7 @@ export function ItemPricesPage() {
   const selectedQuality = params.get('quality') ?? ''
   const selectedEnchant = params.get('enchantment') ?? ''
   const data = useItemPrices(uniqueName, realm, scope, locations, limit, offset)
+  const places = useLocations()
   const rows = useMemo(
     () =>
       data.data?.prices.filter(
@@ -60,7 +61,7 @@ export function ItemPricesPage() {
   const demandLocation = selectedLocation || undefined
   const demandQuality = selectedQuality ? Number(selectedQuality) : undefined
   const locationLabel = (locationId: string) =>
-    data.places.find((place) => place.location_id === locationId)?.name ||
+    places.find((place) => place.location_id === locationId)?.name ||
     LOCATION_LABELS[locationId] ||
     locationId
   return (
@@ -89,7 +90,7 @@ export function ItemPricesPage() {
             className="ml-2 rounded border border-border-strong bg-background px-2 py-1"
           >
             <option value="">Todas</option>
-            {data.places.map((place) => (
+            {places.map((place) => (
               <option key={place.location_id} value={place.location_id}>
                 {locationLabel(place.location_id)}
               </option>

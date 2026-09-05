@@ -119,7 +119,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 12 — Tokens de design
 - [x] 13 — Tema claro/escuro real
 - [x] 14 — Linguagem visual do produto
-- [ ] 15 — Migração para TanStack Query
+- [x] 15 — Migração para TanStack Query
 - [ ] 16 — Restauração de sessão
 - [ ] 17 — Ordenação e paginação no servidor
 - [ ] 18 — Módulo monetário e vetores dourados

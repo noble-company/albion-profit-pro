@@ -1,116 +1,66 @@
-import { useEffect, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+
+import { queryPolicies } from '@/api'
 import type { components } from '@/api/schema'
+
 import {
+  getCategories,
   getFlipOpportunities,
   getProductionOpportunities,
   type OpportunityQuery,
-  type OpportunityPage,
   type ProductionKind,
 } from './service'
+
+/**
+ * `/items/categories` alimenta só os filtros de Market Flip hoje, mas fica com chave própria
+ * e política `catalog` (task 3.5/15) pra qualquer outra tela que vier a precisar dedupli-
+ * car contra ela.
+ */
+export function useCategories() {
+  const { data } = useQuery({
+    queryKey: ['categories'] as const,
+    queryFn: ({ signal }) => getCategories(signal),
+    ...queryPolicies.catalog,
+  })
+  return data ?? []
+}
 
 export function useFlipOpportunities(
   server: components['schemas']['AlbionServer'] | null,
   query: OpportunityQuery,
 ) {
-  const [data, setData] = useState<OpportunityPage | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<unknown>(null)
-  const key = JSON.stringify([server, query])
-  useEffect(() => {
-    if (!server) return
-    let controller = new AbortController()
-    let disposed = false
-
-    const fetchOpportunities = () => {
-      controller.abort()
-      controller = new AbortController()
-      const requestController = controller
-      // The request lifecycle is external state synchronized by this effect.
-      setLoading(true)
-      setError(null)
-      void getFlipOpportunities(server, query, requestController.signal)
-        .then((value) => {
-          if (!disposed && !requestController.signal.aborted)
-            setData(value ?? null)
-        })
-        .catch((reason: unknown) => {
-          if (!disposed && !requestController.signal.aborted) {
-            setData(null)
-            setError(reason)
-          }
-        })
-        .finally(() => {
-          if (!disposed && !requestController.signal.aborted) setLoading(false)
-        })
-    }
-
-    // Never show rows from the previous filter while the new query is pending.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setData(null)
-    fetchOpportunities()
-    const interval = window.setInterval(fetchOpportunities, 30_000)
-
-    return () => {
-      disposed = true
-      window.clearInterval(interval)
-      controller.abort()
-    }
-  }, [key, query, server])
-  return { data, loading, error }
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['opportunities', 'flip', server, query] as const,
+    queryFn: ({ signal }) => {
+      if (!server) throw new Error('Selecione um servidor')
+      return getFlipOpportunities(server, query, signal)
+    },
+    enabled: server != null,
+    placeholderData: keepPreviousData,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    ...queryPolicies.market,
+  })
+  return { data: data ?? null, loading: isLoading, error }
 }
 
 export function useProductionOpportunities(
   kind: ProductionKind,
   server: components['schemas']['AlbionServer'] | null,
   query: OpportunityQuery,
+  options?: { pausePolling?: boolean },
 ) {
-  const [data, setData] = useState<OpportunityPage | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<unknown>(null)
-  const key = JSON.stringify([kind, server, query])
-
-  useEffect(() => {
-    if (!server) return
-    let controller = new AbortController()
-    let disposed = false
-
-    const fetchOpportunities = () => {
-      controller.abort()
-      controller = new AbortController()
-      const requestController = controller
-      setLoading(true)
-      setError(null)
-      void getProductionOpportunities(
-        kind,
-        server,
-        query,
-        requestController.signal,
-      )
-        .then((value) => {
-          if (!disposed && !requestController.signal.aborted)
-            setData(value ?? null)
-        })
-        .catch((reason: unknown) => {
-          if (!disposed && !requestController.signal.aborted) {
-            setData(null)
-            setError(reason)
-          }
-        })
-        .finally(() => {
-          if (!disposed && !requestController.signal.aborted) setLoading(false)
-        })
-    }
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setData(null)
-    fetchOpportunities()
-    const interval = window.setInterval(fetchOpportunities, 30_000)
-    return () => {
-      disposed = true
-      window.clearInterval(interval)
-      controller.abort()
-    }
-  }, [key, kind, query, server])
-
-  return { data, loading, error }
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['opportunities', kind, server, query] as const,
+    queryFn: ({ signal }) => {
+      if (!server) throw new Error('Selecione um servidor')
+      return getProductionOpportunities(kind, server, query, signal)
+    },
+    enabled: server != null,
+    placeholderData: keepPreviousData,
+    refetchInterval: options?.pausePolling ? false : 30_000,
+    refetchIntervalInBackground: false,
+    ...queryPolicies.market,
+  })
+  return { data: data ?? null, loading: isLoading, error }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Line,
   LineChart,
@@ -7,11 +7,12 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { queryPolicies } from '@/api'
 import type { components } from '@/api/schema'
-import { apiClient, safeApiCall } from '@/api'
 import { EstadoVazio, Carregando, EstadoErro } from '@/components/ui/states'
 import { formatarSilver } from '@/lib/formatters'
-type Demand = components['schemas']['DemandOut']
+import { getDemand } from './service'
+
 export function useDemand(
   item: string,
   server: components['schemas']['AlbionServer'] | null,
@@ -19,38 +20,21 @@ export function useDemand(
   quality: number | undefined,
   enchantment: number,
 ) {
-  const [data, setData] = useState<Demand | null>(null)
-  const [error, setError] = useState<unknown>(null)
-  useEffect(() => {
-    if (!server || !location || quality === undefined) {
-      return
-    }
-    const c = new AbortController()
-    void safeApiCall(() =>
-      apiClient.GET('/items/{item_id}/demand', {
-        params: {
-          path: { item_id: item },
-          query: {
-            server,
-            location_id: location,
-            quality,
-            enchantment_level: enchantment,
-          },
-        },
-        signal: c.signal,
-      }),
-    )
-      .then((r) => {
-        if (r.data) setData(r.data)
-      })
-      .catch((e) => {
-        if (!c.signal.aborted) setError(e)
-      })
-    return () => c.abort()
-  }, [enchantment, item, location, quality, server])
+  const enabled = Boolean(server && location && quality !== undefined)
+  const { data, error } = useQuery({
+    queryKey: ['demand', item, server, location, quality, enchantment] as const,
+    queryFn: ({ signal }) => {
+      if (!server || !location || quality === undefined) {
+        throw new Error('Selecione cidade e qualidade')
+      }
+      return getDemand(item, server, location, quality, enchantment, signal)
+    },
+    enabled,
+    ...queryPolicies.demand,
+  })
   return {
-    data: !server || !location || quality === undefined ? null : data,
-    error,
+    data: enabled ? (data ?? null) : null,
+    error: enabled ? error : null,
   }
 }
 function Card({

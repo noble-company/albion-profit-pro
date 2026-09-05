@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useSearchParams } from 'react-router'
 import { useServer } from '@/app/ServerContext'
 import { EstadoErro, EstadoVazio, Carregando } from '@/components/ui/states'
 import { formatarPct, formatarSilver } from '@/lib/formatters'
-import { getLocations, type Location } from '@/prices/service'
+import { useLocations } from '@/prices/hooks'
 import { simulateCraft, type CraftRequest, type CraftResult } from './service'
 type FormValues = Omit<CraftRequest, 'server'>
 const PREFS = 'albion-profit-pro:calculator:v1'
@@ -99,10 +99,8 @@ function Result({ result }: { result: CraftResult }) {
 export function CalculadoraPage() {
   const { realm } = useServer()
   const [searchParams] = useSearchParams()
-  const [locations, setLocations] = useState<Location[]>([])
-  const [result, setResult] = useState<CraftResult | null>(null)
-  const [error, setError] = useState<unknown>(null)
-  const [loading, setLoading] = useState(false)
+  const locations = useLocations()
+  const mutation = useMutation({ mutationFn: simulateCraft })
   const {
     register,
     handleSubmit,
@@ -124,49 +122,31 @@ export function CalculadoraPage() {
       location_id: '',
     },
   })
-  useEffect(() => {
-    const c = new AbortController()
-    void getLocations(c.signal)
-      .then(setLocations)
-      .catch(() => undefined)
-    return () => c.abort()
-  }, [])
   if (!realm)
     return (
       <EstadoVazio title="Escolha um servidor">
         Selecione um servidor antes de simular.
       </EstadoVazio>
     )
-  const submit = async (values: FormValues) => {
-    setLoading(true)
-    setError(null)
-    try {
-      localStorage.setItem(
-        PREFS,
-        JSON.stringify({
-          version: 1,
-          output_quality: values.output_quality,
-          scope: values.scope,
-          premium: values.premium,
-          use_focus: values.use_focus,
-        }),
-      )
-      setResult(
-        await simulateCraft({
-          server: realm,
-          ...values,
-          quantity: Number(values.quantity),
-          output_quality: Number(values.output_quality),
-          return_rate: String(values.return_rate),
-          station_cost_per_execution: String(values.station_cost_per_execution),
-        }),
-      )
-    } catch (e) {
-      setError(e)
-      setResult(null)
-    } finally {
-      setLoading(false)
-    }
+  const submit = (values: FormValues) => {
+    localStorage.setItem(
+      PREFS,
+      JSON.stringify({
+        version: 1,
+        output_quality: values.output_quality,
+        scope: values.scope,
+        premium: values.premium,
+        use_focus: values.use_focus,
+      }),
+    )
+    mutation.mutate({
+      server: realm,
+      ...values,
+      quantity: Number(values.quantity),
+      output_quality: Number(values.output_quality),
+      return_rate: String(values.return_rate),
+      station_cost_per_execution: String(values.station_cost_per_execution),
+    })
   }
   return (
     <section>
@@ -264,13 +244,13 @@ export function CalculadoraPage() {
         </label>
         <button
           className="rounded bg-primary px-4 py-2 font-semibold text-on-primary md:col-span-3"
-          disabled={loading}
+          disabled={mutation.isPending}
           type="submit"
         >
-          {loading ? 'Calculando…' : 'Simular craft'}
+          {mutation.isPending ? 'Calculando…' : 'Simular craft'}
         </button>
       </form>
-      {Boolean(error) && (
+      {mutation.isError && (
         <div className="mt-5">
           <EstadoErro
             title="Não foi possível simular"
@@ -278,8 +258,8 @@ export function CalculadoraPage() {
           />
         </div>
       )}
-      {loading && <Carregando label="Calculando cenários…" />}
-      {result && <Result result={result} />}
+      {mutation.isPending && <Carregando label="Calculando cenários…" />}
+      {mutation.data && <Result result={mutation.data} />}
     </section>
   )
 }

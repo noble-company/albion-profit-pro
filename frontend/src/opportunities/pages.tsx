@@ -1,5 +1,5 @@
 import { ArrowLeftRight } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { RequireRealm } from '@/components/AppShell'
 import { Button } from '@/components/ui/button'
@@ -15,8 +15,7 @@ import {
   formatarQualidade,
   formatarSilver,
 } from '@/lib/formatters'
-import { useFlipOpportunities } from './hooks'
-import { getCategories, type Category } from './service'
+import { useCategories, useFlipOpportunities } from './hooks'
 
 // Chrome dos campos de filtro. O CSS à mão que vivia em index.css saiu na task 12; até as
 // telas serem refeitas (tasks 21–24) o estilo mora aqui, em tokens.
@@ -48,14 +47,7 @@ function updateParam(params: URLSearchParams, key: string, value: string) {
 function DashboardContent() {
   const { realm } = useServer()
   const [params, setParams] = useSearchParams()
-  const [categories, setCategories] = useState<Category[]>([])
-  useEffect(() => {
-    const controller = new AbortController()
-    void getCategories(controller.signal)
-      .then(setCategories)
-      .catch(() => setCategories([]))
-    return () => controller.abort()
-  }, [])
+  const categories = useCategories()
   const query = useMemo(
     () => ({
       category: params.get('category') || undefined,

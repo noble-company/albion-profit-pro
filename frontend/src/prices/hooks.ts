@@ -1,11 +1,23 @@
-import { useEffect, useState } from 'react'
-import {
-  getItemPrices,
-  getLocations,
-  type ItemPrices,
-  type Location,
-} from './service'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+
+import { queryPolicies } from '@/api'
 import type { components } from '@/api/schema'
+
+import { getItemPrices, getLocations } from './service'
+
+/**
+ * `/locations` é pedido por preços, calculadora e ranking de produção — mesma chave de
+ * query em todo lugar, então o TanStack Query deduplica sozinho (task 3.5/15).
+ */
+export function useLocations() {
+  const { data } = useQuery({
+    queryKey: ['locations'] as const,
+    queryFn: ({ signal }) => getLocations(signal),
+    ...queryPolicies.catalog,
+  })
+  return data ?? []
+}
+
 export function useItemPrices(
   item: string,
   server: components['schemas']['AlbionServer'] | null,
@@ -14,50 +26,34 @@ export function useItemPrices(
   limit: number,
   offset: number,
 ) {
-  const [data, setData] = useState<ItemPrices | null>(null)
-  const [places, setPlaces] = useState<Location[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<unknown>(null)
-  useEffect(() => {
-    const c = new AbortController()
-    void getLocations(c.signal)
-      .then(setPlaces)
-      .catch(() => undefined)
-    return () => c.abort()
-  }, [])
-  useEffect(() => {
-    if (!server) return
-    let timer: number | undefined
-    const load = () => {
-      setLoading(true)
-      void getItemPrices(
+  const { data, isLoading, error } = useQuery({
+    queryKey: [
+      'prices',
+      'item',
+      item,
+      server,
+      scope,
+      locations,
+      limit,
+      offset,
+    ] as const,
+    queryFn: ({ signal }) => {
+      if (!server) throw new Error('Selecione um servidor')
+      return getItemPrices(
         item,
         server,
         scope,
         locations,
         limit,
         offset,
-        new AbortController().signal,
+        signal,
       )
-        .then((value) => {
-          if (value) setData(value)
-        })
-        .catch(setError)
-        .finally(() => setLoading(false))
-    }
-    load()
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        clearInterval(timer)
-        timer = window.setInterval(load, 30000)
-      } else clearInterval(timer)
-    }
-    onVisibility()
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => {
-      clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisibility)
-    }
-  }, [item, server, scope, locations.join(','), limit, offset])
-  return { data, places, loading, error }
+    },
+    enabled: server != null,
+    placeholderData: keepPreviousData,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    ...queryPolicies.market,
+  })
+  return { data: data ?? null, loading: isLoading, error }
 }

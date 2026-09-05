@@ -1,46 +1,27 @@
-import { useEffect, useState } from 'react'
-import { searchItems, type CatalogItem, type SearchFilters } from './service'
+import { useQuery } from '@tanstack/react-query'
+
+import { queryPolicies } from '@/api'
+import { useDebouncedValue } from '@/lib/useDebouncedValue'
+
+import { searchItems, type SearchFilters } from './service'
+
 export function useBuscaItens(query: string, filters: SearchFilters) {
-  const [data, setData] = useState<CatalogItem[]>([])
-  const [isLoading, setLoading] = useState(false)
-  const [error, setError] = useState<unknown>(null)
   const normalized = query.trim()
-  useEffect(() => {
-    if (normalized.length < 2) {
-      return
-    }
-    const controller = new AbortController()
-    const timer = window.setTimeout(() => {
-      setLoading(true)
-      setError(null)
-      void searchItems(normalized, filters, controller.signal)
-        .then(setData)
-        .catch((reason) => {
-          if (!controller.signal.aborted) {
-            setError(reason)
-            setData([])
-          }
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setLoading(false)
-        })
-    }, 300)
-    return () => {
-      window.clearTimeout(timer)
-      controller.abort()
-    }
-  }, [
-    normalized,
-    filters.apenas_craftaveis,
-    filters.categoria,
-    filters.enchantment_level,
-    filters.tier,
-    filters,
-  ])
+  // Debounça o texto, não a query: a chave já muda pelo conteúdo de `filters`, então um
+  // re-render do pai que recria o objeto `filters` não reinicia o debounce (task 3.5/15,
+  // item 6 — hoje reinicia porque `filters` está no array de dependências do useEffect).
+  const debounced = useDebouncedValue(normalized, 300)
+  const enabled = debounced.length >= 2
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['items', 'search', debounced, filters] as const,
+    queryFn: ({ signal }) => searchItems(debounced, filters, signal),
+    enabled,
+    ...queryPolicies.catalog,
+  })
   return {
-    data: normalized.length < 2 ? [] : data,
-    isLoading: normalized.length < 2 ? false : isLoading,
-    error: normalized.length < 2 ? null : error,
+    data: enabled ? (data ?? []) : [],
+    isLoading: enabled ? isLoading : false,
+    error: enabled ? error : null,
     needsMore: normalized.length > 0 && normalized.length < 2,
   }
 }

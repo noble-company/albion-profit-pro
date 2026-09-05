@@ -1,5 +1,6 @@
+import { useMutation } from '@tanstack/react-query'
 import { TrendingUp, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
 import { useServer } from '@/app/ServerContext'
@@ -16,7 +17,7 @@ import {
   formatarQualidade,
   formatarSilver,
 } from '@/lib/formatters'
-import { getLocations, type Location } from '@/prices/service'
+import { useLocations } from '@/prices/hooks'
 
 import { useProductionOpportunities } from './hooks'
 import type { Opportunity, ProductionKind } from './service'
@@ -73,19 +74,13 @@ function formatQuantity(value: string | number) {
 function ProductionRankingPage({ config }: { config: PageConfig }) {
   const { realm } = useServer()
   const [params, setParams] = useSearchParams()
-  const [locations, setLocations] = useState<Location[]>([])
+  const allLocations = useLocations()
+  const locations = useMemo(
+    () => allLocations.filter((row) => row.kind === 'city'),
+    [allLocations],
+  )
   const [selected, setSelected] = useState<Opportunity | null>(null)
-  const [detail, setDetail] = useState<CraftResult | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [detailError, setDetailError] = useState<unknown>(null)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void getLocations(controller.signal)
-      .then((rows) => setLocations(rows.filter((row) => row.kind === 'city')))
-      .catch(() => setLocations([]))
-    return () => controller.abort()
-  }, [])
+  const detailMutation = useMutation({ mutationFn: simulateCraft })
 
   const query = useMemo(
     () => ({
@@ -114,7 +109,9 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
     }),
     [params],
   )
-  const result = useProductionOpportunities(config.kind, realm, query)
+  const result = useProductionOpportunities(config.kind, realm, query, {
+    pausePolling: selected != null,
+  })
   const rows = useMemo(() => {
     const sorted = [...(result.data?.opportunities ?? [])]
     const value = (row: Opportunity) => {
@@ -145,36 +142,26 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
   const page = query.offset / query.limit + 1
   const best = rows[0]
 
-  const openDetail = async (row: Opportunity) => {
+  const openDetail = (row: Opportunity) => {
     if (!row.buy_location) return
     setSelected(row)
-    setDetail(null)
-    setDetailError(null)
-    setDetailLoading(true)
-    try {
-      setDetail(
-        await simulateCraft({
-          server: realm,
-          output_item: row.item,
-          location_id: row.buy_location,
-          quantity: 1,
-          output_quality: row.quality_level ?? 1,
-          scope: 'all',
-          return_rate: query.returnRate,
-          station_cost_per_execution: query.stationCostPerExecution,
-          use_focus: query.useFocus,
-          premium: query.premium,
-          sales_tax_rate: null,
-          setup_fee_rate: null,
-          ingredient_overrides: {},
-          manual_prices: {},
-        }),
-      )
-    } catch (error) {
-      setDetailError(error)
-    } finally {
-      setDetailLoading(false)
-    }
+    // useMutation zera data/error ao entrar em 'pending' — a linha anterior nunca aparece.
+    detailMutation.mutate({
+      server: realm,
+      output_item: row.item,
+      location_id: row.buy_location,
+      quantity: 1,
+      output_quality: row.quality_level ?? 1,
+      scope: 'all',
+      return_rate: query.returnRate,
+      station_cost_per_execution: query.stationCostPerExecution,
+      use_focus: query.useFocus,
+      premium: query.premium,
+      sales_tax_rate: null,
+      setup_fee_rate: null,
+      ingredient_overrides: {},
+      manual_prices: {},
+    })
   }
 
   return (
@@ -450,9 +437,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
           </p>
         </div>
       )}
-      {rows.length > 0 && (
-        <ProductionTable rows={rows} onOpen={(row) => void openDetail(row)} />
-      )}
+      {rows.length > 0 && <ProductionTable rows={rows} onOpen={openDetail} />}
       {(result.data?.total ?? 0) > 0 && (
         <div className="flex items-center justify-between rounded-xl border border-border bg-surface/40 px-3 py-2 text-sm text-foreground-muted">
           <Button
@@ -498,9 +483,9 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       {selected && (
         <DetailDrawer
           row={selected}
-          result={detail}
-          loading={detailLoading}
-          error={detailError}
+          result={detailMutation.data ?? null}
+          loading={detailMutation.isPending}
+          error={detailMutation.error}
           onClose={() => setSelected(null)}
         />
       )}
