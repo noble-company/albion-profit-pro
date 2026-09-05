@@ -120,7 +120,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 13 — Tema claro/escuro real
 - [x] 14 — Linguagem visual do produto
 - [x] 15 — Migração para TanStack Query
-- [ ] 16 — Restauração de sessão
+- [x] 16 — Restauração de sessão
 - [ ] 17 — Ordenação e paginação no servidor
 - [ ] 18 — Módulo monetário e vetores dourados
 - [ ] 19 — Fonte única de localizações e categorias

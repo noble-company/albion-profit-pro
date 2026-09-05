@@ -6,16 +6,17 @@ import {
   type PropsWithChildren,
 } from 'react'
 
-import { subscribeUnauthorized } from '@/api/session'
+import {
+  getAccessToken,
+  setAccessToken,
+  subscribeUnauthorized,
+} from '@/api/session'
 
 import {
-  clearStoredToken,
   fetchCurrentUser,
   loginUser,
   logoutUser,
-  readStoredToken,
   registerUser,
-  writeStoredToken,
 } from './service'
 import { AuthContext, type AuthContextValue } from './context'
 import type { AuthStatus, AuthUser, Credentials } from './types'
@@ -23,12 +24,12 @@ import type { AuthStatus, AuthUser, Credentials } from './types'
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [status, setStatus] = useState<AuthStatus>(() =>
-    readStoredToken() ? 'loading' : 'unauthenticated',
+    getAccessToken() ? 'loading' : 'unauthenticated',
   )
   const [sessionExpired, setSessionExpired] = useState(false)
 
   const clearSession = useCallback((expired: boolean) => {
-    clearStoredToken()
+    setAccessToken(null)
     setUser(null)
     setStatus('unauthenticated')
     setSessionExpired(expired)
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const unsubscribe = subscribeUnauthorized(() => clearSession(true))
-    const token = readStoredToken()
+    const token = getAccessToken()
     if (!token) return unsubscribe
     void fetchCurrentUser()
       .then((currentUser) => {
@@ -50,13 +51,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const login = useCallback(async (credentials: Credentials) => {
     setSessionExpired(false)
     const token = await loginUser(credentials)
-    writeStoredToken(token)
+    setAccessToken(token)
     try {
       const currentUser = await fetchCurrentUser()
       setUser(currentUser)
       setStatus('authenticated')
     } catch (error) {
-      clearStoredToken()
+      setAccessToken(null)
       setUser(null)
       setStatus('unauthenticated')
       throw error

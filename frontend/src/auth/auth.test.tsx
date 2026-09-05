@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 
 import { App } from '@/App'
 import { renderWithProviders } from '@/test/render'
+import { requireBearer } from '@/test/msw/auth'
 import { server } from '@/test/msw/server'
 
 const user = {
@@ -40,7 +41,9 @@ test('faz login com form-urlencoded, grava sessão e acessa o destino', async ()
         token_type: 'bearer',
       })
     }),
-    http.get('http://localhost:8000/auth/me', () => HttpResponse.json(user)),
+    http.get('http://localhost:8000/auth/me', ({ request }) => {
+      return requireBearer(request) ?? HttpResponse.json(user)
+    }),
   )
 
   renderWithProviders(<App />)
@@ -129,13 +132,20 @@ test('exibe rate limit do backend no login', async () => {
 
 test('restaura uma sessão válida armazenada na aba', async () => {
   sessionStorage.setItem('albion-profit-pro.access-token', 'jwt-valido')
+  let authHeader: string | null = null
   server.use(
-    http.get('http://localhost:8000/auth/me', () => HttpResponse.json(user)),
+    http.get('http://localhost:8000/auth/me', ({ request }) => {
+      authHeader = request.headers.get('authorization')
+      return requireBearer(request) ?? HttpResponse.json(user)
+    }),
   )
   renderWithProviders(<App />)
   expect(
     await screen.findByRole('heading', { name: 'Escolha um servidor' }),
   ).toBeInTheDocument()
+  // A restauração só conta se o token de fato chegou ao header — sem isto, o handler
+  // devolvia o usuário incondicionalmente e o teste passava mentindo (task 3.5/16).
+  expect(authHeader).toBe('Bearer jwt-valido')
 })
 
 test('restaura sessão da aba e mostra expiração após 401', async () => {
@@ -155,9 +165,20 @@ test('restaura sessão da aba e mostra expiração após 401', async () => {
   )
 })
 
+test('o token vive só no sessionStorage — sem cache de módulo que vaze entre testes', async () => {
+  const session = await import('@/api/session')
+  session.setAccessToken('jwt-a')
+  expect(session.getAccessToken()).toBe('jwt-a')
+  // Um `sessionStorage.clear()` externo (o afterEach de setup.ts, outra aba) tem que se
+  // refletir na hora — antes da task 3.5/16 uma variável de módulo mantinha 'jwt-a' vivo.
+  sessionStorage.clear()
+  expect(session.getAccessToken()).toBeNull()
+})
+
 test('logout sempre limpa a sessão mesmo se a API falhar', async () => {
-  const { logoutUser, writeStoredToken } = await import('./service')
-  writeStoredToken('jwt-logout')
+  const { logoutUser } = await import('./service')
+  const { setAccessToken } = await import('@/api/session')
+  setAccessToken('jwt-logout')
   server.use(
     http.post('http://localhost:8000/auth/logout', () =>
       HttpResponse.json({ detail: 'indisponível' }, { status: 503 }),

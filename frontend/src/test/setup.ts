@@ -29,4 +29,11 @@ afterEach(() => {
   // test/render.tsx reutiliza o queryClient de produção (mesmo singleton); sem isto, cache
   // de um teste (ex.: /locations) vaza pro próximo teste do mesmo arquivo (task 3.5/15).
   queryClient.clear()
+  // O token de sessão vive no sessionStorage (fonte de verdade única, task 3.5/16); limpar
+  // aqui garante que nenhuma sessão de um teste sobreviva pro próximo.
+  try {
+    sessionStorage.clear()
+  } catch {
+    // ignore
+  }
 })
