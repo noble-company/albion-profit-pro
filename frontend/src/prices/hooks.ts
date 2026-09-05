@@ -25,6 +25,7 @@ export function useItemPrices(
   locations: string[],
   limit: number,
   offset: number,
+  filters: { quality?: number; enchantment?: number } = {},
 ) {
   const { data, isLoading, error } = useQuery({
     queryKey: [
@@ -36,6 +37,7 @@ export function useItemPrices(
       locations,
       limit,
       offset,
+      filters,
     ] as const,
     queryFn: ({ signal }) => {
       if (!server) throw new Error('Selecione um servidor')
@@ -47,6 +49,7 @@ export function useItemPrices(
         limit,
         offset,
         signal,
+        filters,
       )
     },
     enabled: server != null,

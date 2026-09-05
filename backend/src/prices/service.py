@@ -181,10 +181,17 @@ async def query_item_combinations(
     item_id: str,
     user_id: uuid.UUID | None = None,
     location_ids: list[str] | None = None,
+    quality_level: int | None = None,
+    enchantment_level: int | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> tuple[list[tuple[str, int, int, bool, bool]], int]:
-    """Lista somente combinações realmente observadas, com paginação no Postgres."""
+    """Lista somente combinações realmente observadas, com paginação no Postgres.
+
+    Os filtros de qualidade/encantamento entram ANTES da contagem e da paginação (F08): o
+    ``total`` reflete o conjunto filtrado, e uma página não aparece vazia por conta de um
+    filtro aplicado depois do corte.
+    """
     book = select(
         MarketOrder.location_id.label("location_id"),
         MarketOrder.quality_level.label("quality_level"),
@@ -215,7 +222,7 @@ async def query_item_combinations(
         history = history.where(MarketHistoryEntry.location_id.in_(location_ids))
 
     observations = book.union_all(history).cte("item_observations")
-    combinations = (
+    grouped = (
         select(
             observations.c.location_id,
             observations.c.quality_level,
@@ -230,6 +237,13 @@ async def query_item_combinations(
         )
         .cte("item_combinations")
     )
+    combo_filters = []
+    if quality_level is not None:
+        combo_filters.append(grouped.c.quality_level == quality_level)
+    if enchantment_level is not None:
+        combo_filters.append(grouped.c.enchantment_level == enchantment_level)
+    combinations = select(grouped).where(*combo_filters).cte("filtered_item_combinations")
+
     total = int((await session.scalar(select(func.count()).select_from(combinations))) or 0)
     stmt = (
         select(
@@ -689,6 +703,8 @@ async def get_item_prices(
     scope: str,
     user_id=None,
     location_ids: list[str] | None = None,
+    quality_level: int | None = None,
+    enchantment_level: int | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> dict:
@@ -700,6 +716,8 @@ async def get_item_prices(
         item_id,
         user_id=scan_user_id,
         location_ids=location_ids,
+        quality_level=quality_level,
+        enchantment_level=enchantment_level,
         limit=limit,
         offset=offset,
     )

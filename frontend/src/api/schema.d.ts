@@ -2386,6 +2386,8 @@ export interface operations {
         server: components['schemas']['AlbionServer']
         scope?: 'all' | 'mine'
         location_id?: string[] | null
+        quality_level?: number | null
+        enchantment_level?: number | null
         limit?: number
         offset?: number
       }
@@ -2541,6 +2543,8 @@ export interface operations {
         premium?: boolean
         buy_order?: boolean
         sell_order?: boolean
+        sort?: 'profit' | 'roi' | 'freshness'
+        direction?: 'asc' | 'desc'
       }
       header?: never
       path?: never
@@ -2587,6 +2591,8 @@ export interface operations {
         station_cost_per_execution?: number | string
         use_focus?: boolean
         premium?: boolean
+        sort?: 'profit' | 'roi' | 'freshness'
+        direction?: 'asc' | 'desc'
       }
       header?: never
       path?: never
@@ -2633,6 +2639,8 @@ export interface operations {
         station_cost_per_execution?: number | string
         use_focus?: boolean
         premium?: boolean
+        sort?: 'profit' | 'roi' | 'freshness'
+        direction?: 'asc' | 'desc'
       }
       header?: never
       path?: never

@@ -27,8 +27,12 @@ test('preços sempre enviam servidor, escopo e local repetível', async () => {
     20,
     0,
     new AbortController().signal,
+    { quality: 3, enchantment: 1 },
   )
   expect(url).toContain('server=west')
   expect(url).toContain('location_id=1001')
   expect(url).toContain('location_id=1002')
+  // Qualidade/encantamento vão pro servidor, antes da paginação (F08).
+  expect(url).toContain('quality_level=3')
+  expect(url).toContain('enchantment_level=1')
 })

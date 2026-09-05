@@ -20,6 +20,7 @@ import {
 import { useLocations } from '@/prices/hooks'
 
 import { useProductionOpportunities } from './hooks'
+import { parseSortParam } from './service'
 import type { Opportunity, ProductionKind } from './service'
 
 // Chrome dos campos de filtro. O CSS à mão que vivia em index.css saiu na task 12; até as
@@ -105,29 +106,16 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       returnRate: percentageToRate(params.get('return_rate') || '0'),
       stationCostPerExecution: params.get('station_cost') || '0',
       useFocus: params.get('focus') === 'true',
-      sort: params.get('sort') || 'profit_desc',
+      ...parseSortParam(params.get('sort')),
     }),
     [params],
   )
+  const sortParam = params.get('sort') || 'profit_desc'
   const result = useProductionOpportunities(config.kind, realm, query, {
     pausePolling: selected != null,
   })
-  const rows = useMemo(() => {
-    const sorted = [...(result.data?.opportunities ?? [])]
-    const value = (row: Opportunity) => {
-      if (query.sort.startsWith('roi'))
-        return Number(row.roi ?? Number.NEGATIVE_INFINITY)
-      if (query.sort.startsWith('freshness')) {
-        return Date.parse(row.oldest_observed_at ?? '') || 0
-      }
-      return Number(row.profit ?? Number.NEGATIVE_INFINITY)
-    }
-    sorted.sort((a, b) => {
-      const difference = value(a) - value(b)
-      return query.sort.endsWith('asc') ? difference : -difference
-    })
-    return sorted
-  }, [query.sort, result.data?.opportunities])
+  // O servidor ordena e pagina sobre o ranking completo (F08).
+  const rows = result.data?.opportunities ?? []
 
   if (!realm) {
     return (
@@ -356,7 +344,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
                 <select
                   aria-label="Ordenar por"
                   className={fieldControl}
-                  value={query.sort}
+                  value={sortParam}
                   onChange={(event) => set('sort', event.target.value)}
                 >
                   <option value="profit_desc">Lucro (maior → menor)</option>

@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { useParams, useSearchParams } from 'react-router'
 import { useServer } from '@/app/ServerContext'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
@@ -29,18 +28,24 @@ export function ItemPricesPage() {
   const offset = Math.max(0, Number(params.get('offset') ?? 0) || 0)
   const selectedQuality = params.get('quality') ?? ''
   const selectedEnchant = params.get('enchantment') ?? ''
-  const data = useItemPrices(uniqueName, realm, scope, locations, limit, offset)
-  const places = useLocations()
-  const rows = useMemo(
-    () =>
-      data.data?.prices.filter(
-        (row) =>
-          (!selectedQuality || String(row.quality_level) === selectedQuality) &&
-          (!selectedEnchant ||
-            String(row.enchantment_level) === selectedEnchant),
-      ) ?? [],
-    [data.data, selectedEnchant, selectedQuality],
+  const filters = {
+    quality: selectedQuality ? Number(selectedQuality) : undefined,
+    enchantment: selectedEnchant ? Number(selectedEnchant) : undefined,
+  }
+  const data = useItemPrices(
+    uniqueName,
+    realm,
+    scope,
+    locations,
+    limit,
+    offset,
+    filters,
   )
+  const places = useLocations()
+  // Qualidade e encantamento são filtrados no servidor, ANTES da paginação (F08); `total` e
+  // as linhas já vêm do conjunto certo.
+  const rows = data.data?.prices ?? []
+  const isFiltered = Boolean(selectedQuality || selectedEnchant)
   if (!realm)
     return (
       <EstadoVazio title="Escolha um servidor">
@@ -209,6 +214,7 @@ export function ItemPricesPage() {
         <span className="py-2 text-sm text-foreground-muted">
           {offset + 1}–{Math.min(offset + limit, data.data?.total ?? 0)} de{' '}
           {data.data?.total ?? 0}
+          {isFiltered ? ' filtrados' : ''}
         </span>
         <button
           disabled={!data.data || offset + limit >= data.data.total}

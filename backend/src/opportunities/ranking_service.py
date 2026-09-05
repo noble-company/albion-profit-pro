@@ -25,6 +25,7 @@ from src.items.models import Item, Location
 from src.items.normalization import normalize_item_search
 from src.opportunities.models import RecipeRanking, RecipeRankingRun
 from src.opportunities.schemas import OpportunityOut, RankingCoverage
+from src.opportunities.sorting import apply_order
 from src.prices.constants import AlbionServer
 from src.prices.models import MarketOrder
 from src.prices.service import latest_order_observation_filter
@@ -378,6 +379,8 @@ async def read_recipe_ranking(
     use_focus: bool = False,
     premium: bool = True,
     item_id: str | None = None,
+    sort: str = "profit",
+    direction: str = "desc",
 ) -> tuple[list[OpportunityOut], int, RankingCoverage]:
     is_refining = kind == "refining"
     conditions = [
@@ -425,11 +428,29 @@ async def read_recipe_ranking(
         or 0
     )
 
+    freshest = func.least(
+        RecipeRanking.ingredients_oldest_observed_at,
+        RecipeRanking.output_immediate_observed_at,
+    )
+    order_by = apply_order(
+        {
+            "profit": RecipeRanking.neutral_profit,
+            "roi": RecipeRanking.neutral_roi,
+            "freshness": freshest,
+        },
+        [
+            RecipeRanking.output_item_unique_name.asc(),
+            RecipeRanking.location_id.asc(),
+            RecipeRanking.output_quality.asc(),
+        ],
+        sort,
+        direction,
+    )
     page = (
         select(RecipeRanking, Item.name_pt, Item.name_en)
         .join(Item, Item.unique_name == RecipeRanking.output_item_unique_name)
         .where(*conditions)
-        .order_by(RecipeRanking.neutral_profit.desc().nulls_last())
+        .order_by(*order_by)
         .limit(limit)
         .offset(offset)
     )

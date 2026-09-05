@@ -299,6 +299,35 @@ async def test_refining_ranking_reads_materialized_table_with_projection(client,
     assert quality_filtered["total"] == 1
     assert quality_filtered["opportunities"][0]["quality_level"] == 2
 
+    # F08: o ranking de produção também ordena no servidor sobre o conjunto completo.
+    async def _profits(sort: str, direction: str) -> list:
+        page = (
+            await client.get(
+                "/opportunities/refining",
+                params={
+                    "server": "west",
+                    "location_id": "1002",
+                    "sort": sort,
+                    "direction": direction,
+                },
+                headers=headers,
+            )
+        ).json()
+        assert page["total"] == 2
+        return [Decimal(row["profit"]) for row in page["opportunities"]]
+
+    desc = await _profits("profit", "desc")
+    assert desc == sorted(desc, reverse=True)
+    assert (await _profits("profit", "asc")) == sorted(desc)
+    # sort=freshness não pode dar 500 mesmo com observações no mesmo instante.
+    assert len(await _profits("freshness", "desc")) == 2
+    bad = await client.get(
+        "/opportunities/refining",
+        params={"server": "west", "sort": "gross"},
+        headers=headers,
+    )
+    assert bad.status_code == 422
+
     # The page projection reacts to the request knobs against the same materialized rows.
     async def _profit(**params) -> Decimal:
         await _flush_opportunity_cache()
@@ -545,3 +574,111 @@ async def test_flip_query_count_is_constant_regardless_of_dataset_size(client, d
     assert large_count <= 12
     # 2,500+ combinations still resolve well under a generous budget because the work is in SQL.
     assert large_elapsed < 5.0
+
+
+async def test_flip_sort_is_global_not_a_reorder_of_the_profit_page(client, db_session):
+    """F08: ordenar por ROI e paginar dá sequência globalmente decrescente entre páginas.
+
+    Os 6 itens são construídos com lucro crescente e ROI decrescente — as pontas do ranking
+    de lucro e do ranking de ROI se invertem. Antes desta task o servidor ignorava ``sort`` e
+    devolvia sempre a ordem de lucro; percorrer as páginas com ``sort=roi`` não dava sequência
+    monotônica.
+    """
+    _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    specs = [(10, 30), (40, 85), (160, 260), (640, 860), (2560, 3060), (10240, 11340)]
+    for buy, sell in specs:
+        item_id = _item_id()
+        db_session.add(Item(unique_name=item_id, albion_id=uuid.uuid4().int % 1_000_000_000))
+        db_session.add_all(
+            [
+                _order(item_id, "1002", "offer", buy, 100),
+                _order(item_id, "3005", "request", sell, 100),
+            ]
+        )
+    await db_session.commit()
+
+    async def _walk(sort: str, direction: str) -> list[dict]:
+        rows: list[dict] = []
+        for offset in (0, 2, 4):
+            page = (
+                await client.get(
+                    "/opportunities/flips",
+                    params={
+                        "server": "west",
+                        "limit": 2,
+                        "offset": offset,
+                        "sort": sort,
+                        "direction": direction,
+                    },
+                    headers=headers,
+                )
+            ).json()
+            assert page["total"] == 6
+            rows.extend(page["opportunities"])
+        return rows
+
+    by_roi = await _walk("roi", "desc")
+    roi_values = [Decimal(row["roi"]) for row in by_roi]
+    assert roi_values == sorted(roi_values, reverse=True)
+    assert len({row["item"] for row in by_roi}) == 6  # nenhuma linha repetida ou omitida
+
+    by_profit = await _walk("profit", "desc")
+    profit_values = [Decimal(row["profit"]) for row in by_profit]
+    assert profit_values == sorted(profit_values, reverse=True)
+    # É outro ranking: a 1ª linha por ROI é a última por lucro.
+    assert by_roi[0]["item"] == by_profit[-1]["item"]
+
+    ascending = await _walk("roi", "asc")
+    assert [Decimal(row["roi"]) for row in ascending] == sorted(
+        Decimal(row["roi"]) for row in ascending
+    )
+
+
+async def test_flip_rejects_invalid_sort_before_it_reaches_sql(client):
+    _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    for bad in ("'; DROP TABLE market_order; --", "profit; --", "gross", "PROFIT"):
+        response = await client.get(
+            "/opportunities/flips",
+            params={"server": "west", "sort": bad},
+            headers=headers,
+        )
+        assert response.status_code == 422, (bad, response.text)
+
+    bad_direction = await client.get(
+        "/opportunities/flips",
+        params={"server": "west", "direction": "sideways"},
+        headers=headers,
+    )
+    assert bad_direction.status_code == 422
+
+
+async def test_flip_pagination_is_stable_when_profit_ties(client, db_session):
+    """Desempate estável (F08, item 6): lucros idênticos não fazem a paginação repetir/pular."""
+    _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    for _ in range(6):
+        item_id = _item_id()
+        db_session.add(Item(unique_name=item_id, albion_id=uuid.uuid4().int % 1_000_000_000))
+        db_session.add_all(
+            [
+                _order(item_id, "1002", "offer", 100, 10),
+                _order(item_id, "3005", "request", 200, 10),
+            ]
+        )
+    await db_session.commit()
+
+    seen: list[str] = []
+    for offset in (0, 3):
+        page = (
+            await client.get(
+                "/opportunities/flips",
+                params={"server": "west", "limit": 3, "offset": offset},
+                headers=headers,
+            )
+        ).json()
+        assert page["total"] == 6
+        seen.extend(row["item"] for row in page["opportunities"])
+    assert len(seen) == 6
+    assert len(set(seen)) == 6

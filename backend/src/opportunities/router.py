@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,6 +59,8 @@ async def flips(
     premium: bool = Query(True),
     buy_order: bool = Query(False),
     sell_order: bool = Query(False),
+    sort: Literal["profit", "roi", "freshness"] = Query("profit"),
+    direction: Literal["asc", "desc"] = Query("desc"),
     session: AsyncSession = Depends(get_session),
 ):
     cache_params = {
@@ -80,6 +83,8 @@ async def flips(
         "premium": premium,
         "buy_order": buy_order,
         "sell_order": sell_order,
+        "sort": sort,
+        "direction": direction,
     }
     cached = await _cached_page("flip", cache_params)
     if cached is not None:
@@ -105,6 +110,8 @@ async def flips(
         quality=quality_level,
         max_age_hours=max_age_hours,
         require_complete=require_complete,
+        sort=sort,
+        direction=direction,
     )
     page = OpportunityPage(
         server=server, kind="flip", opportunities=rows, total=total, limit=limit, offset=offset
@@ -132,6 +139,8 @@ async def _production_page(
     use_focus: bool,
     premium: bool,
     item_id: str | None,
+    sort: str,
+    direction: str,
     session: AsyncSession,
 ) -> OpportunityPage:
     cache_params = {
@@ -151,6 +160,8 @@ async def _production_page(
         "station_cost_per_execution": station_cost_per_execution,
         "use_focus": use_focus,
         "premium": premium,
+        "sort": sort,
+        "direction": direction,
     }
     cached = await _cached_page(kind, cache_params)
     if cached is not None:
@@ -174,6 +185,8 @@ async def _production_page(
         use_focus=use_focus,
         premium=premium,
         item_id=item_id,
+        sort=sort,
+        direction=direction,
     )
     page = OpportunityPage(
         server=server,
@@ -206,6 +219,8 @@ async def refining(
     station_cost_per_execution: Decimal = Query(Decimal("0"), ge=0),
     use_focus: bool = Query(False),
     premium: bool = Query(True),
+    sort: Literal["profit", "roi", "freshness"] = Query("profit"),
+    direction: Literal["asc", "desc"] = Query("desc"),
     session: AsyncSession = Depends(get_session),
 ):
     return await _production_page(
@@ -226,6 +241,8 @@ async def refining(
         station_cost_per_execution=station_cost_per_execution,
         use_focus=use_focus,
         premium=premium,
+        sort=sort,
+        direction=direction,
         session=session,
     )
 
@@ -248,6 +265,8 @@ async def crafting(
     station_cost_per_execution: Decimal = Query(Decimal("0"), ge=0),
     use_focus: bool = Query(False),
     premium: bool = Query(True),
+    sort: Literal["profit", "roi", "freshness"] = Query("profit"),
+    direction: Literal["asc", "desc"] = Query("desc"),
     session: AsyncSession = Depends(get_session),
 ):
     return await _production_page(
@@ -268,5 +287,7 @@ async def crafting(
         station_cost_per_execution=station_cost_per_execution,
         use_focus=use_focus,
         premium=premium,
+        sort=sort,
+        direction=direction,
         session=session,
     )

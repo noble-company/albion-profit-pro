@@ -16,6 +16,7 @@ import {
   formatarSilver,
 } from '@/lib/formatters'
 import { useCategories, useFlipOpportunities } from './hooks'
+import { parseSortParam } from './service'
 
 // Chrome dos campos de filtro. O CSS à mão que vivia em index.css saiu na task 12; até as
 // telas serem refeitas (tasks 21–24) o estilo mora aqui, em tokens.
@@ -74,27 +75,15 @@ function DashboardContent() {
       premium: params.get('premium') !== 'false',
       buyOrder: params.get('buy_order') === 'true',
       sellOrder: params.get('sell_order') === 'true',
-      sort: params.get('sort') || 'profit_desc',
+      ...parseSortParam(params.get('sort')),
     }),
     [params],
   )
+  const sortParam = params.get('sort') || 'profit_desc'
   const result = useFlipOpportunities(realm, query)
-  const rows = useMemo(() => {
-    const source = result.data?.opportunities ?? []
-    const sorted = [...source]
-    const value = (row: (typeof source)[number]) => {
-      if (query.sort.startsWith('roi'))
-        return Number(row.roi ?? Number.NEGATIVE_INFINITY)
-      if (query.sort.startsWith('freshness'))
-        return Date.parse(row.oldest_observed_at ?? '') || 0
-      return Number(row.profit ?? Number.NEGATIVE_INFINITY)
-    }
-    sorted.sort((a, b) => {
-      const difference = value(a) - value(b)
-      return query.sort.endsWith('asc') ? difference : -difference
-    })
-    return sorted
-  }, [query.sort, result.data?.opportunities])
+  // O servidor já ordena e pagina sobre o conjunto completo (F08) — nada de reordenar a
+  // página aqui.
+  const rows = result.data?.opportunities ?? []
   if (!realm)
     return (
       <RequireRealm>
@@ -292,7 +281,7 @@ function DashboardContent() {
                 <select
                   aria-label="Ordenar por"
                   className={fieldControl}
-                  value={query.sort}
+                  value={sortParam}
                   onChange={(e) => set('sort', e.target.value)}
                 >
                   <option value="profit_desc">Lucro (maior → menor)</option>

@@ -27,6 +27,26 @@ export type OpportunityQuery = {
   returnRate?: string
   stationCostPerExecution?: string
   useFocus?: boolean
+  sort?: SortField
+  direction?: SortDirection
+}
+
+export type SortField = 'profit' | 'roi' | 'freshness'
+export type SortDirection = 'asc' | 'desc'
+
+/**
+ * O `<select>` de ordenação mantém o formato combinado `profit_desc` na URL (link
+ * compartilhável estável); o servidor recebe `sort` e `direction` separados (F08).
+ */
+export function parseSortParam(raw: string | null): {
+  sort: SortField
+  direction: SortDirection
+} {
+  const [field, dir] = (raw ?? '').split('_')
+  return {
+    sort: field === 'roi' || field === 'freshness' ? field : 'profit',
+    direction: dir === 'asc' ? 'asc' : 'desc',
+  }
 }
 
 export type ProductionKind = 'refining' | 'crafting'
@@ -62,6 +82,8 @@ export async function getFlipOpportunities(
           premium: query.premium,
           buy_order: query.buyOrder,
           sell_order: query.sellOrder,
+          sort: query.sort,
+          direction: query.direction,
         },
       },
       signal,
@@ -99,6 +121,8 @@ export async function getProductionOpportunities(
     station_cost_per_execution: query.stationCostPerExecution || '0',
     use_focus: query.useFocus ?? false,
     premium: query.premium ?? true,
+    sort: query.sort,
+    direction: query.direction,
   }
   const response = await safeApiCall(() =>
     kind === 'refining'

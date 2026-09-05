@@ -36,6 +36,8 @@ test('Market Flip envia filtros e paginação na URL compartilhável', async () 
       premium: false,
       buyOrder: true,
       sellOrder: true,
+      sort: 'roi',
+      direction: 'asc',
     },
     new AbortController().signal,
   )
@@ -50,6 +52,9 @@ test('Market Flip envia filtros e paginação na URL compartilhável', async () 
   expect(requested).toContain('buy_order=true')
   expect(requested).toContain('sell_order=true')
   expect(requested).toContain('offset=50')
+  // A ordenação vai pro servidor, sobre o conjunto completo (F08).
+  expect(requested).toContain('sort=roi')
+  expect(requested).toContain('direction=asc')
 })
 
 test('ranking de produção envia retorno, estação, foco e Premium ao backend', async () => {

@@ -9,6 +9,7 @@ from src.items.models import Item
 from src.items.normalization import normalize_item_search
 from src.opportunities.ranking_service import read_recipe_ranking
 from src.opportunities.schemas import OpportunityOut, RankingCoverage
+from src.opportunities.sorting import apply_order
 from src.prices.constants import AlbionServer
 from src.prices.models import MarketOrder
 from src.prices.policy import get_market_book_policy
@@ -60,6 +61,8 @@ async def flip_opportunities(
     premium: bool = True,
     buy_order: bool = False,
     sell_order: bool = False,
+    sort: str = "profit",
+    direction: str = "desc",
 ) -> tuple[list[OpportunityOut], int]:
     """Rank cross-city arbitrage entirely in PostgreSQL.
 
@@ -225,9 +228,26 @@ async def flip_opportunities(
 
     total = int(await session.scalar(select(func.count()).select_from(filtered_cte)) or 0)
 
+    def _order(cols):
+        return apply_order(
+            {
+                "profit": cols.profit,
+                "roi": cols.roi,
+                "freshness": cols.oldest_seen,
+            },
+            [
+                cols.item_id.asc(),
+                cols.buy_location.asc(),
+                cols.sell_location.asc(),
+                cols.quality_level.asc(),
+            ],
+            sort,
+            direction,
+        )
+
     page_ids = (
         select(filtered_cte)
-        .order_by(filtered_cte.c.profit.desc().nulls_last())
+        .order_by(*_order(filtered_cte.c))
         .limit(limit)
         .offset(offset)
         .subquery("flip_page")
@@ -235,7 +255,7 @@ async def flip_opportunities(
     page = (
         select(page_ids, Item.name_pt.label("name_pt"), Item.name_en.label("name_en"))
         .join(Item, Item.unique_name == page_ids.c.item_id)
-        .order_by(page_ids.c.profit.desc().nulls_last())
+        .order_by(*_order(page_ids.c))
     )
     rows = (await session.execute(page)).all()
 
@@ -288,6 +308,8 @@ async def recipe_opportunities(
     use_focus: bool = False,
     premium: bool = True,
     item_id: str | None = None,
+    sort: str = "profit",
+    direction: str = "desc",
 ) -> tuple[list[OpportunityOut], int, RankingCoverage]:
     """Serve /opportunities/refining and /crafting from the materialized ranking (B02).
 
@@ -314,4 +336,6 @@ async def recipe_opportunities(
         use_focus=use_focus,
         premium=premium,
         item_id=item_id,
+        sort=sort,
+        direction=direction,
     )

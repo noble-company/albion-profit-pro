@@ -535,3 +535,52 @@ async def test_cache_is_recomputed_when_book_source_disappears_but_history_remai
     match = _match(resp.json())
     assert match["sell"]["best_price"] is None
     assert match["sold_24h"]["units"] == 10
+
+
+async def test_prices_quality_filter_changes_total_before_pagination(client, db_session):
+    """F08: qualidade/encantamento entram no SQL antes do corte — `total` reflete o filtro."""
+    item_id = _unique_item_id()
+    _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    orders = []
+    for quality in (1, 2, 3):
+        for enchant in (0, 1):
+            order = _order(item_id, "offer", 40 + quality, 10)
+            order.quality_level = quality
+            order.enchantment_level = enchant
+            order.location_id = f"100{quality}"
+            orders.append(order)
+    db_session.add_all(orders)
+    await db_session.commit()
+
+    unfiltered = await client.get(
+        f"/items/{item_id}/prices", params={"server": "west"}, headers=headers
+    )
+    assert unfiltered.json()["total"] == 6
+
+    by_quality = await client.get(
+        f"/items/{item_id}/prices",
+        params={"server": "west", "quality_level": 2},
+        headers=headers,
+    )
+    assert by_quality.status_code == 200, by_quality.text
+    assert by_quality.json()["total"] == 2
+    assert all(row["quality_level"] == 2 for row in by_quality.json()["prices"])
+
+    by_both = await client.get(
+        f"/items/{item_id}/prices",
+        params={"server": "west", "quality_level": 2, "enchantment_level": 1},
+        headers=headers,
+    )
+    assert by_both.json()["total"] == 1
+    row = by_both.json()["prices"][0]
+    assert (row["quality_level"], row["enchantment_level"]) == (2, 1)
+
+    # E o filtro respeita a paginação: total filtrado, não total bruto.
+    page = await client.get(
+        f"/items/{item_id}/prices",
+        params={"server": "west", "quality_level": 3, "limit": 1},
+        headers=headers,
+    )
+    assert page.json()["total"] == 2
+    assert len(page.json()["prices"]) == 1

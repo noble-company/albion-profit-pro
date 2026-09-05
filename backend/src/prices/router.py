@@ -27,6 +27,8 @@ async def read_item_prices(
     server: AlbionServer = Query(...),
     scope: Literal["all", "mine"] = Query("all"),
     location_id: list[str] | None = Query(None),
+    quality_level: int | None = Query(None, ge=1, le=5),
+    enchantment_level: int | None = Query(None, ge=0, le=4),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     user=Depends(current_active_user),
@@ -39,6 +41,8 @@ async def read_item_prices(
         scope,
         user_id=user.id if scope == "mine" else None,
         location_ids=location_id,
+        quality_level=quality_level,
+        enchantment_level=enchantment_level,
         limit=limit,
         offset=offset,
     )

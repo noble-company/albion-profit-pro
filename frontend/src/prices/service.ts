@@ -11,6 +11,7 @@ export async function getItemPrices(
   limit: number,
   offset: number,
   signal: AbortSignal,
+  filters: { quality?: number; enchantment?: number } = {},
 ) {
   const response = await safeApiCall(() =>
     apiClient.GET('/items/{item_id}/prices', {
@@ -20,6 +21,8 @@ export async function getItemPrices(
           server,
           scope,
           location_id: locations.length ? locations : undefined,
+          quality_level: filters.quality,
+          enchantment_level: filters.enchantment,
           limit,
           offset,
         },
