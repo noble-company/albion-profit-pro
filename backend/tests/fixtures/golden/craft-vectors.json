@@ -1,0 +1,420 @@
+{
+  "_generated_by": "backend/scripts/generate_craft_vectors.py",
+  "_source": "backend/src/craft/formulas.py",
+  "rates": {
+    "premium_sales_tax": "0.04",
+    "non_premium_sales_tax": "0.08",
+    "setup_fee": "0.025"
+  },
+  "vectors": [
+    {
+      "fn": "calculate_percentage_charge",
+      "args": {
+        "base": "0",
+        "rate": "0.04"
+      },
+      "expected": "0"
+    },
+    {
+      "fn": "calculate_percentage_charge",
+      "args": {
+        "base": "1500",
+        "rate": "0.04"
+      },
+      "expected": "60"
+    },
+    {
+      "fn": "calculate_percentage_charge",
+      "args": {
+        "base": "1501",
+        "rate": "0.04"
+      },
+      "expected": "61"
+    },
+    {
+      "fn": "calculate_percentage_charge",
+      "args": {
+        "base": "25",
+        "rate": "0.025"
+      },
+      "expected": "1"
+    },
+    {
+      "fn": "calculate_percentage_charge",
+      "args": {
+        "base": "1",
+        "rate": "1"
+      },
+      "expected": "1"
+    },
+    {
+      "fn": "calculate_percentage_charge",
+      "args": {
+        "base": "1",
+        "rate": "0"
+      },
+      "expected": "0"
+    },
+    {
+      "fn": "calculate_percentage_charge",
+      "args": {
+        "base": "99999999999999999999",
+        "rate": "0.025"
+      },
+      "expected": "2500000000000000000"
+    },
+    {
+      "fn": "calculate_percentage_charge",
+      "args": {
+        "base": "123456789012345678",
+        "rate": "0.08"
+      },
+      "expected": "9876543120987655"
+    },
+    {
+      "fn": "ceil_decimal",
+      "args": {
+        "value": "0"
+      },
+      "expected": 0
+    },
+    {
+      "fn": "ceil_decimal",
+      "args": {
+        "value": "7.0001"
+      },
+      "expected": 8
+    },
+    {
+      "fn": "ceil_decimal",
+      "args": {
+        "value": "7"
+      },
+      "expected": 7
+    },
+    {
+      "fn": "round_down_for_display",
+      "args": {
+        "value": "2.525"
+      },
+      "expected": "2.5"
+    },
+    {
+      "fn": "round_down_for_display",
+      "args": {
+        "value": "-2.525"
+      },
+      "expected": "-2.6"
+    },
+    {
+      "fn": "round_down_for_display",
+      "args": {
+        "value": "10.5",
+        "decimal_places": 1
+      },
+      "expected": "10.5"
+    },
+    {
+      "fn": "calculate_production",
+      "args": {
+        "desired_quantity": 11,
+        "amount_crafted": 5
+      },
+      "expected": {
+        "executions": 3,
+        "produced_quantity": 15,
+        "surplus_quantity": 4
+      }
+    },
+    {
+      "fn": "calculate_production",
+      "args": {
+        "desired_quantity": 10,
+        "amount_crafted": 5
+      },
+      "expected": {
+        "executions": 2,
+        "produced_quantity": 10,
+        "surplus_quantity": 0
+      }
+    },
+    {
+      "fn": "calculate_production",
+      "args": {
+        "desired_quantity": 1,
+        "amount_crafted": 1
+      },
+      "expected": {
+        "executions": 1,
+        "produced_quantity": 1,
+        "surplus_quantity": 0
+      }
+    },
+    {
+      "fn": "calculate_ingredient_requirement",
+      "args": {
+        "count_per_execution": 3,
+        "executions": 3,
+        "return_rate": "0.15"
+      },
+      "expected": {
+        "gross_quantity": 9,
+        "expected_return_quantity": "1.35",
+        "effective_quantity": "7.65",
+        "purchase_quantity": 8
+      }
+    },
+    {
+      "fn": "calculate_ingredient_requirement",
+      "args": {
+        "count_per_execution": 1,
+        "executions": 10,
+        "return_rate": "0.15"
+      },
+      "expected": {
+        "gross_quantity": 10,
+        "expected_return_quantity": "1.5",
+        "effective_quantity": "8.5",
+        "purchase_quantity": 9
+      }
+    },
+    {
+      "fn": "calculate_ingredient_requirement",
+      "args": {
+        "count_per_execution": 2,
+        "executions": 5,
+        "return_rate": "0"
+      },
+      "expected": {
+        "gross_quantity": 10,
+        "expected_return_quantity": "0",
+        "effective_quantity": "10",
+        "purchase_quantity": 10
+      }
+    },
+    {
+      "fn": "calculate_ingredient_requirement",
+      "args": {
+        "count_per_execution": 2,
+        "executions": 5,
+        "return_rate": "1"
+      },
+      "expected": {
+        "gross_quantity": 10,
+        "expected_return_quantity": "10",
+        "effective_quantity": "0",
+        "purchase_quantity": 0
+      }
+    },
+    {
+      "fn": "calculate_ingredient_requirement",
+      "args": {
+        "count_per_execution": 4,
+        "executions": 7,
+        "return_rate": "0.40",
+        "return_eligible": false
+      },
+      "expected": {
+        "gross_quantity": 28,
+        "expected_return_quantity": "0",
+        "effective_quantity": "28",
+        "purchase_quantity": 28
+      }
+    },
+    {
+      "fn": "calculate_focus_consumed",
+      "args": {
+        "crafting_focus": 18,
+        "executions": 10,
+        "use_focus": true
+      },
+      "expected": 180
+    },
+    {
+      "fn": "calculate_focus_consumed",
+      "args": {
+        "crafting_focus": 18,
+        "executions": 10,
+        "use_focus": false
+      },
+      "expected": 0
+    },
+    {
+      "fn": "calculate_acquisition_cost",
+      "args": {
+        "quoted_cost": "810",
+        "mode": "immediate",
+        "setup_fee_rate": "0.025"
+      },
+      "expected": {
+        "quoted_cost": "810",
+        "setup_fee": "0",
+        "total_cost": "810"
+      }
+    },
+    {
+      "fn": "calculate_acquisition_cost",
+      "args": {
+        "quoted_cost": "810",
+        "mode": "buy_order",
+        "setup_fee_rate": "0.025"
+      },
+      "expected": {
+        "quoted_cost": "810",
+        "setup_fee": "21",
+        "total_cost": "831"
+      }
+    },
+    {
+      "fn": "calculate_acquisition_cost",
+      "args": {
+        "quoted_cost": "0",
+        "mode": "buy_order",
+        "setup_fee_rate": "0.025"
+      },
+      "expected": {
+        "quoted_cost": "0",
+        "setup_fee": "0",
+        "total_cost": "0"
+      }
+    },
+    {
+      "fn": "calculate_acquisition_cost",
+      "args": {
+        "quoted_cost": "50000000000000000000",
+        "mode": "buy_order",
+        "setup_fee_rate": "0.025"
+      },
+      "expected": {
+        "quoted_cost": "50000000000000000000",
+        "setup_fee": "1250000000000000000",
+        "total_cost": "51250000000000000000"
+      }
+    },
+    {
+      "fn": "calculate_sale_revenue",
+      "args": {
+        "gross_revenue": "1500",
+        "mode": "immediate",
+        "sales_tax_rate": "0.04",
+        "setup_fee_rate": "0.025"
+      },
+      "expected": {
+        "gross_revenue": "1500",
+        "setup_fee": "0",
+        "sales_tax": "60",
+        "net_revenue": "1440"
+      }
+    },
+    {
+      "fn": "calculate_sale_revenue",
+      "args": {
+        "gross_revenue": "1500",
+        "mode": "sell_order",
+        "sales_tax_rate": "0.04",
+        "setup_fee_rate": "0.025"
+      },
+      "expected": {
+        "gross_revenue": "1500",
+        "setup_fee": "38",
+        "sales_tax": "60",
+        "net_revenue": "1402"
+      }
+    },
+    {
+      "fn": "calculate_sale_revenue",
+      "args": {
+        "gross_revenue": "101",
+        "mode": "immediate",
+        "sales_tax_rate": "0.08",
+        "setup_fee_rate": "0.025"
+      },
+      "expected": {
+        "gross_revenue": "101",
+        "setup_fee": "0",
+        "sales_tax": "9",
+        "net_revenue": "92"
+      }
+    },
+    {
+      "fn": "calculate_sale_revenue",
+      "args": {
+        "gross_revenue": "0",
+        "mode": "sell_order",
+        "sales_tax_rate": "0.04",
+        "setup_fee_rate": "0.025"
+      },
+      "expected": {
+        "gross_revenue": "0",
+        "setup_fee": "0",
+        "sales_tax": "0",
+        "net_revenue": "0"
+      }
+    },
+    {
+      "fn": "calculate_financial_result",
+      "args": {
+        "total_cost": "80",
+        "net_revenue": "100",
+        "produced_quantity": 4
+      },
+      "expected": {
+        "profit": "20",
+        "profit_per_unit": "5",
+        "roi": "0.25"
+      }
+    },
+    {
+      "fn": "calculate_financial_result",
+      "args": {
+        "total_cost": "0",
+        "net_revenue": "100",
+        "produced_quantity": 5
+      },
+      "expected": {
+        "profit": "100",
+        "profit_per_unit": "20",
+        "roi": null
+      }
+    },
+    {
+      "fn": "calculate_financial_result",
+      "args": {
+        "total_cost": "240",
+        "net_revenue": "320",
+        "produced_quantity": 3
+      },
+      "expected": {
+        "profit": "80",
+        "profit_per_unit": "26.66666666666666666666666667",
+        "roi": "0.3333333333333333333333333333"
+      }
+    },
+    {
+      "fn": "calculate_financial_result",
+      "args": {
+        "total_cost": "1000000",
+        "net_revenue": "999999",
+        "produced_quantity": 7
+      },
+      "expected": {
+        "profit": "-1",
+        "profit_per_unit": "-0.1428571428571428571428571429",
+        "roi": "-0.000001"
+      }
+    },
+    {
+      "fn": "calculate_financial_result",
+      "args": {
+        "total_cost": "12345678901234567890",
+        "net_revenue": "12345678901234567891",
+        "produced_quantity": 1
+      },
+      "expected": {
+        "profit": "1",
+        "profit_per_unit": "1",
+        "roi": "0.00000000000000000008100000072900000663471006038"
+      }
+    }
+  ]
+}

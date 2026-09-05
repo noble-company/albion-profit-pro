@@ -30,6 +30,17 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // F09 / task 3.5/18: dinheiro é string decimal — nunca `number`. Proíbe
+      // `Number(x.profit)` / `parseFloat(x.roi)` e afins sobre campos monetários do contrato.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'CallExpression[callee.name=/^(Number|parseFloat|parseInt)$/] > MemberExpression[property.name=/^(profit|profit_per_unit|roi|min_profit|min_roi|buy_price|sell_price|gross_revenue|net_revenue|total_cost|total_fees|sales_tax|sale_setup_fee|acquisition_setup_fee|station_cost|expected_return_quantity|effective_quantity|unit_price|unit_price_silver|best_price|average_price)$/]',
+          message:
+            'Dinheiro é string decimal — use @/lib/money em vez de Number()/parseFloat() (F09).',
+        },
+      ],
     },
   },
   {

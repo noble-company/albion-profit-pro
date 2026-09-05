@@ -122,7 +122,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 15 — Migração para TanStack Query
 - [x] 16 — Restauração de sessão
 - [x] 17 — Ordenação e paginação no servidor
-- [ ] 18 — Módulo monetário e vetores dourados
+- [x] 18 — Módulo monetário e vetores dourados
 - [ ] 19 — Fonte única de localizações e categorias
 - [ ] 20 — Componentes compartilhados
 - [ ] 21 — Tela Market Flip

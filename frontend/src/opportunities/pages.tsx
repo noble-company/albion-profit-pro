@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Carregando, EstadoErro } from '@/components/ui/states'
 import { Switch } from '@/components/ui/switch'
 import { useServer } from '@/app/ServerContext'
+import * as money from '@/lib/money'
 import {
   formatarCategoria,
   formatarIdade,
@@ -90,10 +91,9 @@ function DashboardContent() {
         <DashboardIntro />
       </RequireRealm>
     )
-  const totalProfit = rows.reduce(
-    (sum, row) => sum + Number(row.profit ?? 0),
-    0,
-  )
+  const totalProfit = money
+    .add(...rows.map((row) => row.profit ?? '0'))
+    .toString()
   const page = query.offset / query.limit + 1
   const set = (key: string, value: string) =>
     setParams(updateParam(params, key, value))
@@ -135,7 +135,7 @@ function DashboardContent() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Kpi
           label="Lucro na página"
-          value={formatarSilver(String(totalProfit))}
+          value={formatarSilver(totalProfit)}
           tone="profit"
         />
         <Kpi
@@ -633,20 +633,10 @@ function OpportunityTable({
                   </div>
                 </td>
                 <td className="p-4 font-semibold text-primary">
-                  {formatarSilver(
-                    row.total_cost ??
-                      (row.buy_price
-                        ? String(Number(row.buy_price) * row.quantity)
-                        : null),
-                  )}
+                  {formatarSilver(row.total_cost)}
                 </td>
                 <td className="p-4 font-semibold text-buy-side">
-                  {formatarSilver(
-                    row.gross_revenue ??
-                      (row.sell_price
-                        ? String(Number(row.sell_price) * row.quantity)
-                        : null),
-                  )}
+                  {formatarSilver(row.gross_revenue)}
                 </td>
                 <td className="p-4 text-foreground-muted">
                   {formatarSilver(row.total_fees)}

@@ -17,6 +17,7 @@ import {
   formatarQualidade,
   formatarSilver,
 } from '@/lib/formatters'
+import * as money from '@/lib/money'
 import { useLocations } from '@/prices/hooks'
 
 import { useProductionOpportunities } from './hooks'
@@ -572,14 +573,12 @@ function ProductionTable({
                   {formatarSilver(row.gross_revenue)}
                 </td>
                 <td className="p-4 text-xs">
-                  {(row.ingredients ?? []).some(
-                    (ingredient) =>
-                      Number(ingredient.expected_return_quantity) > 0,
+                  {(row.ingredients ?? []).some((ingredient) =>
+                    money.isPositive(ingredient.expected_return_quantity),
                   )
                     ? (row.ingredients ?? [])
-                        .filter(
-                          (ingredient) =>
-                            Number(ingredient.expected_return_quantity) > 0,
+                        .filter((ingredient) =>
+                          money.isPositive(ingredient.expected_return_quantity),
                         )
                         .map((ingredient) => (
                           <div key={ingredient.item}>
