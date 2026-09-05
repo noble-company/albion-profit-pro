@@ -7,9 +7,9 @@ import {
 } from './confidence'
 
 /**
- * Demonstração da task 3.5/14 (docs/13-linguagem-visual.md §4) — não é o componente
- * definitivo. `WarningBadges`, reutilizável e ligado ao schema real de avisos, é extraído
- * na task 20 sobre este vocabulário.
+ * Demonstração da task 3.5/14 (docs/13-linguagem-visual.md §4). O componente reutilizável
+ * das telas de oportunidade é `@/components/opportunities/WarningBadges` (task 3.5/20), que
+ * renderiza uma lista destes badges a partir de `row.warnings`.
  */
 
 const LEVEL_STYLE: Record<

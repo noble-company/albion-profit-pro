@@ -124,7 +124,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 17 — Ordenação e paginação no servidor
 - [x] 18 — Módulo monetário e vetores dourados
 - [x] 19 — Fonte única de localizações e categorias
-- [ ] 20 — Componentes compartilhados
+- [x] 20 — Componentes compartilhados
 - [ ] 21 — Tela Market Flip
 - [ ] 22 — Telas de Refino e Craft
 - [ ] 23 — Camada "e se" no cliente
@@ -165,3 +165,4 @@ o estado real e receber confirmação explícita antes de alterar código.
 | `W9` | `CLAUDE.md` e `README.md` mandam `celery ... worker -Q ingest -c 4` (pool prefork), que estoura `PermissionError [WinError 5]` no `billiard` no Windows (pool workers num loop de respawn). Produção (Linux) roda prefork ok; o dev na máquina Windows precisa de `--pool=solo` ou `--pool=threads`. Achado na revisão do Bloco 1. | Nota nos docs, ou detecção de SO no `celery_app.py` |
 | `W10` | `opportunities.tasks.rebuild_recipe_ranking` varre os 3 realms a cada 10 min. East/Europe não têm dado, mas o job ainda faz `output_meta` (join de ~5,6 mil itens), `eligible` e `DELETE FROM recipe_ranking` por realm. Custo de segundos, não crítico. Achado na revisão do Bloco 1 (task 03). | `if not combos: return` cedo no `rebuild_ranking` |
 | `W11` | `RELEVANT_CATEGORIES` (`scripts/_dumps.py`) só tem `["simpleitem", "equipmentitem", "weapon", "consumableitem"]`, mas `docs/02-dados-de-receita.md` lista `mount` e `furnitureitem` como categorias relevantes. Receitas de montaria/móvel **nunca são importadas** → nunca entram no ranking de craft. Pré-existente, surgido na revisão da task 09. | Task própria de dados (import de receitas) |
+| `W12` | Paginação das telas de oportunidade estava morta: o `updateParam` compartilhado fazia `next.delete('offset')` em toda escrita, então os botões "Próxima"/"Anterior" (que chamavam `updateParam(params, 'offset', …)`) removiam o `offset` da URL e a tela nunca saía da página 1. Nenhum teste cobria (os de paginação batem no `service.ts` direto). Achado e **corrigido** na task 20 — `useOpportunityParams` separa `setFilter` de `setOffset`. | Task 20 (corrigido junto) |
