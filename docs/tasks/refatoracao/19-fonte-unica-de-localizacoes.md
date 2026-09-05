@@ -141,7 +141,11 @@ Subir o frontend (`npm run dev`) com o backend e o worker `maintenance` rodando 
 
 1. Lymhurst aparece com o mesmo nome ("Lymhurst") nas 5 telas — inclusive no toggle do Market
    Flip, que agora agrupa os dois IDs.
-2. O Black Market aparece nas telas onde há linha com `location_id = 3003` (Preços, Flip) com o
-   nome "Black Market" — não "Hell Den" nem "Covil do Inferno".
-3. Se alguma linha vier com um `location_id` que não está em `/locations`, a tela mostra **o
-   código**, não "Mercado".
+2. O Black Market (`location_id = 3003`, curado em `SPECIAL_MARKETS`) aparece com o nome
+   "Black Market" nas telas onde há linha dele (Preços, Flip). Esse ID nunca esteve em disputa
+   entre os mapas antigos — os dois já diziam "Black Market"; a inconsistência de rótulo da
+   spec era no `1000-HellDen` (covil de contrabandista), "Covil do Inferno" vs "Hell Den".
+3. Se alguma linha vier com um `location_id` sem `name` curado — o caso do `1000-HellDen`, que
+   entra no `location` só via `upsert_locations` do ingest, com `name` nulo — a tela agora
+   mostra **o código cru** (`1000-HellDen`), não mais a tradução inventada no cliente nem
+   "Mercado". É a mudança de comportamento que a task pede (fallback honesto).
