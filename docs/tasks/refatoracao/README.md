@@ -123,7 +123,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 16 — Restauração de sessão
 - [x] 17 — Ordenação e paginação no servidor
 - [x] 18 — Módulo monetário e vetores dourados
-- [ ] 19 — Fonte única de localizações e categorias
+- [x] 19 — Fonte única de localizações e categorias
 - [ ] 20 — Componentes compartilhados
 - [ ] 21 — Tela Market Flip
 - [ ] 22 — Telas de Refino e Craft

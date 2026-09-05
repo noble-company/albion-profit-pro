@@ -22,25 +22,10 @@ export function formatarIdade(
   return `há ${hours} h${stale}`
 }
 
-const LOCATION_LABELS: Record<string, string> = {
-  '3005': 'Caerleon',
-  '2004': 'Bridgewatch',
-  '4002': 'Fort Sterling',
-  '1002': 'Lymhurst',
-  '1301': 'Lymhurst',
-  '3008': 'Martlock',
-  '0007': 'Thetford',
-  '5003': 'Brecilien',
-  '3003': 'Black Market',
-  '1000-HellDen': 'Covil do Inferno',
-}
-
-export function formatarLocalidade(value: string | null | undefined) {
-  if (!value) return '—'
-  return LOCATION_LABELS[value] ?? 'Mercado'
-}
-
-export function formatarNomeJogador(
+// Nome de item (T4_SWORD@1 -> "Espada T4.1"), não de jogador (F11, task 3.5/19). Localização
+// e categoria saíram daqui: `useLocationName` (@/lib/locations) e `traduzirCategoria`
+// (@/i18n/categories).
+export function formatarNomeItem(
   name: string | null | undefined,
   uniqueName: string,
 ) {
@@ -59,62 +44,4 @@ export function formatarQualidade(value: number | null | undefined) {
   return value != null && value >= 1 && value <= labels.length
     ? labels[value - 1]
     : 'Qualidade desconhecida'
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  weapons: 'Armas',
-  armors: 'Armaduras',
-  artifacts: 'Artefatos',
-  bags: 'Bolsas',
-  capes: 'Capas',
-  consumables: 'Consumíveis',
-  crafting: 'Fabricação',
-  farming: 'Cultivo',
-  gathering: 'Coleta',
-  head: 'Cabeça',
-  offhands: 'Mão secundária',
-  other: 'Outros',
-  shoes: 'Calçados',
-  vanity: 'Cosméticos',
-  accessoires: 'Acessórios',
-  sword: 'Espada',
-  swords: 'Espadas',
-  bow: 'Arco',
-  bows: 'Arcos',
-  axe: 'Machado',
-  axes: 'Machados',
-  dagger: 'Adaga',
-  daggers: 'Adagas',
-  staff: 'Cajado',
-  staffs: 'Cajados',
-  spear: 'Lança',
-  spears: 'Lanças',
-  mace: 'Maça',
-  maces: 'Maças',
-  avalon: 'Avalon',
-  crystal: 'Cristal',
-  morgana: 'Morgana',
-  keeper: 'Guardião',
-  heretic: 'Herege',
-  undead: 'Morto-vivo',
-  demon: 'Demônio',
-  bridgewatch: 'Bridgewatch',
-  caerleon: 'Caerleon',
-  fortsterling: 'Fort Sterling',
-  lymhurst: 'Lymhurst',
-  martlock: 'Martlock',
-  thetford: 'Thetford',
-  brecilien: 'Brecilien',
-  smuggler: 'Contrabandista',
-}
-
-export function formatarCategoria(value: string) {
-  return value
-    .split('_')
-    .map(
-      (part) =>
-        CATEGORY_LABELS[part.toLowerCase()] ??
-        part.charAt(0).toUpperCase() + part.slice(1),
-    )
-    .join(' · ')
 }

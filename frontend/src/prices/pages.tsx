@@ -2,20 +2,9 @@ import { useParams, useSearchParams } from 'react-router'
 import { useServer } from '@/app/ServerContext'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { formatarIdade, formatarSilver } from '@/lib/formatters'
+import { useLocationName } from '@/lib/locations'
 import { useItemPrices, useLocations } from './hooks'
 import { DemandaItem } from './demand'
-
-const LOCATION_LABELS: Record<string, string> = {
-  '3005': 'Caerleon',
-  '2004': 'Bridgewatch',
-  '4002': 'Fort Sterling',
-  '1301': 'Lymhurst',
-  '3008': 'Martlock',
-  '0007': 'Thetford',
-  '5003': 'Brecilien',
-  '3003': 'Black Market',
-  '1000-HellDen': 'Hell Den',
-}
 
 export function ItemPricesPage() {
   const { uniqueName = '' } = useParams()
@@ -42,6 +31,7 @@ export function ItemPricesPage() {
     filters,
   )
   const places = useLocations()
+  const locationName = useLocationName()
   // Qualidade e encantamento são filtrados no servidor, ANTES da paginação (F08); `total` e
   // as linhas já vêm do conjunto certo.
   const rows = data.data?.prices ?? []
@@ -65,10 +55,6 @@ export function ItemPricesPage() {
   }
   const demandLocation = selectedLocation || undefined
   const demandQuality = selectedQuality ? Number(selectedQuality) : undefined
-  const locationLabel = (locationId: string) =>
-    places.find((place) => place.location_id === locationId)?.name ||
-    LOCATION_LABELS[locationId] ||
-    locationId
   return (
     <section>
       <p className="text-sm uppercase tracking-widest text-primary">{realm}</p>
@@ -97,7 +83,7 @@ export function ItemPricesPage() {
             <option value="">Todas</option>
             {places.map((place) => (
               <option key={place.location_id} value={place.location_id}>
-                {locationLabel(place.location_id)}
+                {locationName(place.location_id)}
               </option>
             ))}
           </select>
@@ -158,7 +144,7 @@ export function ItemPricesPage() {
                 key={`${row.location_id}-${row.quality_level}-${row.enchantment_level}`}
                 className="border-t border-border"
               >
-                <td className="p-3">{locationLabel(row.location_id)}</td>
+                <td className="p-3">{locationName(row.location_id)}</td>
                 <td className="p-3">
                   {row.quality_level} / .{row.enchantment_level}
                 </td>

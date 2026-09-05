@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router'
 import { useServer } from '@/app/ServerContext'
 import { EstadoErro, EstadoVazio, Carregando } from '@/components/ui/states'
 import { formatarPct, formatarSilver } from '@/lib/formatters'
+import { useLocationName } from '@/lib/locations'
 import { useLocations } from '@/prices/hooks'
 import { simulateCraft, type CraftRequest, type CraftResult } from './service'
 type FormValues = Omit<CraftRequest, 'server'>
@@ -100,6 +101,7 @@ export function CalculadoraPage() {
   const { realm } = useServer()
   const [searchParams] = useSearchParams()
   const locations = useLocations()
+  const locationName = useLocationName()
   const mutation = useMutation({ mutationFn: simulateCraft })
   const {
     register,
@@ -187,7 +189,7 @@ export function CalculadoraPage() {
             <option value="">Selecionar</option>
             {locations.map((l) => (
               <option key={l.location_id} value={l.location_id}>
-                {l.name ?? l.display_name}
+                {locationName(l.location_id)}
               </option>
             ))}
           </select>

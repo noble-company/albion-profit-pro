@@ -6,16 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Carregando, EstadoErro } from '@/components/ui/states'
 import { Switch } from '@/components/ui/switch'
 import { useServer } from '@/app/ServerContext'
-import * as money from '@/lib/money'
+import { traduzirCategoria } from '@/i18n/categories'
 import {
-  formatarCategoria,
   formatarIdade,
-  formatarLocalidade,
-  formatarNomeJogador,
+  formatarNomeItem,
   formatarPct,
   formatarQualidade,
   formatarSilver,
 } from '@/lib/formatters'
+import { useLocationName, useMarketToggles } from '@/lib/locations'
+import * as money from '@/lib/money'
 import { useCategories, useFlipOpportunities } from './hooks'
 import { parseSortParam } from './service'
 
@@ -25,18 +25,6 @@ const fieldLabel =
   'flex flex-col gap-1.5 text-xs font-bold uppercase tracking-wide text-foreground-subtle'
 const fieldControl =
   'min-h-11 rounded-lg border border-border-strong bg-background/75 px-3 py-2 text-sm font-medium normal-case tracking-normal text-foreground outline-none transition hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/30'
-
-const cities = [
-  { ids: ['3005'], name: 'Caerleon' },
-  { ids: ['2004'], name: 'Bridgewatch' },
-  { ids: ['4002'], name: 'Fort Sterling' },
-  // O grupo de Lymhurst inclui o mercado principal e o cluster do portal.
-  { ids: ['1002', '1301'], name: 'Lymhurst' },
-  { ids: ['3008'], name: 'Martlock' },
-  { ids: ['0007'], name: 'Thetford' },
-  { ids: ['5003'], name: 'Brecilien' },
-  { ids: ['3003'], name: 'Black Market' },
-] as const
 
 function updateParam(params: URLSearchParams, key: string, value: string) {
   const next = new URLSearchParams(params)
@@ -50,6 +38,7 @@ function DashboardContent() {
   const { realm } = useServer()
   const [params, setParams] = useSearchParams()
   const categories = useCategories()
+  const marketToggles = useMarketToggles()
   const query = useMemo(
     () => ({
       category: params.get('category') || undefined,
@@ -302,7 +291,7 @@ function DashboardContent() {
                 Cidades observadas
               </p>
               <div className="flex flex-wrap gap-2">
-                {cities.map(({ ids, name }) => {
+                {marketToggles.map(({ ids, name }) => {
                   const selected = ids.every((id) =>
                     query.locations.includes(id),
                   )
@@ -553,7 +542,7 @@ function CategorySelect({
         <option value="">Todos</option>
         {[...options].sort().map((option) => (
           <option key={option} value={option}>
-            {formatarCategoria(option)}
+            {traduzirCategoria(option)}
           </option>
         ))}
       </select>
@@ -567,6 +556,7 @@ function OpportunityTable({
     ReturnType<typeof useFlipOpportunities>['data']
   >['opportunities']
 }) {
+  const locationName = useLocationName()
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-2xl shadow-black/20">
       <div className="flex items-center justify-between border-b border-border bg-surface/70 px-5 py-3">
@@ -610,7 +600,7 @@ function OpportunityTable({
                     className="font-bold text-foreground transition hover:text-primary"
                     to={`/calculadora?item=${encodeURIComponent(row.item)}`}
                   >
-                    {formatarNomeJogador(row.item_name, row.item)}
+                    {formatarNomeItem(row.item_name, row.item)}
                   </Link>
                 </td>
                 <td className="p-4 font-medium text-foreground">
@@ -621,7 +611,7 @@ function OpportunityTable({
                     {formatarSilver(row.buy_price)}
                   </strong>
                   <div className="mt-0.5 text-xs font-medium text-buy-side">
-                    {formatarLocalidade(row.buy_location)}
+                    {locationName(row.buy_location)}
                   </div>
                 </td>
                 <td className="p-4">
@@ -629,7 +619,7 @@ function OpportunityTable({
                     {formatarSilver(row.sell_price)}
                   </strong>
                   <div className="mt-0.5 text-xs font-medium text-sell-side">
-                    {formatarLocalidade(row.sell_location)}
+                    {locationName(row.sell_location)}
                   </div>
                 </td>
                 <td className="p-4 font-semibold text-primary">

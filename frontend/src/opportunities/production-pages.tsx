@@ -11,12 +11,12 @@ import { Switch } from '@/components/ui/switch'
 import { simulateCraft, type CraftResult } from '@/craft/service'
 import {
   formatarIdade,
-  formatarLocalidade,
-  formatarNomeJogador,
+  formatarNomeItem,
   formatarPct,
   formatarQualidade,
   formatarSilver,
 } from '@/lib/formatters'
+import { useLocationName } from '@/lib/locations'
 import * as money from '@/lib/money'
 import { useLocations } from '@/prices/hooks'
 
@@ -81,6 +81,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
     () => allLocations.filter((row) => row.kind === 'city'),
     [allLocations],
   )
+  const locationName = useLocationName()
   const [selected, setSelected] = useState<Opportunity | null>(null)
   const detailMutation = useMutation({ mutationFn: simulateCraft })
 
@@ -253,7 +254,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
                       key={location.location_id}
                       value={location.location_id}
                     >
-                      {location.name ?? location.display_name}
+                      {locationName(location.location_id)}
                     </option>
                   ))}
                 </select>
@@ -489,6 +490,7 @@ function ProductionTable({
   rows: Opportunity[]
   onOpen: (row: Opportunity) => void
 }) {
+  const locationName = useLocationName()
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-2xl shadow-black/20">
       <div className="flex items-center justify-between border-b border-border bg-surface/70 px-5 py-3">
@@ -528,7 +530,7 @@ function ProductionTable({
               >
                 <td className="p-4">
                   <strong className="text-foreground">
-                    {formatarNomeJogador(row.item_name, row.item)}
+                    {formatarNomeItem(row.item_name, row.item)}
                   </strong>
                   <div className="mt-1 text-xs text-foreground-subtle">
                     {formatarQualidade(row.quality_level)}
@@ -550,7 +552,7 @@ function ProductionTable({
                   {(row.ingredients ?? []).length > 0
                     ? (row.ingredients ?? []).map((ingredient) => (
                         <div key={ingredient.item}>
-                          {formatarNomeJogador(
+                          {formatarNomeItem(
                             ingredient.item_name,
                             ingredient.item,
                           )}{' '}
@@ -560,7 +562,7 @@ function ProductionTable({
                     : '—'}
                 </td>
                 <td className="p-4 font-medium text-buy-side">
-                  {formatarLocalidade(row.buy_location)}
+                  {locationName(row.buy_location)}
                 </td>
                 <td className="p-4 text-xs text-foreground">
                   {modeLabels[row.acquisition_mode ?? ''] ?? '—'} →{' '}
@@ -582,7 +584,7 @@ function ProductionTable({
                         )
                         .map((ingredient) => (
                           <div key={ingredient.item}>
-                            {formatarNomeJogador(
+                            {formatarNomeItem(
                               ingredient.item_name,
                               ingredient.item,
                             )}{' '}
@@ -632,6 +634,7 @@ function DetailDrawer({
   error: unknown
   onClose: () => void
 }) {
+  const locationName = useLocationName()
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-sm"
@@ -651,10 +654,10 @@ function DetailDrawer({
               Análise detalhada
             </p>
             <h2 className="mt-2 text-2xl font-bold">
-              {formatarNomeJogador(row.item_name, row.item)}
+              {formatarNomeItem(row.item_name, row.item)}
             </h2>
             <p className="text-sm text-foreground-muted">
-              {formatarLocalidade(row.buy_location)} ·{' '}
+              {locationName(row.buy_location)} ·{' '}
               {formatarQualidade(row.quality_level)}
             </p>
           </div>
@@ -726,9 +729,7 @@ function DetailResult({ result }: { result: CraftResult }) {
               key={`${ingredient.position}-${ingredient.unique_name}`}
               className="rounded border border-border p-3"
             >
-              <strong>
-                {formatarNomeJogador(null, ingredient.unique_name)}
-              </strong>
+              <strong>{formatarNomeItem(null, ingredient.unique_name)}</strong>
               <div className="mt-1 text-foreground-muted">
                 Bruto {ingredient.gross_quantity} · retorno esperado{' '}
                 {String(ingredient.expected_return_quantity)} · comprar{' '}
