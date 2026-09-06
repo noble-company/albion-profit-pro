@@ -57,3 +57,42 @@ Tasks 11-20.
 
 Percorrer o produto inteiro com teclado apenas, sem mouse, e confirmar que toda ação é
 alcançável. Conferir as cinco telas em 1366×768 e no celular.
+
+## Estado da implementação
+
+**Em andamento — quebrada em dois passos** (a pedido do usuário).
+
+### Passo A — `ItemAutocomplete` + Calculadora + Busca ✅
+
+Frontend: `npm run typecheck` limpo · `npm run lint` 0 erros (4 warnings pré-existentes) ·
+`npm run test` **162/162 em 36 arquivos** (+8) · `npm run build` passa.
+
+- **`src/components/ItemAutocomplete.tsx`** (novo) — combobox com navegação completa por
+  teclado: `↑`/`↓` movem o item ativo via `aria-activedescendant`, `Enter` seleciona, `Esc`
+  fecha, `Home`/`End` nas pontas, mouse hover sincroniza o ativo. Compartilhado.
+- **Calculadora** (`craft/pages.tsx`): campo de texto → `ItemAutocomplete` (via `Controller`
+  do react-hook-form, `filters={{ apenas_craftaveis: true }}`). Rótulos de cenário
+  `immediate → sell_order` → `MODE_LABELS` (movido de `opportunities/labels.ts` para
+  `src/lib/craft-labels.ts`). Ingrediente `unique_name` → `formatarNomeItem`. Avisos →
+  `WarningBadges`. `onRetry={() => undefined}` → **refaz a última simulação de verdade**
+  (`mutation.mutate(mutation.variables)`). As prefs de `albion-profit-pro:calculator:v1` —
+  gravadas e **nunca lidas** — passam a semear qualidade/escopo/premium/foco no mount.
+- **Busca** (`items/pages.tsx`): usa o `ItemAutocomplete`; filtro de categoria de `<input>`
+  de texto livre → `<select>` de `/items/categories` (`useCategories`), rótulos por
+  `traduzirCategoria`.
+- Guard `src/test/no-inert-onretry.test.ts`: nenhum `onRetry={() => undefined|{}}` nas telas
+  do produto (as demos `/estilo` e `/ui` ficam de fora, com comentário).
+
+### Passo B — Preços/Demanda + AppShell + Tokens ⏳
+
+Pendente: nome do item no lugar do `unique_name` cru + conserto da paginação em
+`prices/pages.tsx`; tokens de cor nos eixos/tooltip do gráfico `recharts`; `AppShell` no
+layout da task 14 §6 (header sticky de 3 zonas, nav com ícone, `Sheet` no mobile); fundação
+visual da tela de Tokens.
+
+### Pendente pra você testar (Passo A)
+
+- Calculadora: digitar "algodão" → escolher pela seta + `Enter` → o formulário preenche e
+  simula; recarregar a tela mantém qualidade/premium/foco da última simulação.
+- Busca: navegar a lista só com teclado; filtro de categoria é um `select` traduzido.
+- O botão "Tentar novamente" da Calculadora refaz a chamada (não fica inerte).

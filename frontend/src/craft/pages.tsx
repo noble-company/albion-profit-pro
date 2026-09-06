@@ -1,14 +1,61 @@
 import { useMutation } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { useSearchParams } from 'react-router'
+
 import { useServer } from '@/app/ServerContext'
-import { EstadoErro, EstadoVazio, Carregando } from '@/components/ui/states'
-import { formatarPct, formatarSilver } from '@/lib/formatters'
+import { ItemAutocomplete } from '@/components/ItemAutocomplete'
+import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
+import { WarningBadges } from '@/components/opportunities/WarningBadges'
+import { MODE_LABELS } from '@/lib/craft-labels'
+import { formatarNomeItem, formatarPct, formatarSilver } from '@/lib/formatters'
 import { useLocationName } from '@/lib/locations'
 import { useLocations } from '@/prices/hooks'
+
 import { simulateCraft, type CraftRequest, type CraftResult } from './service'
+
 type FormValues = Omit<CraftRequest, 'server'>
 const PREFS = 'albion-profit-pro:calculator:v1'
+
+const BASE_DEFAULTS: FormValues = {
+  output_item: '',
+  quantity: 1,
+  output_quality: 1,
+  scope: 'all',
+  return_rate: '0',
+  station_cost_per_execution: '0',
+  use_focus: false,
+  premium: true,
+  sales_tax_rate: null,
+  setup_fee_rate: null,
+  ingredient_overrides: {},
+  manual_prices: {},
+  location_id: '',
+}
+
+/** Preferências gravadas no `submit` — antes eram escritas e nunca lidas (task 3.5/24 item 1). */
+function readPrefs(): Partial<FormValues> {
+  try {
+    const raw = localStorage.getItem(PREFS)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as {
+      version?: number
+      output_quality?: number
+      scope?: FormValues['scope']
+      premium?: boolean
+      use_focus?: boolean
+    }
+    if (parsed.version !== 1) return {}
+    return {
+      output_quality: parsed.output_quality,
+      scope: parsed.scope,
+      premium: parsed.premium,
+      use_focus: parsed.use_focus,
+    }
+  } catch {
+    return {}
+  }
+}
+
 function Result({ result }: { result: CraftResult }) {
   return (
     <section className="mt-8">
@@ -30,49 +77,37 @@ function Result({ result }: { result: CraftResult }) {
           >
             <h3 className="font-semibold">
               {index === 0 ? 'Pessimista · ' : ''}
-              {scenario.acquisition_mode} → {scenario.sale_mode}
+              {MODE_LABELS[scenario.acquisition_mode] ??
+                scenario.acquisition_mode}{' '}
+              → {MODE_LABELS[scenario.sale_mode] ?? scenario.sale_mode}
             </h3>
             <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt>Custo total</dt>
-                <dd>
-                  {scenario.costs.total_cost == null
-                    ? 'Indisponível'
-                    : formatarSilver(scenario.costs.total_cost)}
+                <dd className="tabular-nums">
+                  {formatarSilver(scenario.costs.total_cost)}
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt>Receita líquida</dt>
-                <dd>
-                  {scenario.revenue.net_revenue == null
-                    ? 'Indisponível'
-                    : formatarSilver(scenario.revenue.net_revenue)}
+                <dd className="tabular-nums">
+                  {formatarSilver(scenario.revenue.net_revenue)}
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt>Lucro</dt>
-                <dd>
-                  {scenario.profit == null
-                    ? 'Indisponível'
-                    : formatarSilver(scenario.profit)}
+                <dd className="tabular-nums text-profit">
+                  {formatarSilver(scenario.profit)}
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt>ROI</dt>
-                <dd>
-                  {scenario.roi == null
-                    ? 'Indisponível'
-                    : formatarPct(scenario.roi)}
+                <dd className="tabular-nums text-profit">
+                  {formatarPct(scenario.roi)}
                 </dd>
               </div>
             </dl>
-            {scenario.warnings.length > 0 && (
-              <ul className="mt-3 space-y-1 text-xs text-primary">
-                {scenario.warnings.map((w) => (
-                  <li key={w}>Aviso: {w}</li>
-                ))}
-              </ul>
-            )}
+            <WarningBadges warnings={scenario.warnings} className="mt-3" />
           </article>
         ))}
       </div>
@@ -87,8 +122,10 @@ function Result({ result }: { result: CraftResult }) {
             key={`${ingredient.position}-${ingredient.unique_name}`}
             className="rounded border border-border p-3"
           >
-            <span className="font-medium">{ingredient.unique_name}</span> ·
-            bruto {ingredient.gross_quantity} · efetivo{' '}
+            <span className="font-medium">
+              {formatarNomeItem(null, ingredient.unique_name)}
+            </span>{' '}
+            · bruto {ingredient.gross_quantity} · efetivo{' '}
             {String(ingredient.effective_quantity)} · compra{' '}
             {ingredient.purchase_quantity}
           </li>
@@ -97,6 +134,7 @@ function Result({ result }: { result: CraftResult }) {
     </section>
   )
 }
+
 export function CalculadoraPage() {
   const { realm } = useServer()
   const [searchParams] = useSearchParams()
@@ -105,37 +143,30 @@ export function CalculadoraPage() {
   const mutation = useMutation({ mutationFn: simulateCraft })
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
-      output_item: searchParams.get('item') || 'T2_CLOTH',
-      quantity: 1,
-      output_quality: 1,
-      scope: 'all',
-      return_rate: '0',
-      station_cost_per_execution: '0',
-      use_focus: false,
-      premium: true,
-      sales_tax_rate: null,
-      setup_fee_rate: null,
-      ingredient_overrides: {},
-      manual_prices: {},
-      location_id: '',
+      ...BASE_DEFAULTS,
+      ...readPrefs(),
+      output_item: searchParams.get('item') || '',
     },
   })
+
   if (!realm)
     return (
       <EstadoVazio title="Escolha um servidor">
         Selecione um servidor antes de simular.
       </EstadoVazio>
     )
-  const submit = (values: FormValues) => {
+
+  const runSimulation = (values: FormValues) => {
     localStorage.setItem(
       PREFS,
       JSON.stringify({
         version: 1,
-        output_quality: values.output_quality,
+        output_quality: Number(values.output_quality),
         scope: values.scope,
         premium: values.premium,
         use_focus: values.use_focus,
@@ -150,24 +181,37 @@ export function CalculadoraPage() {
       station_cost_per_execution: String(values.station_cost_per_execution),
     })
   }
+
+  const lastVariables = mutation.variables
+  const retryLastSimulation = lastVariables
+    ? () => mutation.mutate(lastVariables)
+    : undefined
+
   return (
     <section>
       <p className="text-sm uppercase tracking-widest text-primary">{realm}</p>
       <h1 className="mt-2 text-3xl font-bold">Calculadora de craft</h1>
       <form
         className="mt-6 grid gap-4 rounded-xl border border-border bg-surface p-5 md:grid-cols-3"
-        onSubmit={(e) => void handleSubmit(submit)(e)}
+        onSubmit={(event) => void handleSubmit(runSimulation)(event)}
       >
-        <label>
-          Item canônico
-          <input
-            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
-            {...register('output_item', { required: 'Informe o item' })}
+        <div className="md:col-span-3">
+          <Controller
+            control={control}
+            name="output_item"
+            rules={{ required: 'Informe o item' }}
+            render={({ field }) => (
+              <ItemAutocomplete
+                label="Item"
+                value={field.value}
+                onChange={field.onChange}
+                filters={{ apenas_craftaveis: true }}
+                error={errors.output_item?.message}
+                autoFocus
+              />
+            )}
           />
-          {errors.output_item && (
-            <small className="text-danger">{errors.output_item.message}</small>
-          )}
-        </label>
+        </div>
         <label>
           Quantidade
           <input
@@ -187,9 +231,9 @@ export function CalculadoraPage() {
             {...register('location_id', { required: 'Selecione a cidade' })}
           >
             <option value="">Selecionar</option>
-            {locations.map((l) => (
-              <option key={l.location_id} value={l.location_id}>
-                {locationName(l.location_id)}
+            {locations.map((location) => (
+              <option key={location.location_id} value={location.location_id}>
+                {locationName(location.location_id)}
               </option>
             ))}
           </select>
@@ -200,9 +244,9 @@ export function CalculadoraPage() {
             className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
             {...register('output_quality', { valueAsNumber: true })}
           >
-            {[1, 2, 3, 4, 5].map((v) => (
-              <option key={v} value={v}>
-                {v}
+            {[1, 2, 3, 4, 5].map((value) => (
+              <option key={value} value={value}>
+                {value}
               </option>
             ))}
           </select>
@@ -256,7 +300,7 @@ export function CalculadoraPage() {
         <div className="mt-5">
           <EstadoErro
             title="Não foi possível simular"
-            onRetry={() => undefined}
+            onRetry={retryLastSimulation}
           />
         </div>
       )}

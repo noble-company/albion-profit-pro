@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 
 import { Carregando, EstadoErro } from '@/components/ui/states'
 import type { CraftResult } from '@/craft/service'
+import { MODE_LABELS } from '@/lib/craft-labels'
 import {
   formatarNomeItem,
   formatarPct,
@@ -10,7 +11,6 @@ import {
   formatarSilver,
 } from '@/lib/formatters'
 import { useLocationName } from '@/lib/locations'
-import { MODE_LABELS } from '@/opportunities/labels'
 import type { Opportunity } from '@/opportunities/service'
 
 import { WarningBadges } from './WarningBadges'

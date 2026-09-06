@@ -33,13 +33,13 @@ import {
   formatarQualidade,
   formatarSilver,
 } from '@/lib/formatters'
+import { MODE_LABELS } from '@/lib/craft-labels'
 import { useLocationName } from '@/lib/locations'
 import * as money from '@/lib/money'
 import { applyProjection } from '@/lib/ranking-projection'
 import { usePageVisible } from '@/lib/usePageVisible'
 import { useLocations } from '@/prices/hooks'
 
-import { MODE_LABELS } from './labels'
 import { useProductionOpportunities } from './hooks'
 import type { Opportunity, ProductionKind } from './service'
 import { useOpportunityParams } from './useOpportunityParams'
