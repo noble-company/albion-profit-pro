@@ -106,7 +106,7 @@ ETAPA 4 — fechamento
 - [x] 15 — Motor agregado de oportunidades
 - [x] 16 — Dashboard Market Flip
 - [x] 17 — Rankings Refino + Craft
-- [ ] 18 — Resiliência e E2E — **absorvida** pela [Fase 3.5, task 27](../refatoracao/27-e2e-playwright.md)
+- [x] 18 — Resiliência e E2E — **entregue** pela [Fase 3.5, task 27](../refatoracao/27-e2e-playwright.md) (suíte Playwright contra a stack real)
 - [ ] 19 — Build e validação final — **executada depois da Fase 3.5**, como gate conjunto
 
 > ⚠️ **Fase 3 pausada em 2026-08-30.** A auditoria em

@@ -131,7 +131,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 24 — Demais telas
 - [x] 25 — Acessibilidade e code splitting
 - [x] 26 — Testes proporcionais
-- [ ] 27 — E2E Playwright
+- [x] 27 — E2E Playwright
 - [ ] 28 — Retomada dos snapshots (20.4-20.11)
 - [ ] 29 — Fechamento documental
 

@@ -1,0 +1,82 @@
+name: Frontend E2E
+
+# E2E de verdade (task 3.5/27, A03): API + PostgreSQL + Redis + RabbitMQ reais, sem MSW.
+# Subir a stack custa minutos — não roda em todo push. Dispara sob demanda e no fechamento
+# de fase (tag `fase-*`). O procedimento reproduzível está em frontend/e2e/README.md.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "fase-*"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+asyncpg://profitpro:profitpro@localhost:5433/profitpro
+      REDIS_URL: redis://localhost:6380/0
+      RABBITMQ_URL: amqp://guest:guest@localhost:5672//
+      JWT_SECRET: ci-secret-not-for-production-32-characters
+      ENVIRONMENT: development
+      CORS_ORIGINS: '["http://127.0.0.1:4173","http://localhost:4173"]'
+      VITE_API_BASE_URL: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v9
+        with:
+          version: "0.11.10"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install Python 3.13
+        run: uv python install 3.13
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Bring up the real stack
+        working-directory: backend
+        run: docker compose up -d --wait
+
+      - name: Schema, static catalog and deterministic market
+        working-directory: backend
+        run: |
+          uv run alembic upgrade head
+          uv run python -m scripts.seed_static_data
+          uv run python -m scripts.seed_e2e_market --realm west --reset
+          uv run python -m scripts.seed_e2e_market --rebuild-ranking --realm west
+          docker compose exec -T redis redis-cli FLUSHALL
+
+      - name: Start the API
+        working-directory: backend
+        run: |
+          uv run uvicorn src.main:app --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8000/health
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
