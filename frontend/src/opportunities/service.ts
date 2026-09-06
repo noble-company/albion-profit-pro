@@ -105,6 +105,9 @@ export async function getProductionOpportunities(
   query: OpportunityQuery,
   signal: AbortSignal,
 ) {
+  // premium / return_rate / station_cost / use_focus NÃO vão ao servidor: são a camada
+  // "e se" do cliente (task 23), aplicada em `applyProjection` sobre a página carregada. O
+  // servidor devolve os componentes neutros e a projeção default; o cliente recalcula.
   const params = {
     server,
     location_id: query.locations?.length ? query.locations : undefined,
@@ -117,10 +120,6 @@ export async function getProductionOpportunities(
     offset: query.offset,
     min_profit: query.profitOnly ? query.minProfit || '0' : query.minProfit,
     min_roi: query.minRoi,
-    return_rate: query.returnRate || '0',
-    station_cost_per_execution: query.stationCostPerExecution || '0',
-    use_focus: query.useFocus ?? false,
-    premium: query.premium ?? true,
     sort: query.sort,
     direction: query.direction,
   }

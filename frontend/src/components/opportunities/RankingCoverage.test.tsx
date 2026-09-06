@@ -19,9 +19,7 @@ test('mostra a razão de cobertura e o aviso de estimativa (W6)', () => {
     screen.getByText(/4\.100 receitas com preço · 5\.600 avaliadas de 5\.623/),
   ).toBeInTheDocument()
   expect(screen.getByText(/Ranking recalculado/)).toBeInTheDocument()
-  expect(
-    screen.getByText(/Valores da lista são estimativa/),
-  ).toBeInTheDocument()
+  expect(screen.getByText(/projeção sobre o ranking/)).toBeInTheDocument()
 })
 
 test('ranking desatualizado usa o tom de atenção e o rótulo', () => {

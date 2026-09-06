@@ -57,7 +57,7 @@ test('Market Flip envia filtros e paginação na URL compartilhável', async () 
   expect(requested).toContain('direction=asc')
 })
 
-test('ranking de produção envia retorno, estação, foco e Premium ao backend', async () => {
+test('ranking de produção envia filtros de universo, mas NÃO os controles "e se" (task 23)', async () => {
   let requested = ''
   server.use(
     http.get('http://localhost:8000/opportunities/refining', ({ request }) => {
@@ -104,8 +104,9 @@ test('ranking de produção envia retorno, estação, foco e Premium ao backend'
   expect(requested).toContain('require_complete=true')
   expect(requested).toContain('min_profit=500')
   expect(requested).toContain('min_roi=12.5')
-  expect(requested).toContain('return_rate=0.365')
-  expect(requested).toContain('station_cost_per_execution=450')
-  expect(requested).toContain('use_focus=true')
-  expect(requested).toContain('premium=false')
+  // premium/retorno/estação/foco são projeção no cliente (task 23) — não vão ao servidor.
+  expect(requested).not.toContain('return_rate')
+  expect(requested).not.toContain('station_cost_per_execution')
+  expect(requested).not.toContain('use_focus')
+  expect(requested).not.toContain('premium')
 })

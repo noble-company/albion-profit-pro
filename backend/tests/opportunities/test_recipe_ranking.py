@@ -239,6 +239,43 @@ async def test_materialized_row_matches_simulate_craft_in_neutral_params(client,
     assert Decimal(str(row.output_gross_immediate)) == ii["revenue"]["gross_revenue"]
 
 
+async def test_ranking_row_carries_neutral_components_for_the_client(client, db_session):
+    """Task 3.5/23: a resposta traz os componentes neutros para a camada 'e se' do cliente
+    recalcular premium/imposto/retorno/estação/foco sem round-trip."""
+    _, token = await registrar_e_logar(client)
+    await _city(db_session)
+    prefix = uuid.uuid4().hex[:6]
+    output = f"COMP_{prefix}"
+    ingredient = f"COMPI_{prefix}"
+    await _seed_recipe(db_session, output, ingredient)
+    await db_session.commit()
+
+    await rebuild_ranking(db_session, "west")
+    row = await db_session.scalar(
+        select(RecipeRanking).where(RecipeRanking.output_item_unique_name == output)
+    )
+    assert row is not None
+
+    await _flush_cache()
+    body = (
+        await client.get(
+            "/opportunities/refining",
+            params={"server": "west", "limit": 50},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    ).json()
+    match = next(o for o in body["opportunities"] if o["item"] == output)
+    components = match["components"]
+    assert components is not None
+    assert components["recipe_silver_cost"] == row.recipe_silver_cost
+    assert components["executions"] == row.executions
+    assert components["produced_quantity"] == row.produced_quantity
+    assert Decimal(components["ingredient_cost_immediate"]) == Decimal(
+        str(row.ingredient_cost_immediate)
+    )
+    assert Decimal(components["output_gross_immediate"]) == Decimal(str(row.output_gross_immediate))
+
+
 async def test_rebuild_is_idempotent(db_session):
     await _city(db_session)
     prefix = uuid.uuid4().hex[:6]

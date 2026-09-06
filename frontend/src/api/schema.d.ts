@@ -1320,6 +1320,7 @@ export interface components {
       oldest_observed_at?: string | null
       /** Warnings */
       warnings?: string[]
+      components?: components['schemas']['RankingComponentsOut'] | null
     }
     /** OpportunityPage */
     OpportunityPage: {
@@ -1354,6 +1355,39 @@ export interface components {
       subtotal: string
       /** Observed At */
       observed_at?: string | null
+    }
+    /**
+     * RankingComponentsOut
+     * @description Componentes neutros de uma linha do ranking materializado (task 3.5/23).
+     *
+     *     Premium, imposto, taxa de retorno, custo de estação e foco são transformações baratas
+     *     sobre estes números — o cliente as aplica na hora (`src/lib/ranking-projection.ts`), sem
+     *     round-trip. O que o servidor faz é a varredura (avaliar milhares de receitas contra o
+     *     livro); o que ele não precisa fazer é multiplicar por 0,96 a cada tecla.
+     */
+    RankingComponentsOut: {
+      /** Recipe Silver Cost */
+      recipe_silver_cost: number
+      /** Crafting Focus */
+      crafting_focus: number
+      /** Executions */
+      executions: number
+      /** Produced Quantity */
+      produced_quantity: number
+      /** Ingredient Cost Immediate */
+      ingredient_cost_immediate?: string | null
+      /** Ingredient Cost Order */
+      ingredient_cost_order?: string | null
+      /** Output Gross Immediate */
+      output_gross_immediate?: string | null
+      /** Output Gross Order */
+      output_gross_order?: string | null
+      /** Ingredients Oldest Observed At */
+      ingredients_oldest_observed_at?: string | null
+      /** Output Immediate Observed At */
+      output_immediate_observed_at?: string | null
+      /** Output Order Observed At */
+      output_order_observed_at?: string | null
     }
     /**
      * RankingCoverage

@@ -42,8 +42,8 @@ export function RankingCoverage({ coverage }: { coverage: Coverage }) {
         </span>
         <span className="inline-flex items-center gap-1 text-foreground-subtle">
           <Info className="size-3.5" aria-hidden="true" />
-          Valores da lista são estimativa — abra "Analisar" para o cálculo
-          exato.
+          Os valores acompanham os controles abaixo, mas são projeção sobre o
+          ranking — o número exato, com profundidade de livro, é o "Analisar".
         </span>
       </p>
     </div>

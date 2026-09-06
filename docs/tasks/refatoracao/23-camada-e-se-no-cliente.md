@@ -73,3 +73,89 @@ dourados, isto vira uma segunda implementação do dinheiro divergindo em silên
 Mover o controle de taxa de retorno de 0 a 50% e confirmar que a tabela responde sem
 carregamento perceptível. Depois abrir o detalhe de uma linha e conferir que o número exato do
 servidor é coerente com a projeção mostrada.
+
+## Estado da implementação
+
+**Concluída.** Backend: `uv run pytest tests/ -q` → **346 passed** (+4) · `uv run ruff check .`
+limpo. Frontend: `npm run typecheck` limpo · `npm run lint` 0 erros (4 warnings pré-existentes)
+· `npm run test` **154/154 em 33 arquivos** (+4) · `npm run build` passa.
+
+### Backend
+
+- **`RankingComponentsOut`** (novo em `opportunities/schemas.py`), aninhado como
+  `OpportunityOut.components` (nullable, só nas linhas de ranking). Traz os 11 componentes
+  neutros da `RecipeRanking`: `recipe_silver_cost`, `crafting_focus`, `executions`,
+  `produced_quantity`, `ingredient_cost_{immediate,order}`, `output_gross_{immediate,order}` e
+  os 3 `*_observed_at`.
+- `read_recipe_ranking` popula `components` (`_row_components`). O `_project_row` **continua**
+  rodando com os defaults (premium on, retorno 0) — os campos financeiros do payload são a
+  projeção default, para o first paint e para consumidores sem JS. `neutral_profit`/`neutral_roi`
+  (filtro `min_profit`/`min_roi` + `sort` no servidor) não mudam com o "e se", então o
+  endpoint **não** precisou de mudança de contrato — só do campo novo.
+- `frontend/src/api/schema.d.ts` regerado (diff de 34 linhas, só o schema novo).
+
+### Frontend
+
+- **`src/lib/ranking-projection.ts`** — porte de `_project_row` sobre `craft-formulas.ts` +
+  `decimal.js`. `projectRankingRow(components, params)` devolve o melhor cenário;
+  `applyProjection(row, params)` devolve uma cópia da linha com os campos recalculados
+  (linha sem `components` volta intacta).
+- `production-pages.tsx`: `premium`/`returnRate`/`stationCostPerExecution`/`useFocus` saem da
+  query do servidor (`serverQuery` = `query` sem esses 4) → **não entram na chave do TanStack**,
+  então mexer neles **não dispara refetch**. Um `useMemo` roda `applyProjection` sobre a
+  página carregada; a tabela e os KPIs usam as linhas projetadas.
+- `service.ts` `getProductionOpportunities`: os 4 params saíram da requisição.
+- `RankingCoverage`: o aviso vira "Os valores acompanham os controles abaixo, mas são projeção
+  sobre o ranking — o número exato, com profundidade de livro, é o 'Analisar'" (item 6).
+
+### Vetores dourados (paridade cliente/servidor)
+
+- `backend/scripts/generate_projection_vectors.py` → `backend/tests/fixtures/golden/projection-vectors.json`
+  (8 casos: premium on/off, retorno 0/15/25/50%, estação, foco, um lado ausente, base gigante).
+- `tests/opportunities/test_projection_vectors.py` (Python): freshness + `_project_row` bate
+  com os `expected` congelados.
+- `frontend/src/lib/ranking-projection.golden.test.ts` (TS): `projectRankingRow` bate **string
+  a string** com o mesmo arquivo. As duas implementações não podem divergir em silêncio.
+
+### Desvios da spec
+
+- **Item 2/4 — `min_profit`/`min_roi` e a ordenação ficaram no servidor**, não no cliente.
+  Motivo: eles operam sobre `neutral_profit`/`neutral_roi` (valores materializados que **não**
+  mudam com premium/retorno/estação), então mantê-los no servidor preserva a paginação honesta
+  do F08 (task 17) sem custo de UX — não têm o problema "dígito a dígito" que a spec descreve
+  para retorno/estação. O que ficou instantâneo é exatamente o que o "Por que" da task cita:
+  premium, retorno, estação, foco, imposto. A tabela **não** reordena no cliente (só recalcula
+  valores), então o guard `no-client-paging-mutation` não precisou de exceção.
+- O endpoint mantém os 4 params "e se" (com defaults) — o frontend só parou de enviá-los. Sem
+  quebra de contrato; a projeção default do servidor continua correta para o first paint.
+
+### Testes automatizados — os 5 bullets
+
+1. *Mexer em premium/retorno/estação não dispara request* → `production-pages.test.tsx`
+   (contador de requests do MSW: igual antes e depois de togglar "Conta Premium" / digitar
+   50% de retorno).
+2. *Resultado local == `_project_row`* → vetores dourados (Python + TS sobre o mesmo arquivo).
+3. *Onde profundidade altera o preço, a UI sinaliza projeção* → o aviso do `RankingCoverage`
+   está sempre visível na tela de ranking; `price_model="neutral_ranking"` no payload.
+4. *Vetores da task 18 continuam verdes* → `craft-formulas.golden.test.ts` intacto.
+5. *Filtro de universo continua no servidor* → `opportunities.test.ts` ("envia filtros de
+   universo, mas NÃO os controles 'e se'").
+
+### Testes manuais que já rodei
+
+`npm run dev` compila sem erro; shell monta sem erro no console. A caminhada real precisa de
+backend + login + ranking materializado.
+
+### Pendente pra você testar
+
+Com backend + worker `maintenance` + login, em `/refino` ou `/craft`:
+
+1. **Instantâneo**: arrastar "Retorno de recurso" de 0 a 50% — a coluna Lucro/ROI/Custo muda a
+   cada tecla, **sem** spinner nem piscar. Idem "Conta Premium", "Usar foco", "Estação".
+2. **Coerência com o exato**: numa linha, anotar o Lucro projetado, abrir "Analisar" com os
+   mesmos parâmetros — o número do `/craft/simulate` tem que ser coerente (igual quando a
+   profundidade de livro não move o preço unitário; um pouco menor quando move).
+3. **Universo continua no servidor**: mudar cidade/tier/frescor/lucro-mínimo/ordenação **dá**
+   um carregamento (é o servidor refazendo a varredura) — isso é esperado.
+4. Aba de rede do navegador: togglar premium/retorno/estação → **nenhuma** requisição a
+   `/opportunities/*`.

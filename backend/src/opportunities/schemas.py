@@ -14,6 +14,29 @@ class OpportunityIngredientOut(BaseModel):
     purchase_quantity: int
 
 
+class RankingComponentsOut(BaseModel):
+    """Componentes neutros de uma linha do ranking materializado (task 3.5/23).
+
+    Premium, imposto, taxa de retorno, custo de estação e foco são transformações baratas
+    sobre estes números — o cliente as aplica na hora (`src/lib/ranking-projection.ts`), sem
+    round-trip. O que o servidor faz é a varredura (avaliar milhares de receitas contra o
+    livro); o que ele não precisa fazer é multiplicar por 0,96 a cada tecla.
+    """
+
+    recipe_silver_cost: int
+    crafting_focus: int
+    executions: int
+    produced_quantity: int
+    # None quando não há oferta/procura o suficiente naquele lado.
+    ingredient_cost_immediate: Decimal | None = None
+    ingredient_cost_order: Decimal | None = None
+    output_gross_immediate: Decimal | None = None
+    output_gross_order: Decimal | None = None
+    ingredients_oldest_observed_at: str | None = None
+    output_immediate_observed_at: str | None = None
+    output_order_observed_at: str | None = None
+
+
 class OpportunityOut(BaseModel):
     kind: Literal["flip", "refining", "crafting"]
     item: str
@@ -50,6 +73,10 @@ class OpportunityOut(BaseModel):
     focus_consumed: int | None = None
     oldest_observed_at: str | None = None
     warnings: list[str] = Field(default_factory=list)
+    # Só nas linhas de ranking (refino/craft). O flip não tem "e se" no cliente. Os campos
+    # financeiros acima trazem a projeção default do servidor (premium on, retorno 0); a UI
+    # os recalcula a partir daqui quando o usuário mexe nos controles.
+    components: RankingComponentsOut | None = None
 
 
 class RankingCoverage(BaseModel):

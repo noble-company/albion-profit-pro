@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { renderWithProviders } from '@/test/render'
@@ -256,9 +256,7 @@ test('receita fora das 200 primeiras em ordem alfabética aparece no ranking (B0
   expect(
     screen.getByText(/4\.100 receitas com preço · 5\.600 avaliadas de 5\.623/),
   ).toBeInTheDocument()
-  expect(
-    screen.getByText(/Valores da lista são estimativa/),
-  ).toBeInTheDocument()
+  expect(screen.getByText(/projeção sobre o ranking/)).toBeInTheDocument()
 })
 
 test('"Analisar" envia a qualidade do filtro ativo, não um valor fixo (item 5)', async () => {
@@ -315,4 +313,102 @@ test('trocar de Refino para Craft preserva os filtros da URL (item 6)', async ()
 
   const craftTab = screen.getByRole('tab', { name: 'Craft' })
   expect(craftTab.getAttribute('href')).toContain('tier=6')
+})
+
+// --- Camada "e se" no cliente (task 23) ---
+
+// components: ingredientes 6000 imediato (sem ordem), venda bruta 10000 imediato, receita
+// 12×4, 4 produzidos. Projeção premium/retorno-0: imposto 400 → lucro 3552. Premium off:
+// imposto 800 → lucro 3152. Retorno 50%: ingrediente cai pra 3000 → lucro 6552.
+const rankingRow = {
+  kind: 'refining',
+  item: 'T4_METALBAR',
+  item_name: 'Barra',
+  quality_level: 1,
+  buy_location: '1002',
+  sell_location: '1002',
+  quantity: 4,
+  price_model: 'neutral_ranking',
+  total_cost: '6048',
+  gross_revenue: '10000',
+  profit: '3552',
+  roi: '58.7301',
+  acquisition_mode: 'immediate',
+  sale_mode: 'immediate',
+  station_cost: '0',
+  ingredients: [],
+  warnings: [],
+  components: {
+    recipe_silver_cost: 12,
+    crafting_focus: 180,
+    executions: 4,
+    produced_quantity: 4,
+    ingredient_cost_immediate: '6000',
+    ingredient_cost_order: null,
+    output_gross_immediate: '10000',
+    output_gross_order: null,
+    ingredients_oldest_observed_at: '2026-09-01T09:30:00+00:00',
+    output_immediate_observed_at: '2026-09-01T12:00:00+00:00',
+    output_order_observed_at: null,
+  },
+}
+
+function mockRanking() {
+  let requests = 0
+  server.use(
+    http.get('http://localhost:8000/locations', () => HttpResponse.json([])),
+    http.get('http://localhost:8000/opportunities/refining', () => {
+      requests += 1
+      return HttpResponse.json({
+        server: 'west',
+        kind: 'refining',
+        opportunities: [rankingRow],
+        total: 1,
+        limit: 25,
+        offset: 0,
+        coverage: {
+          evaluated_recipes: 10,
+          priced_recipes: 8,
+          total_recipes: 12,
+          computed_at: new Date().toISOString(),
+          stale: false,
+        },
+      })
+    }),
+  )
+  return () => requests
+}
+
+test('mexer em Premium recalcula os valores no cliente sem nova requisição (task 23)', async () => {
+  const user = userEvent.setup()
+  const requestCount = mockRanking()
+
+  renderWithProviders(<RefiningRankingPage />)
+  const row = (await screen.findByText('Barra T4')).closest('tr')!
+  expect(within(row).getByText('3.552 silver')).toBeInTheDocument() // lucro projetado (premium)
+  const afterInitial = requestCount()
+
+  await user.click(screen.getByRole('switch', { name: /Conta Premium/ }))
+  // premium off → imposto 8% → lucro 3.152; o número muda na hora, sem request
+  await waitFor(() =>
+    expect(within(row).getByText('3.152 silver')).toBeInTheDocument(),
+  )
+  expect(requestCount()).toBe(afterInitial)
+})
+
+test('mexer no retorno recalcula sem request e a linha não some (só muda de valor)', async () => {
+  const user = userEvent.setup()
+  const requestCount = mockRanking()
+
+  renderWithProviders(<RefiningRankingPage />)
+  const row = (await screen.findByText('Barra T4')).closest('tr')!
+  const afterInitial = requestCount()
+
+  const retorno = screen.getByLabelText('Retorno de recurso (%)')
+  await user.clear(retorno)
+  await user.type(retorno, '50')
+  await waitFor(() =>
+    expect(within(row).getByText('6.552 silver')).toBeInTheDocument(),
+  )
+  expect(requestCount()).toBe(afterInitial)
 })

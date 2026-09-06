@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { TrendingUp } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 
 import { useServer } from '@/app/ServerContext'
@@ -35,6 +35,7 @@ import {
 } from '@/lib/formatters'
 import { useLocationName } from '@/lib/locations'
 import * as money from '@/lib/money'
+import { applyProjection } from '@/lib/ranking-projection'
 import { usePageVisible } from '@/lib/usePageVisible'
 import { useLocations } from '@/prices/hooks'
 
@@ -115,11 +116,32 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
   const { params, query, sortParam, setFilter, setOffset, reset } =
     useOpportunityParams(readProductionExtra)
 
-  const result = useProductionOpportunities(config.kind, realm, query, {
+  // Camada "e se" (task 23): premium/retorno/estação/foco NÃO entram na query do servidor —
+  // ficam de fora da chave do TanStack, então mexer neles não dispara refetch.
+  const {
+    premium,
+    returnRate,
+    stationCostPerExecution,
+    useFocus,
+    ...serverQuery
+  } = query
+  const projectionParams = useMemo(
+    () => ({ premium, returnRate, stationCostPerExecution, useFocus }),
+    [premium, returnRate, stationCostPerExecution, useFocus],
+  )
+
+  const result = useProductionOpportunities(config.kind, realm, serverQuery, {
     pausePolling: selected != null,
   })
-  // O servidor ordena e pagina sobre o ranking completo (F08).
-  const rows = result.data?.opportunities ?? []
+  // O servidor ordena e pagina sobre o ranking completo (F08); o cliente recalcula os
+  // valores da página quando os controles "e se" mudam — sem requisição.
+  const rows = useMemo(
+    () =>
+      (result.data?.opportunities ?? []).map((row) =>
+        applyProjection(row, projectionParams),
+      ),
+    [result.data?.opportunities, projectionParams],
+  )
   const coverage = result.data?.coverage
 
   if (!realm) {

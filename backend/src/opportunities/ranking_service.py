@@ -24,7 +24,11 @@ from src.craft.service import simulate_craft
 from src.items.models import Item, Location
 from src.items.normalization import normalize_item_search
 from src.opportunities.models import RecipeRanking, RecipeRankingRun
-from src.opportunities.schemas import OpportunityOut, RankingCoverage
+from src.opportunities.schemas import (
+    OpportunityOut,
+    RankingComponentsOut,
+    RankingCoverage,
+)
 from src.opportunities.sorting import apply_order
 from src.prices.constants import AlbionServer
 from src.prices.models import MarketOrder
@@ -359,6 +363,27 @@ def _project_row(
     return best
 
 
+def _row_components(row: RecipeRanking) -> RankingComponentsOut:
+    """Empacota os componentes neutros da linha para a camada 'e se' do cliente (task 23)."""
+
+    def _iso(value: datetime | None) -> str | None:
+        return value.isoformat() if value else None
+
+    return RankingComponentsOut(
+        recipe_silver_cost=row.recipe_silver_cost,
+        crafting_focus=row.crafting_focus,
+        executions=row.executions,
+        produced_quantity=row.produced_quantity,
+        ingredient_cost_immediate=row.ingredient_cost_immediate,
+        ingredient_cost_order=row.ingredient_cost_order,
+        output_gross_immediate=row.output_gross_immediate,
+        output_gross_order=row.output_gross_order,
+        ingredients_oldest_observed_at=_iso(row.ingredients_oldest_observed_at),
+        output_immediate_observed_at=_iso(row.output_immediate_observed_at),
+        output_order_observed_at=_iso(row.output_order_observed_at),
+    )
+
+
 async def read_recipe_ranking(
     session: AsyncSession,
     server: str,
@@ -501,6 +526,7 @@ async def read_recipe_ranking(
                 oldest_observed_at=oldest.isoformat() if oldest else None,
                 warnings=list(row.warnings),
                 price_model="neutral_ranking",
+                components=_row_components(row),
             )
         )
 
