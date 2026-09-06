@@ -26,8 +26,8 @@ afterEach(() => {
   document.body.innerHTML = ''
   delete document.documentElement.dataset.theme
   document.documentElement.style.removeProperty('color-scheme')
-  // test/render.tsx reutiliza o queryClient de produção (mesmo singleton); sem isto, cache
-  // de um teste (ex.: /locations) vaza pro próximo teste do mesmo arquivo (task 3.5/15).
+  // test/render.tsx cria um QueryClient por render (task 3.5/26); este clear cobre os poucos
+  // testes que ainda usam o singleton de produção direto (ex.: DetailDrawer.test.tsx).
   queryClient.clear()
   // O token de sessão vive no sessionStorage (fonte de verdade única, task 3.5/16); limpar
   // aqui garante que nenhuma sessão de um teste sobreviva pro próximo.

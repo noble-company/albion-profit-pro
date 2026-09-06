@@ -9,16 +9,26 @@ export const queryPolicies = {
   craft: { staleTime: 0, refetchOnWindowFocus: false },
 } as const
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: (failureCount, error) =>
-        failureCount < 2 && isRetryableApiError(error),
-      staleTime: 0,
-      refetchOnWindowFocus: false,
+/**
+ * Constrói um `QueryClient` com as políticas de produção (retry só em erro retryável,
+ * mutações sem retry). A aplicação usa o singleton `queryClient` abaixo; os testes de
+ * componente (`src/test/render.tsx`) criam um por render para isolar o cache entre casos
+ * sem abrir mão das políticas reais (task 3.5/26, item 2).
+ */
+export function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: (failureCount, error) =>
+          failureCount < 2 && isRetryableApiError(error),
+        staleTime: 0,
+        refetchOnWindowFocus: false,
+      },
+      mutations: {
+        retry: false,
+      },
     },
-    mutations: {
-      retry: false,
-    },
-  },
-})
+  })
+}
+
+export const queryClient = createQueryClient()

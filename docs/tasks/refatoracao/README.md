@@ -130,7 +130,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 23 — Camada "e se" no cliente
 - [x] 24 — Demais telas
 - [x] 25 — Acessibilidade e code splitting
-- [ ] 26 — Testes proporcionais
+- [x] 26 — Testes proporcionais
 - [ ] 27 — E2E Playwright
 - [ ] 28 — Retomada dos snapshots (20.4-20.11)
 - [ ] 29 — Fechamento documental

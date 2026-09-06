@@ -93,4 +93,17 @@ describe('formatação', () => {
     expect(formatQuantity(null)).toBe('—')
     expect(formatQuantity('')).toBe('—')
   })
+
+  // task 3.5/26: os três formatadores de exibição têm de degradar pra "—" com lixo do
+  // servidor (string não-numérica) ou não-finito — nunca lançar dentro de uma célula.
+  test('formatadores degradam pra "—" com entrada inválida ou não-finita', () => {
+    for (const bad of ['abc', 'NaN', 'R$ 10', '1,5']) {
+      expect(formatSilver(bad)).toBe('—')
+      expect(formatQuantity(bad)).toBe('—')
+      expect(formatPercent(bad)).toBe('—')
+    }
+    expect(formatSilver('Infinity')).toBe('—')
+    expect(formatQuantity('Infinity')).toBe('—')
+    expect(formatPercent('-Infinity')).toBe('—')
+  })
 })
