@@ -4,34 +4,50 @@ import { Navigate, Route, Routes } from 'react-router'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { LoginPage, RegisterPage } from '@/auth/pages'
 import { AppShell } from '@/components/AppShell'
-import { TokensPage } from '@/tokens/pages'
-import { BuscaItem } from '@/items/pages'
-import { ItemPricesPage } from '@/prices/pages'
-import { CalculadoraPage } from '@/craft/pages'
-import { MarketFlipPage } from '@/opportunities/pages'
-import {
-  CraftingRankingPage,
-  RefiningRankingPage,
-} from '@/opportunities/production-pages'
+import { Carregando } from '@/components/ui/states'
 
-const LazyHome = lazy(() => Promise.resolve({ default: MarketFlipPage }))
-const LazyItems = lazy(() => Promise.resolve({ default: BuscaItem }))
-const LazyItem = lazy(() => Promise.resolve({ default: ItemPricesPage }))
-const LazyCalculator = lazy(() => Promise.resolve({ default: CalculadoraPage }))
-// Rota temporária da task 3.5/11 — demo dos primitivos shadcn/ui. Lazy pra não pesar o bundle
-// principal com um arquivo que importa todos os componentes de uma vez.
-const LazyUiPreview = lazy(() =>
+// Code splitting de verdade (task 3.5/25, F11): cada rota de tela vira um chunk próprio,
+// carregado sob demanda. `/refino` e `/craft` compartilham o chunk de `production-pages`.
+const MarketFlipPage = lazy(() =>
+  import('@/opportunities/pages').then((m) => ({ default: m.MarketFlipPage })),
+)
+const BuscaItem = lazy(() =>
+  import('@/items/pages').then((m) => ({ default: m.BuscaItem })),
+)
+const ItemPricesPage = lazy(() =>
+  import('@/prices/pages').then((m) => ({ default: m.ItemPricesPage })),
+)
+const CalculadoraPage = lazy(() =>
+  import('@/craft/pages').then((m) => ({ default: m.CalculadoraPage })),
+)
+const RefiningRankingPage = lazy(() =>
+  import('@/opportunities/production-pages').then((m) => ({
+    default: m.RefiningRankingPage,
+  })),
+)
+const CraftingRankingPage = lazy(() =>
+  import('@/opportunities/production-pages').then((m) => ({
+    default: m.CraftingRankingPage,
+  })),
+)
+const TokensPage = lazy(() =>
+  import('@/tokens/pages').then((m) => ({ default: m.TokensPage })),
+)
+// Rotas de desenvolvimento (tasks 3.5/11 e 3.5/14).
+const UiPreview = lazy(() =>
   import('@/components/ui/Preview').then((m) => ({ default: m.UiPreview })),
 )
-// Rota de desenvolvimento da task 3.5/14 — referência viva de docs/13-linguagem-visual.md.
-const LazyLinguagemVisual = lazy(() =>
+const LinguagemVisualPage = lazy(() =>
   import('@/design/LinguagemVisualPage').then((m) => ({
     default: m.LinguagemVisualPage,
   })),
 )
+
 function Boundary({ children }: { children: ReactNode }) {
   return (
-    <Suspense fallback={<p role="status">Carregando…</p>}>{children}</Suspense>
+    <Suspense fallback={<Carregando label="Carregando a tela…" />}>
+      {children}
+    </Suspense>
   )
 }
 
@@ -47,7 +63,7 @@ export function App() {
             path="/"
             element={
               <Boundary>
-                <LazyHome />
+                <MarketFlipPage />
               </Boundary>
             }
           />
@@ -55,7 +71,7 @@ export function App() {
             path="/item"
             element={
               <Boundary>
-                <LazyItems />
+                <BuscaItem />
               </Boundary>
             }
           />
@@ -63,7 +79,7 @@ export function App() {
             path="/item/:uniqueName"
             element={
               <Boundary>
-                <LazyItem />
+                <ItemPricesPage />
               </Boundary>
             }
           />
@@ -71,18 +87,39 @@ export function App() {
             path="/calculadora"
             element={
               <Boundary>
-                <LazyCalculator />
+                <CalculadoraPage />
               </Boundary>
             }
           />
-          <Route path="/refino" element={<RefiningRankingPage />} />
-          <Route path="/craft" element={<CraftingRankingPage />} />
-          <Route path="/tokens" element={<TokensPage />} />
+          <Route
+            path="/refino"
+            element={
+              <Boundary>
+                <RefiningRankingPage />
+              </Boundary>
+            }
+          />
+          <Route
+            path="/craft"
+            element={
+              <Boundary>
+                <CraftingRankingPage />
+              </Boundary>
+            }
+          />
+          <Route
+            path="/tokens"
+            element={
+              <Boundary>
+                <TokensPage />
+              </Boundary>
+            }
+          />
           <Route
             path="/ui"
             element={
               <Boundary>
-                <LazyUiPreview />
+                <UiPreview />
               </Boundary>
             }
           />
@@ -90,7 +127,7 @@ export function App() {
             path="/estilo"
             element={
               <Boundary>
-                <LazyLinguagemVisual />
+                <LinguagemVisualPage />
               </Boundary>
             }
           />

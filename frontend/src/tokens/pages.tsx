@@ -2,6 +2,14 @@ import { useState } from 'react'
 
 import { ApiError } from '@/api'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { useToast } from '@/components/ui/ToastProvider'
 
@@ -59,32 +67,39 @@ function CreatedModal({
     }
   }
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="token-created"
-      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        // Só deixa fechar depois de copiar — o segredo não volta a aparecer.
+        if (!next && copied) onClose()
+      }}
     >
-      <div className="w-full max-w-xl rounded-2xl border border-primary/40 bg-surface p-6">
-        <h2 id="token-created" className="text-xl font-bold">
-          Token criado — copie agora
-        </h2>
-        <p className="mt-2 text-sm text-primary">
-          Este segredo não será mostrado novamente.
-        </p>
-        <code className="mt-4 block break-all rounded bg-background p-4 text-sm">
+      <DialogContent
+        className="max-w-xl border-primary/40"
+        onEscapeKeyDown={(event) => {
+          if (!copied) event.preventDefault()
+        }}
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>Token criado — copie agora</DialogTitle>
+          <DialogDescription className="text-primary">
+            Este segredo não será mostrado novamente.
+          </DialogDescription>
+        </DialogHeader>
+        <code className="block break-all rounded bg-background p-4 text-sm">
           {token.token}
         </code>
-        <div className="mt-5 flex flex-wrap justify-end gap-3">
+        <DialogFooter>
           <Button variant="outline" onClick={() => void copy()}>
             {copied ? 'Copiado' : 'Copiar segredo'}
           </Button>
           <Button disabled={!copied} onClick={onClose}>
             Copiei e fechar
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 export function TokensPage() {

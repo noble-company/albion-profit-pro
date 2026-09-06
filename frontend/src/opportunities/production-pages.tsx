@@ -506,15 +506,16 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
         onOffsetChange={setOffset}
       />
 
-      {selected && (
-        <DetailDrawer
-          row={selected}
-          result={detailMutation.data ?? null}
-          loading={detailMutation.isPending}
-          error={detailMutation.error}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      <DetailDrawer
+        row={selected}
+        result={detailMutation.data ?? null}
+        loading={detailMutation.isPending}
+        error={detailMutation.error}
+        open={selected != null}
+        onOpenChange={(next) => {
+          if (!next) setSelected(null)
+        }}
+      />
     </section>
   )
 }

@@ -129,7 +129,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 22 — Telas de Refino e Craft
 - [x] 23 — Camada "e se" no cliente
 - [x] 24 — Demais telas
-- [ ] 25 — Acessibilidade e code splitting
+- [x] 25 — Acessibilidade e code splitting
 - [ ] 26 — Testes proporcionais
 - [ ] 27 — E2E Playwright
 - [ ] 28 — Retomada dos snapshots (20.4-20.11)

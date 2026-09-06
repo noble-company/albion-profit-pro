@@ -155,3 +155,17 @@ button,
 a {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Acessibilidade — task 3.5/25 (F10). Quem pediu menos movimento no SO não vê
+   animação contínua (o `animate-ping` do selo de atualização, o `animate-pulse`
+   do skeleton) nem transições longas do Radix. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -163,10 +163,8 @@ test('Refino renderiza entradas, retorno calculado, alertas e abre a análise', 
   expect(screen.getByText('72 silver')).toBeInTheDocument()
 
   await user.click(screen.getByRole('button', { name: 'Analisar' }))
-  const dialog = await screen.findByRole('dialog', {
-    name: 'Análise detalhada',
-  })
-  expect(dialog).toBeInTheDocument()
+  const dialog = await screen.findByRole('dialog', { name: /Tecido T4\.1/ })
+  expect(within(dialog).getByText('Análise detalhada')).toBeInTheDocument()
   expect(
     within(dialog).getByText('Imediato → Pedido de venda'),
   ).toBeInTheDocument()

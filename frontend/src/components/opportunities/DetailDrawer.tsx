@@ -1,6 +1,12 @@
-import { X } from 'lucide-react'
 import { Link } from 'react-router'
 
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Carregando, EstadoErro } from '@/components/ui/states'
 import type { CraftResult } from '@/craft/service'
 import { MODE_LABELS } from '@/lib/craft-labels'
@@ -16,71 +22,61 @@ import type { Opportunity } from '@/opportunities/service'
 import { WarningBadges } from './WarningBadges'
 
 /**
- * Gaveta de análise detalhada de uma linha do ranking de produção (F05, task 3.5/20). A
- * acessibilidade (foco preso, `Esc`, `aria`) é da task 25 — aqui o DOM é o que já existia.
+ * Gaveta de análise detalhada de uma linha do ranking (task 3.5/20, acessível na 3.5/25).
+ * Sobre o `Sheet` do Radix: trap de foco, `Esc`, restauração de foco ao gatilho e scroll lock
+ * vêm do primitivo — nada reimplementado à mão.
  */
 export function DetailDrawer({
   row,
   result,
   loading,
   error,
-  onClose,
+  open,
+  onOpenChange,
 }: {
-  row: Opportunity
+  row: Opportunity | null
   result: CraftResult | null
   loading: boolean
   error: unknown
-  onClose: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }) {
   const locationName = useLocationName()
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-sm"
-      role="presentation"
-      onClick={onClose}
-    >
-      <aside
-        aria-label="Análise detalhada"
-        role="dialog"
-        aria-modal="true"
-        className="h-full w-full max-w-2xl overflow-y-auto border-l border-border-strong bg-gradient-to-b from-surface to-background p-5 shadow-2xl shadow-black sm:p-7"
-        onClick={(event) => event.stopPropagation()}
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-full max-w-2xl gap-0 overflow-y-auto sm:max-w-2xl"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-primary">
-              Análise detalhada
-            </p>
-            <h2 className="mt-2 text-2xl font-bold">
-              {formatarNomeItem(row.item_name, row.item)}
-            </h2>
-            <p className="text-sm text-foreground-muted">
-              {locationName(row.buy_location)} ·{' '}
-              {formatarQualidade(row.quality_level)}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border-strong bg-background text-foreground-muted transition hover:border-border-strong hover:text-foreground"
-            onClick={onClose}
-            aria-label="Fechar análise"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </button>
-        </div>
-        {loading && <Carregando label="Calculando quatro cenários…" />}
-        {Boolean(error) && (
-          <EstadoErro title="Não foi possível calcular os detalhes" />
+        {row && (
+          <>
+            <SheetHeader className="text-left">
+              <p className="text-xs uppercase tracking-widest text-primary">
+                Análise detalhada
+              </p>
+              <SheetTitle className="text-2xl font-bold">
+                {formatarNomeItem(row.item_name, row.item)}
+              </SheetTitle>
+              <SheetDescription>
+                {locationName(row.buy_location)} ·{' '}
+                {formatarQualidade(row.quality_level)}
+              </SheetDescription>
+            </SheetHeader>
+            {loading && <Carregando label="Calculando quatro cenários…" />}
+            {Boolean(error) && (
+              <EstadoErro title="Não foi possível calcular os detalhes" />
+            )}
+            {result && <DetailResult result={result} />}
+            <Link
+              className="mt-6 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary transition hover:bg-primary-hover"
+              to={`/calculadora?item=${encodeURIComponent(row.item)}`}
+            >
+              Abrir na calculadora
+            </Link>
+          </>
         )}
-        {result && <DetailResult result={result} />}
-        <Link
-          className="mt-6 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary transition hover:bg-primary-hover"
-          to={`/calculadora?item=${encodeURIComponent(row.item)}`}
-        >
-          Abrir na calculadora
-        </Link>
-      </aside>
-    </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 
