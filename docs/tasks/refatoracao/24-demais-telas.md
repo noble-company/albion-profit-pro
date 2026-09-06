@@ -60,7 +60,9 @@ alcançável. Conferir as cinco telas em 1366×768 e no celular.
 
 ## Estado da implementação
 
-**Em andamento — quebrada em dois passos** (a pedido do usuário).
+**Concluída — feita em dois passos** (a pedido do usuário). Frontend: `typecheck` limpo ·
+`lint` 0 erros (4 warnings pré-existentes) · `test` **167/167 em 38 arquivos** (+13) ·
+`build` passa.
 
 ### Passo A — `ItemAutocomplete` + Calculadora + Busca ✅
 
@@ -83,16 +85,35 @@ Frontend: `npm run typecheck` limpo · `npm run lint` 0 erros (4 warnings pré-e
 - Guard `src/test/no-inert-onretry.test.ts`: nenhum `onRetry={() => undefined|{}}` nas telas
   do produto (as demos `/estilo` e `/ui` ficam de fora, com comentário).
 
-### Passo B — Preços/Demanda + AppShell + Tokens ⏳
+### Passo B — Preços/Demanda + AppShell + Tokens ✅
 
-Pendente: nome do item no lugar do `unique_name` cru + conserto da paginação em
-`prices/pages.tsx`; tokens de cor nos eixos/tooltip do gráfico `recharts`; `AppShell` no
-layout da task 14 §6 (header sticky de 3 zonas, nav com ícone, `Sheet` no mobile); fundação
-visual da tela de Tokens.
+- **Preços** (`prices/pages.tsx`): `<h1>` mostra o **nome do item** (novo hook `useItem` →
+  `GET /items/{unique_name}`, política `catalog`); o `unique_name` cru vira subtítulo pequeno.
+  Paginação **consertada** — antes `new URLSearchParams([...params, ['offset', X]])` acrescentava
+  uma segunda entrada `offset` e o `params.get('offset')` lia a antiga (mesmo bug do `W12`);
+  agora um `setOffset` que apaga antes de setar. Tabela na densidade da §1 (`h-11`, `px-3`,
+  `tabular-nums`, cabeçalho `bg-surface` opaco). Botões `Anterior`/`Próxima` viram `Button`.
+- **Demanda** (`prices/demand.tsx`): eixos e tooltip do `recharts` passam a usar tokens
+  (`var(--color-border-strong)`, `var(--color-foreground-subtle)`, `var(--color-surface)`); a
+  linha já era `var(--color-primary)`.
+- **`AppShell`** reconstruído no layout da task 14 §6: header `sticky top-0` com três zonas —
+  **marca** · **navegação** (ícone lucide + rótulo por tela, `NavLink` com estado ativo) ·
+  **controles** (servidor/tema como `Select` do shadcn, `aria-label`, sempre visíveis à
+  direita). Mobile: a navegação colapsa num `Sheet` lateral; servidor/tema ficam na barra.
+  `type Theme` exportado de `ThemeContext`.
+- **Tokens** (`tokens/pages.tsx`): ações (`Gerar token`, `Revogar`, `Copiar segredo`,
+  `Copiei e fechar`) passam pro `Button` do shadcn. O `CreatedModal` — token uma vez, aviso
+  "não será mostrado novamente", "Copiei e fechar" travado até copiar — já estava certo; o
+  `Dialog` acessível de verdade é da task 25.
+- `renderWithProviders` ganhou `initialEntries` (pra testar telas com `useParams`).
 
-### Pendente pra você testar (Passo A)
+### Pendente pra você testar
 
-- Calculadora: digitar "algodão" → escolher pela seta + `Enter` → o formulário preenche e
-  simula; recarregar a tela mantém qualidade/premium/foco da última simulação.
-- Busca: navegar a lista só com teclado; filtro de categoria é um `select` traduzido.
-- O botão "Tentar novamente" da Calculadora refaz a chamada (não fica inerte).
+- **Calculadora**: digitar "algodão" → escolher pela seta + `Enter` → o form preenche e simula;
+  recarregar mantém qualidade/premium/foco; "Tentar novamente" refaz a chamada.
+- **Busca**: navegar a lista só com teclado; categoria é `select` traduzido.
+- **Preços**: o título é o nome do item; "Próxima"/"Anterior" avançam de página de verdade;
+  mudar a qualidade muda o `total`.
+- **AppShell**: navegar só com teclado por todas as telas; no celular o menu abre no `Sheet` e
+  servidor/tema continuam visíveis na barra; o header fica fixo ao rolar.
+- **Gráfico de demanda**: eixos/tooltip seguem o tema (claro e escuro).

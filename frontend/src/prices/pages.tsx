@@ -1,10 +1,22 @@
 import { useParams, useSearchParams } from 'react-router'
+
 import { useServer } from '@/app/ServerContext'
+import { Button } from '@/components/ui/button'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
-import { formatarIdade, formatarSilver } from '@/lib/formatters'
+import {
+  formatarIdade,
+  formatarNomeItem,
+  formatarSilver,
+} from '@/lib/formatters'
 import { useLocationName } from '@/lib/locations'
-import { useItemPrices, useLocations } from './hooks'
+
 import { DemandaItem } from './demand'
+import { useItem, useItemPrices, useLocations } from './hooks'
+
+const filterField =
+  'flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-foreground-subtle'
+const filterControl =
+  'min-h-11 rounded-lg border border-border-strong bg-background px-3 py-2 text-sm font-medium normal-case tracking-normal text-foreground'
 
 export function ItemPricesPage() {
   const { uniqueName = '' } = useParams()
@@ -30,12 +42,28 @@ export function ItemPricesPage() {
     offset,
     filters,
   )
+  const item = useItem(uniqueName)
   const places = useLocations()
   const locationName = useLocationName()
   // Qualidade e encantamento são filtrados no servidor, ANTES da paginação (F08); `total` e
   // as linhas já vêm do conjunto certo.
   const rows = data.data?.prices ?? []
   const isFiltered = Boolean(selectedQuality || selectedEnchant)
+
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(params)
+    if (value) next.set(key, value)
+    else next.delete(key)
+    next.delete('offset')
+    setParams(next)
+  }
+  const setOffset = (value: number) => {
+    const next = new URLSearchParams(params)
+    if (value > 0) next.set('offset', String(value))
+    else next.delete('offset')
+    setParams(next)
+  }
+
   if (!realm)
     return (
       <EstadoVazio title="Escolha um servidor">
@@ -46,39 +74,40 @@ export function ItemPricesPage() {
     return <Carregando label="Carregando preços…" />
   if (data.error && !data.data)
     return <EstadoErro title="Não foi possível carregar os preços" />
-  const update = (key: string, value: string) => {
-    const next = new URLSearchParams(params)
-    if (value) next.set(key, value)
-    else next.delete(key)
-    next.delete('offset')
-    setParams(next)
-  }
+
   const demandLocation = selectedLocation || undefined
   const demandQuality = selectedQuality ? Number(selectedQuality) : undefined
+
   return (
     <section>
       <p className="text-sm uppercase tracking-widest text-primary">{realm}</p>
-      <h1 className="mt-2 break-all text-3xl font-bold">{uniqueName}</h1>
+      <h1 className="mt-2 text-3xl font-bold">
+        {formatarNomeItem(item?.name_pt ?? item?.name_en, uniqueName)}
+      </h1>
+      <p className="mt-1 break-all text-sm text-foreground-subtle">
+        {uniqueName}
+      </p>
+
       <div className="mt-5 flex flex-wrap gap-3">
-        <label>
+        <label className={filterField}>
           Escopo
           <select
             aria-label="Escopo"
             value={scope}
-            onChange={(e) => update('scope', e.target.value)}
-            className="ml-2 rounded border border-border-strong bg-background px-2 py-1"
+            onChange={(event) => setParam('scope', event.target.value)}
+            className={filterControl}
           >
             <option value="all">Toda plataforma</option>
             <option value="mine">Minha cobertura</option>
           </select>
         </label>
-        <label>
+        <label className={filterField}>
           Cidade
           <select
             aria-label="Cidade"
             value={selectedLocation}
-            onChange={(e) => update('location_id', e.target.value)}
-            className="ml-2 rounded border border-border-strong bg-background px-2 py-1"
+            onChange={(event) => setParam('location_id', event.target.value)}
+            className={filterControl}
           >
             <option value="">Todas</option>
             {places.map((place) => (
@@ -88,85 +117,97 @@ export function ItemPricesPage() {
             ))}
           </select>
         </label>
-        <label>
+        <label className={filterField}>
           Qualidade
           <select
             aria-label="Qualidade"
             value={selectedQuality}
-            onChange={(e) => update('quality', e.target.value)}
-            className="ml-2 rounded border border-border-strong bg-background px-2 py-1"
+            onChange={(event) => setParam('quality', event.target.value)}
+            className={filterControl}
           >
             <option value="">Todas</option>
-            {[1, 2, 3, 4, 5].map((q) => (
-              <option key={q} value={q}>
-                {q}
+            {[1, 2, 3, 4, 5].map((quality) => (
+              <option key={quality} value={quality}>
+                {quality}
               </option>
             ))}
           </select>
         </label>
-        <label>
+        <label className={filterField}>
           Encantamento
           <select
             aria-label="Encantamento"
             value={selectedEnchant}
-            onChange={(e) => update('enchantment', e.target.value)}
-            className="ml-2 rounded border border-border-strong bg-background px-2 py-1"
+            onChange={(event) => setParam('enchantment', event.target.value)}
+            className={filterControl}
           >
             <option value="">Todos</option>
-            {[0, 1, 2, 3, 4].map((e) => (
-              <option key={e} value={e}>
-                .{e}
+            {[0, 1, 2, 3, 4].map((enchant) => (
+              <option key={enchant} value={enchant}>
+                .{enchant}
               </option>
             ))}
           </select>
         </label>
       </div>
+
       {scope === 'mine' && (
         <p className="mt-3 text-sm text-foreground-muted">
           “Minha cobertura” mostra somente combinações coletadas por esta conta;
           livro e histórico têm cobertura independente.
         </p>
       )}
-      <div className="mt-6 overflow-x-auto rounded-xl border border-border">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-surface">
+
+      <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-background">
+        <table className="w-full min-w-[36rem] border-separate border-spacing-0 text-sm">
+          <thead className="bg-surface text-[0.68rem] uppercase tracking-[0.12em] text-foreground-subtle">
             <tr>
-              <th className="p-3">Cidade</th>
-              <th className="p-3">Qual./Enc.</th>
-              <th className="p-3">Venda (ask)</th>
-              <th className="p-3">Compra (bid)</th>
-              <th className="p-3">Vendido 24h</th>
+              <th className="h-11 border-b border-border px-3 text-left">
+                Cidade
+              </th>
+              <th className="h-11 border-b border-border px-3 text-left">
+                Qual./Enc.
+              </th>
+              <th className="h-11 border-b border-border px-3 text-right">
+                Venda (ask)
+              </th>
+              <th className="h-11 border-b border-border px-3 text-right">
+                Compra (bid)
+              </th>
+              <th className="h-11 border-b border-border px-3 text-right">
+                Vendido 24h
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr
                 key={`${row.location_id}-${row.quality_level}-${row.enchantment_level}`}
-                className="border-t border-border"
+                className="transition-colors hover:bg-surface"
               >
-                <td className="p-3">{locationName(row.location_id)}</td>
-                <td className="p-3">
+                <td className="border-b border-border px-3 py-2 font-medium">
+                  {locationName(row.location_id)}
+                </td>
+                <td className="border-b border-border px-3 py-2 tabular-nums">
                   {row.quality_level} / .{row.enchantment_level}
                 </td>
-                <td className="p-3">
+                <td className="border-b border-border px-3 py-2 text-right tabular-nums">
                   {row.sell.best_price
                     ? formatarSilver(row.sell.best_price)
                     : 'Sem cobertura'}
-                  <br />
-                  <span className="text-xs text-foreground-subtle">
+                  <span className="block text-xs text-foreground-subtle">
                     {formatarIdade(row.sell.observed_at)}
                   </span>
                 </td>
-                <td className="p-3">
+                <td className="border-b border-border px-3 py-2 text-right tabular-nums">
                   {row.buy.best_price
                     ? formatarSilver(row.buy.best_price)
                     : 'Sem cobertura'}
-                  <br />
-                  <span className="text-xs text-foreground-subtle">
+                  <span className="block text-xs text-foreground-subtle">
                     {formatarIdade(row.buy.observed_at)}
                   </span>
                 </td>
-                <td className="p-3">
+                <td className="border-b border-border px-3 py-2 text-right tabular-nums">
                   {row.sold_24h ? `${row.sold_24h.units} un.` : 'Sem histórico'}
                 </td>
               </tr>
@@ -182,41 +223,31 @@ export function ItemPricesPage() {
           </div>
         )}
       </div>
-      <div className="mt-4 flex justify-between">
-        <button
+
+      <div className="mt-4 flex items-center justify-between text-sm text-foreground-muted">
+        <Button
+          variant="outline"
+          size="sm"
           disabled={offset === 0}
-          onClick={() =>
-            setParams(
-              new URLSearchParams([
-                ...params,
-                ['offset', String(Math.max(0, offset - limit))],
-              ]),
-            )
-          }
-          className="rounded border border-border-strong px-3 py-2 disabled:opacity-40"
+          onClick={() => setOffset(Math.max(0, offset - limit))}
         >
           Anterior
-        </button>
-        <span className="py-2 text-sm text-foreground-muted">
+        </Button>
+        <span>
           {offset + 1}–{Math.min(offset + limit, data.data?.total ?? 0)} de{' '}
           {data.data?.total ?? 0}
           {isFiltered ? ' filtrados' : ''}
         </span>
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           disabled={!data.data || offset + limit >= data.data.total}
-          onClick={() =>
-            setParams(
-              new URLSearchParams([
-                ...params,
-                ['offset', String(offset + limit)],
-              ]),
-            )
-          }
-          className="rounded border border-border-strong px-3 py-2 disabled:opacity-40"
+          onClick={() => setOffset(offset + limit)}
         >
           Próxima
-        </button>
+        </Button>
       </div>
+
       <DemandaItem
         item={uniqueName}
         server={realm}

@@ -38,6 +38,16 @@ export async function getLocations(signal: AbortSignal) {
   )
   return response.data ?? []
 }
+export type CatalogItem = components['schemas']['ItemCatalogOut']
+export async function getItem(uniqueName: string, signal: AbortSignal) {
+  const response = await safeApiCall(() =>
+    apiClient.GET('/items/{unique_name}', {
+      params: { path: { unique_name: uniqueName } },
+      signal,
+    }),
+  )
+  return response.data ?? null
+}
 export async function getDemand(
   item: string,
   server: components['schemas']['AlbionServer'],

@@ -3,7 +3,18 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { queryPolicies } from '@/api'
 import type { components } from '@/api/schema'
 
-import { getItemPrices, getLocations } from './service'
+import { getItem, getItemPrices, getLocations } from './service'
+
+/** Detalhe do item pelo `unique_name` — só pra mostrar o nome no lugar do identificador cru. */
+export function useItem(uniqueName: string) {
+  const { data } = useQuery({
+    queryKey: ['items', 'detail', uniqueName] as const,
+    queryFn: ({ signal }) => getItem(uniqueName, signal),
+    enabled: uniqueName.length > 0,
+    ...queryPolicies.catalog,
+  })
+  return data ?? null
+}
 
 /**
  * `/locations` é pedido por preços, calculadora e ranking de produção — mesma chave de

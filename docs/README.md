@@ -23,7 +23,7 @@
 | [tasks/client/](tasks/client/README.md) | Microetapas da **Fase 2 (client Go) ✅ completa** — autenticação/destino de ingest, UX de localização e validação com o jogo real. |
 | [tasks/estabilizacao/](tasks/estabilizacao/README.md) | Microetapas da **Fase 2.5 ✅ completa, 14/14** — estabilização transversal concluída. |
 | [tasks/frontend/](tasks/frontend/README.md) | Microetapas da **Fase 3 — 17/19** — entrega o scanner de oportunidades Market Flip, Refino e Craft. A task 18 foi absorvida pela Fase 3.5; a 19 é o gate final, executado depois dela. |
-| [tasks/refatoracao/](tasks/refatoracao/README.md) | Microetapas da **Fase 3.5 ▶ em andamento, 23/29** — refatoração derivada do documento `12`: corrige os motores de oportunidade, instala o design system que nunca foi instalado e move a camada "e se" para o cliente. |
+| [tasks/refatoracao/](tasks/refatoracao/README.md) | Microetapas da **Fase 3.5 ▶ em andamento, 24/29** — refatoração derivada do documento `12`: corrige os motores de oportunidade, instala o design system que nunca foi instalado e move a camada "e se" para o cliente. |
 
 > A extensão transversal [20 — snapshots e preços atuais](tasks/frontend/20-snapshot-precos-atuais.md)
 > adiciona 11 tasks à Fase 3 para garantir que todas as telas usem somente a coleta mais recente.

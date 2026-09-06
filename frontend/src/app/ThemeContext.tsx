@@ -8,7 +8,7 @@ import {
   type PropsWithChildren,
 } from 'react'
 
-type Theme = 'light' | 'dark' | 'system'
+export type Theme = 'light' | 'dark' | 'system'
 type ResolvedTheme = 'light' | 'dark'
 type ThemeContextValue = {
   theme: Theme

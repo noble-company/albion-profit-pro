@@ -139,13 +139,36 @@ export function DemandaItem({
           <div className="mt-3 h-64" aria-label="Gráfico de unidades por hora">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={points}>
-                <XAxis dataKey="hora" />
-                <YAxis />
-                <Tooltip />
+                <XAxis
+                  dataKey="hora"
+                  stroke="var(--color-border-strong)"
+                  tick={{
+                    fill: 'var(--color-foreground-subtle)',
+                    fontSize: 12,
+                  }}
+                />
+                <YAxis
+                  stroke="var(--color-border-strong)"
+                  tick={{
+                    fill: 'var(--color-foreground-subtle)',
+                    fontSize: 12,
+                  }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border-strong)',
+                    borderRadius: 8,
+                    color: 'var(--color-foreground)',
+                  }}
+                  labelStyle={{ color: 'var(--color-foreground-subtle)' }}
+                />
                 <Line
                   type="monotone"
                   dataKey="unidades"
                   stroke="var(--color-primary)"
+                  strokeWidth={2}
+                  dot={false}
                   name="Unidades"
                 />
               </LineChart>

@@ -1,7 +1,10 @@
 import { useState } from 'react'
+
 import { ApiError } from '@/api'
-import { EstadoErro, EstadoVazio, Carregando } from '@/components/ui/states'
+import { Button } from '@/components/ui/button'
+import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { useToast } from '@/components/ui/ToastProvider'
+
 import { useCreateToken, useRevokeToken, useTokens } from './hooks'
 import type { TokenCreated } from './service'
 
@@ -73,19 +76,12 @@ function CreatedModal({
           {token.token}
         </code>
         <div className="mt-5 flex flex-wrap justify-end gap-3">
-          <button
-            className="rounded border border-border-strong px-4 py-2"
-            onClick={() => void copy()}
-          >
+          <Button variant="outline" onClick={() => void copy()}>
             {copied ? 'Copiado' : 'Copiar segredo'}
-          </button>
-          <button
-            className="rounded bg-primary px-4 py-2 font-semibold text-on-primary disabled:opacity-50"
-            disabled={!copied}
-            onClick={onClose}
-          >
+          </Button>
+          <Button disabled={!copied} onClick={onClose}>
             Copiei e fechar
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -137,13 +133,9 @@ export function TokensPage() {
             Gerencie as credenciais usadas pelo coletor AlbionData.
           </p>
         </div>
-        <button
-          className="rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary"
-          onClick={() => void generate()}
-          disabled={create.isPending}
-        >
+        <Button onClick={() => void generate()} disabled={create.isPending}>
           {create.isPending ? 'Gerando…' : 'Gerar token'}
-        </button>
+        </Button>
       </div>
       {active.length === 0 ? (
         <div className="mt-8">
@@ -167,13 +159,15 @@ export function TokensPage() {
                   {date(token.ultimo_uso_em)}
                 </p>
               </div>
-              <button
-                className="rounded border border-danger/50 px-3 py-2 text-sm text-danger"
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-danger/50 text-danger hover:bg-danger/10 hover:text-danger"
                 onClick={() => void revokeOne(token.id)}
                 disabled={revoke.isPending}
               >
                 Revogar
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

@@ -1,100 +1,189 @@
-import { Menu } from 'lucide-react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router'
-import { useAuth } from '@/auth/useAuth'
-import { REALMS, useServer } from '@/app/ServerContext'
-import { useTheme } from '@/app/ThemeContext'
+import {
+  ArrowLeftRight,
+  Calculator,
+  Hammer,
+  KeyRound,
+  Menu,
+  Recycle,
+  Search,
+  type LucideIcon,
+} from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-const labels = { west: 'West', east: 'East', europe: 'Europa' } as const
-export function AppShell() {
-  const { user, logout } = useAuth()
+import { Link, NavLink, Outlet, useNavigate } from 'react-router'
+
+import { REALMS, useServer, type Realm } from '@/app/ServerContext'
+import { useTheme, type Theme } from '@/app/ThemeContext'
+import { useAuth } from '@/auth/useAuth'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
+
+const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
+  { to: '/', label: 'Market Flip', icon: ArrowLeftRight, end: true },
+  { to: '/refino', label: 'Refino', icon: Recycle },
+  { to: '/craft', label: 'Craft', icon: Hammer },
+  { to: '/item', label: 'Itens', icon: Search },
+  { to: '/calculadora', label: 'Calculadora', icon: Calculator },
+  { to: '/tokens', label: 'Tokens', icon: KeyRound },
+]
+
+const REALM_LABEL: Record<Realm, string> = {
+  west: 'West',
+  east: 'East',
+  europe: 'Europa',
+}
+const THEME_LABEL: Record<Theme, string> = {
+  system: 'Sistema',
+  light: 'Claro',
+  dark: 'Escuro',
+}
+
+function NavItems({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <>
+      {NAV.map(({ to, label, icon: Icon, end }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={end}
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              isActive
+                ? 'bg-primary/15 text-primary'
+                : 'text-foreground-muted hover:bg-surface-raised hover:text-foreground'
+            }`
+          }
+        >
+          <Icon className="size-4 shrink-0" aria-hidden="true" />
+          {label}
+        </NavLink>
+      ))}
+    </>
+  )
+}
+
+function ContextControls() {
   const { realm, setRealm } = useServer()
   const { theme, setTheme } = useTheme()
-  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Select
+        value={realm ?? ''}
+        onValueChange={(value) => setRealm(value as Realm)}
+      >
+        <SelectTrigger aria-label="Servidor" className="h-9 w-[7.5rem]">
+          <SelectValue placeholder="Servidor" />
+        </SelectTrigger>
+        <SelectContent>
+          {REALMS.map((option) => (
+            <SelectItem key={option} value={option}>
+              {REALM_LABEL[option]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={theme} onValueChange={(value) => setTheme(value as Theme)}>
+        <SelectTrigger aria-label="Tema" className="h-9 w-[6.5rem]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {(['system', 'light', 'dark'] as const).map((option) => (
+            <SelectItem key={option} value={option}>
+              {THEME_LABEL[option]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </>
+  )
+}
+
+export function AppShell() {
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const signOut = () => {
+    void logout()
+    void navigate('/login')
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <a
         href="#conteudo"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded bg-primary px-3 py-2 text-on-primary"
+        className="sr-only bg-primary px-3 py-2 text-on-primary focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded"
       >
         Pular para o conteúdo
       </a>
-      <header className="border-b border-border bg-surface/95">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <Link to="/" className="font-bold text-primary">
+      <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
+          <Link
+            to="/"
+            className="shrink-0 font-black tracking-tight text-primary"
+          >
             Albion Profit Pro
           </Link>
-          <button
-            aria-label="Abrir menu"
-            className="rounded border border-border-strong px-3 py-1 md:hidden"
-            onClick={() => setOpen(!open)}
-          >
-            <Menu className="size-5" aria-hidden="true" />
-          </button>
           <nav
-            className={`${open ? 'block' : 'hidden'} absolute left-0 right-0 top-14 z-40 border-b border-border-strong bg-surface p-4 md:static md:block md:border-0 md:p-0`}
+            className="hidden items-center gap-1 md:flex"
             aria-label="Navegação principal"
           >
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <NavLink to="/" end className="hover:text-primary">
-                Market Flip
-              </NavLink>
-              <NavLink to="/refino" className="hover:text-primary">
-                Refino
-              </NavLink>
-              <NavLink to="/craft" className="hover:text-primary">
-                Craft
-              </NavLink>
-              <NavLink to="/item" className="hover:text-primary">
-                Itens
-              </NavLink>
-              <NavLink to="/calculadora" className="hover:text-primary">
-                Calculadora
-              </NavLink>
-              <NavLink to="/tokens" className="hover:text-primary">
-                Tokens
-              </NavLink>
-              <label className="flex items-center gap-2 text-sm">
-                Servidor
-                <select
-                  aria-label="Servidor"
-                  value={realm ?? ''}
-                  onChange={(e) =>
-                    setRealm(e.target.value as (typeof REALMS)[number])
-                  }
-                  className="rounded border border-border-strong bg-background px-2 py-1"
-                >
-                  <option value="" disabled>
-                    Selecionar
-                  </option>
-                  {REALMS.map((r) => (
-                    <option key={r} value={r}>
-                      {labels[r]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <select
-                aria-label="Tema"
-                value={theme}
-                onChange={(e) => setTheme(e.target.value as typeof theme)}
-                className="rounded border border-border-strong bg-background px-2 py-1"
-              >
-                <option value="system">Sistema</option>
-                <option value="light">Claro</option>
-                <option value="dark">Escuro</option>
-              </select>
-              <button
-                className="text-left hover:text-primary"
-                onClick={() => {
-                  void logout()
-                  void navigate('/login')
-                }}
-              >
-                {user?.email ?? 'Sair'}
-              </button>
-            </div>
+            <NavItems />
           </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <ContextControls />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden max-w-[12rem] truncate md:inline-flex"
+              onClick={signOut}
+            >
+              {user?.email ?? 'Sair'}
+            </Button>
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="md:hidden"
+                  aria-label="Abrir menu"
+                >
+                  <Menu className="size-5" aria-hidden="true" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72">
+                <SheetHeader>
+                  <SheetTitle>Navegação</SheetTitle>
+                </SheetHeader>
+                <nav className="mt-6 flex flex-col gap-1">
+                  <NavItems onNavigate={() => setMenuOpen(false)} />
+                </nav>
+                <Button
+                  variant="ghost"
+                  className="mt-6 w-full justify-start"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    signOut()
+                  }}
+                >
+                  {user?.email ?? 'Sair'}
+                </Button>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </header>
       <main id="conteudo" className="mx-auto max-w-7xl px-4 py-8">
@@ -103,6 +192,7 @@ export function AppShell() {
     </div>
   )
 }
+
 export function RequireRealm({ children }: { children: ReactNode }) {
   const { realm } = useServer()
   return realm ? (

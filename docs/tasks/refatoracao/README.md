@@ -128,7 +128,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 21 — Tela Market Flip
 - [x] 22 — Telas de Refino e Craft
 - [x] 23 — Camada "e se" no cliente
-- [ ] 24 — Demais telas
+- [x] 24 — Demais telas
 - [ ] 25 — Acessibilidade e code splitting
 - [ ] 26 — Testes proporcionais
 - [ ] 27 — E2E Playwright

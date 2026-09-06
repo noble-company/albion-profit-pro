@@ -9,25 +9,33 @@ import { ServerProvider } from '@/app/ServerContext'
 import { ThemeProvider } from '@/app/ThemeContext'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 
-function TestProviders({ children }: PropsWithChildren) {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ServerProvider>
-          <ToastProvider>
-            <AuthProvider>
-              <MemoryRouter>{children}</MemoryRouter>
-            </AuthProvider>
-          </ToastProvider>
-        </ServerProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  )
+function makeProviders(initialEntries: string[]) {
+  return function TestProviders({ children }: PropsWithChildren) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <ServerProvider>
+            <ToastProvider>
+              <AuthProvider>
+                <MemoryRouter initialEntries={initialEntries}>
+                  {children}
+                </MemoryRouter>
+              </AuthProvider>
+            </ToastProvider>
+          </ServerProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    )
+  }
 }
 
 export function renderWithProviders(
   ui: ReactElement,
-  options?: Omit<RenderOptions, 'wrapper'>,
+  options?: Omit<RenderOptions, 'wrapper'> & { initialEntries?: string[] },
 ) {
-  return render(ui, { wrapper: TestProviders, ...options })
+  const { initialEntries = ['/'], ...renderOptions } = options ?? {}
+  return render(ui, {
+    wrapper: makeProviders(initialEntries),
+    ...renderOptions,
+  })
 }
