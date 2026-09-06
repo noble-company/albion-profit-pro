@@ -115,6 +115,34 @@ export function formatSilver(value: MoneyInput | null | undefined): string {
   return `${sign}${grouped} silver`
 }
 
+/**
+ * Formata uma quantidade (inteira ou fracionária, ex.: retorno esperado `0.7`) em pt-BR.
+ * Decimal, não `Number()` — o backend manda a quantidade como string e casas perdidas por
+ * ponto-flutuante mentem sobre o retorno (F09, task 3.5/22 item 3). Sem casas decimais
+ * desnecessárias: `2` e não `2,0`.
+ */
+export function formatQuantity(
+  value: MoneyInput | null | undefined,
+  maxDecimals = 1,
+): string {
+  if (value == null || value === '') return '—'
+  let parsed: Decimal
+  try {
+    parsed = money(value)
+  } catch {
+    return '—'
+  }
+  if (!parsed.isFinite()) return '—'
+  const rounded = parsed.toDecimalPlaces(maxDecimals, Decimal.ROUND_HALF_EVEN)
+  const parts = rounded.abs().toFixed(maxDecimals).split('.')
+  const groupedWhole = (parts[0] ?? '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  const trimmedFraction = (parts[1] ?? '').replace(/0+$/, '')
+  const sign = rounded.isNegative() ? '-' : ''
+  return trimmedFraction
+    ? `${sign}${groupedWhole},${trimmedFraction}`
+    : `${sign}${groupedWhole}`
+}
+
 /** Formata uma porcentagem (já multiplicada por 100 pelo backend) em pt-BR, 1 casa, floor. */
 export function formatPercent(value: MoneyInput | null | undefined): string {
   if (value == null || value === '') return '—'

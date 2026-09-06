@@ -4,6 +4,7 @@ import {
   add,
   compare,
   formatPercent,
+  formatQuantity,
   formatSilver,
   isPositive,
   isZero,
@@ -80,5 +81,16 @@ describe('formatação', () => {
     expect(formatPercent('18.4999')).toBe('18,4%') // floor, não arredonda pra cima
     expect(formatPercent(money('0'))).toBe('0,0%')
     expect(formatPercent(null)).toBe('—')
+  })
+
+  test('formatQuantity — decimal, sem casas desnecessárias', () => {
+    expect(formatQuantity('2')).toBe('2')
+    expect(formatQuantity('2.0')).toBe('2')
+    expect(formatQuantity('0.7')).toBe('0,7')
+    expect(formatQuantity('0.72')).toBe('0,7') // 1 casa por padrão
+    expect(formatQuantity('1234.5')).toBe('1.234,5')
+    expect(formatQuantity('-3.5')).toBe('-3,5')
+    expect(formatQuantity(null)).toBe('—')
+    expect(formatQuantity('')).toBe('—')
   })
 })

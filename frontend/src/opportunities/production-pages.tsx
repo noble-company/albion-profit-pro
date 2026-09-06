@@ -1,10 +1,11 @@
 import { useMutation } from '@tanstack/react-query'
 import { TrendingUp } from 'lucide-react'
 import { useState } from 'react'
+import { Link, useLocation } from 'react-router'
 
 import { useServer } from '@/app/ServerContext'
 import { RequireRealm } from '@/components/AppShell'
-import { Carregando, EstadoErro } from '@/components/ui/states'
+import { EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { DetailDrawer } from '@/components/opportunities/DetailDrawer'
 import {
   fieldControl,
@@ -22,6 +23,7 @@ import {
   type OpportunityColumn,
 } from '@/components/opportunities/OpportunityTable'
 import { Pagination } from '@/components/opportunities/Pagination'
+import { RankingCoverage } from '@/components/opportunities/RankingCoverage'
 import { WarningBadges } from '@/components/opportunities/WarningBadges'
 import { simulateCraft } from '@/craft/service'
 import {
@@ -33,6 +35,7 @@ import {
 } from '@/lib/formatters'
 import { useLocationName } from '@/lib/locations'
 import * as money from '@/lib/money'
+import { usePageVisible } from '@/lib/usePageVisible'
 import { useLocations } from '@/prices/hooks'
 
 import { MODE_LABELS } from './labels'
@@ -46,6 +49,15 @@ type PageConfig = {
   title: string
   description: string
 }
+
+const KINDS: ReadonlyArray<{
+  kind: ProductionKind
+  label: string
+  path: string
+}> = [
+  { kind: 'refining', label: 'Refino', path: '/refino' },
+  { kind: 'crafting', label: 'Craft', path: '/craft' },
+]
 
 function percentageToRate(value: string) {
   if (!value) return '0'
@@ -61,11 +73,35 @@ function readProductionExtra(params: URLSearchParams) {
   }
 }
 
-function formatQuantity(value: string | number) {
-  const numeric = Number(value)
-  return Number.isFinite(numeric)
-    ? numeric.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
-    : '—'
+/** Alterna entre Refino e Craft carregando os filtros da URL (task 3.5/22 item 6). */
+function KindToggle({ current }: { current: ProductionKind }) {
+  const location = useLocation()
+  return (
+    <div
+      role="tablist"
+      aria-label="Tipo de produção"
+      className="inline-flex rounded-lg border border-border-strong bg-background/50 p-0.5"
+    >
+      {KINDS.map((option) => {
+        const active = option.kind === current
+        return (
+          <Link
+            key={option.kind}
+            role="tab"
+            aria-selected={active}
+            to={{ pathname: option.path, search: location.search }}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+              active
+                ? 'bg-primary text-on-primary shadow'
+                : 'text-foreground-subtle hover:text-foreground'
+            }`}
+          >
+            {option.label}
+          </Link>
+        )
+      })}
+    </div>
+  )
 }
 
 function ProductionRankingPage({ config }: { config: PageConfig }) {
@@ -73,6 +109,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
   const allLocations = useLocations()
   const locations = allLocations.filter((row) => row.kind === 'city')
   const locationName = useLocationName()
+  const pageVisible = usePageVisible()
   const [selected, setSelected] = useState<Opportunity | null>(null)
   const detailMutation = useMutation({ mutationFn: simulateCraft })
   const { params, query, sortParam, setFilter, setOffset, reset } =
@@ -83,6 +120,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
   })
   // O servidor ordena e pagina sobre o ranking completo (F08).
   const rows = result.data?.opportunities ?? []
+  const coverage = result.data?.coverage
 
   if (!realm) {
     return (
@@ -103,7 +141,8 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       output_item: row.item,
       location_id: row.buy_location,
       quantity: 1,
-      output_quality: row.quality_level ?? 1,
+      // Reflete o filtro de qualidade da tela (item 5), não um valor fixo.
+      output_quality: query.quality ?? row.quality_level ?? 1,
       scope: 'all',
       return_rate: query.returnRate,
       station_cost_per_execution: query.stationCostPerExecution,
@@ -121,12 +160,13 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       header: 'Saída',
       sticky: 'left',
       width: '13rem',
+      className: 'whitespace-normal',
       cell: (row) => (
-        <div className="whitespace-normal">
+        <div>
           <strong className="text-foreground">
             {formatarNomeItem(row.item_name, row.item)}
           </strong>
-          <div className="mt-1 text-xs text-foreground-subtle">
+          <div className="mt-0.5 text-xs font-normal text-foreground-subtle">
             {formatarQualidade(row.quality_level)}
           </div>
           <WarningBadges warnings={row.warnings} className="mt-1" />
@@ -134,17 +174,39 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       ),
     },
     {
-      header: 'Entradas',
+      header: 'Receita',
+      width: '15rem',
       className: 'whitespace-normal text-xs',
-      cell: (row) =>
-        (row.ingredients ?? []).length > 0
-          ? (row.ingredients ?? []).map((ingredient) => (
-              <div key={ingredient.item}>
-                {formatarNomeItem(ingredient.item_name, ingredient.item)} ×{' '}
-                {ingredient.purchase_quantity}
-              </div>
-            ))
-          : '—',
+      cell: (row) => {
+        const ingredients = row.ingredients ?? []
+        if (ingredients.length === 0) return '—'
+        return (
+          <ul className="space-y-0.5">
+            {ingredients.map((ingredient) => {
+              const hasReturn = money.isPositive(
+                ingredient.expected_return_quantity,
+              )
+              return (
+                <li key={ingredient.item}>
+                  {formatarNomeItem(ingredient.item_name, ingredient.item)}{' '}
+                  <span className="tabular-nums">
+                    ×{ingredient.purchase_quantity}
+                  </span>
+                  {hasReturn && (
+                    <span className="text-profit">
+                      {' '}
+                      · retorno{' '}
+                      {money.formatQuantity(
+                        ingredient.expected_return_quantity,
+                      )}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )
+      },
     },
     {
       header: 'Cidade',
@@ -168,33 +230,17 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       cell: (row) => formatarSilver(row.gross_revenue),
     },
     {
-      header: 'Retorno',
-      className: 'whitespace-normal text-xs',
-      cell: (row) =>
-        (row.ingredients ?? []).some((ingredient) =>
-          money.isPositive(ingredient.expected_return_quantity),
-        )
-          ? (row.ingredients ?? [])
-              .filter((ingredient) =>
-                money.isPositive(ingredient.expected_return_quantity),
-              )
-              .map((ingredient) => (
-                <div key={ingredient.item}>
-                  {formatarNomeItem(ingredient.item_name, ingredient.item)} ×{' '}
-                  {formatQuantity(ingredient.expected_return_quantity)}
-                </div>
-              ))
-          : '—',
-    },
-    {
       header: 'Estação',
       numeric: true,
+      weight: 'tertiary',
       cell: (row) => formatarSilver(row.station_cost),
     },
     {
       header: 'Lucro',
       numeric: true,
       weight: 'primary',
+      sticky: 'right',
+      width: '7rem',
       className: 'text-profit',
       cell: (row) => formatarSilver(row.profit),
     },
@@ -202,11 +248,15 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       header: 'ROI',
       numeric: true,
       weight: 'primary',
+      sticky: 'right',
+      width: '5.5rem',
       className: 'text-profit',
       cell: (row) => formatarPct(row.roi),
     },
     {
       header: 'Detalhes',
+      sticky: 'right',
+      width: '6rem',
       cell: (row) => (
         <button
           type="button"
@@ -233,14 +283,18 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
             {config.description}
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-profit/20 bg-profit/5 px-3 py-1.5 text-xs font-medium text-profit shadow-lg shadow-black/20">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-profit opacity-50" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-profit" />
-          </span>
-          Atualização automática · 30s
-        </div>
+        {pageVisible && (
+          <div className="flex items-center gap-2 rounded-full border border-profit/20 bg-profit/5 px-3 py-1.5 text-xs font-medium text-profit shadow-lg shadow-black/20">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-profit opacity-50" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-profit" />
+            </span>
+            Atualização automática · 30s
+          </div>
+        )}
       </header>
+
+      <KindToggle current={config.kind} />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiCard
@@ -264,23 +318,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
         />
       </div>
 
-      {result.data?.coverage && (
-        <p
-          className={`text-xs ${
-            result.data.coverage.stale
-              ? 'text-primary'
-              : 'text-foreground-subtle'
-          }`}
-        >
-          Ranking cobre {result.data.coverage.priced_recipes} receitas com preço
-          de {result.data.coverage.evaluated_recipes} avaliadas ·{' '}
-          {result.data.coverage.total_recipes} receitas no total
-          {result.data.coverage.computed_at
-            ? ` · recalculado ${formatarIdade(result.data.coverage.computed_at)}`
-            : ' · ainda não calculado'}
-          {result.data.coverage.stale ? ' · desatualizado' : ''}
-        </p>
-      )}
+      {coverage && <RankingCoverage coverage={coverage} />}
 
       <FilterPanel
         title="Configure seu cenário"
@@ -339,7 +377,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
               label="Frescor máximo"
               value={params.get('freshness') ?? '6'}
               onChange={(v) => setFilter('freshness', v)}
-              options={['1', '2', '6', '12', '24']}
+              options={['1', '2', '6']}
               suffix="h"
             />
             <FilterNumber
@@ -412,38 +450,28 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
         </FilterFieldset>
       </FilterPanel>
 
-      {result.loading && !result.data && (
-        <Carregando
-          label={`Calculando ranking de ${config.eyebrow.toLowerCase()}…`}
-        />
-      )}
-      {Boolean(result.error) && !result.data && (
+      {Boolean(result.error) && !result.data ? (
         <EstadoErro
           title={`Não foi possível carregar ${config.eyebrow.toLowerCase()}`}
         />
-      )}
-      {!result.loading && !result.error && rows.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border-strong/80 bg-gradient-to-b from-surface/40 to-background px-6 py-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border-strong bg-surface text-foreground-muted">
-            <TrendingUp className="size-5" aria-hidden="true" />
-          </div>
-          <h2 className="mt-4 font-bold text-foreground">
-            Nenhuma oportunidade encontrada
-          </h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-foreground-subtle">
-            Não há receita com preços suficientes para estes filtros. Isso não
-            representa lucro zero. Experimente aumentar o frescor ou limpar os
-            filtros.
-          </p>
-        </div>
-      )}
-      {rows.length > 0 && (
+      ) : !result.loading && rows.length === 0 ? (
+        <EstadoVazio
+          title="Nenhuma oportunidade encontrada"
+          icon={<TrendingUp className="size-6" />}
+        >
+          Não há receita com preços suficientes para estes filtros. Isso não
+          representa lucro zero. Experimente aumentar o frescor ou limpar os
+          filtros.
+        </EstadoVazio>
+      ) : (
         <OpportunityTable
           title="Ranking atual"
           description="Cenário mais lucrativo encontrado para cada receita"
           caption="Ranking de produção"
           rows={rows}
           columns={columns}
+          loading={result.loading && !result.data}
+          minWidth="76rem"
           rowKey={(row) =>
             `${row.kind}-${row.item}-${row.quality_level}-${row.buy_location}`
           }

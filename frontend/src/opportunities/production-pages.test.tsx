@@ -154,8 +154,11 @@ test('Refino renderiza entradas, retorno calculado, alertas e abre a análise', 
     await screen.findByRole('heading', { name: 'O que vale a pena refinar' }),
   ).toBeInTheDocument()
   expect(await screen.findByText('Tecido T4.1')).toBeInTheDocument()
-  expect(screen.getByText('Fibra T4 × 2')).toBeInTheDocument()
-  expect(screen.getByText('Fibra T4 × 0,7')).toBeInTheDocument()
+  // A coluna "Receita" junta ingrediente + retorno esperado numa linha só.
+  const receita = screen.getByRole('listitem')
+  expect(receita.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+    'Fibra T4 ×2 · retorno 0,7',
+  )
   expect(screen.getByText('Ordem não garantida')).toBeInTheDocument()
   expect(screen.getByText('72 silver')).toBeInTheDocument()
 
@@ -202,4 +205,114 @@ test('Craft diferencia ausência de oportunidade de lucro zero', async () => {
     await screen.findByText('Nenhuma oportunidade encontrada'),
   ).toBeInTheDocument()
   expect(screen.getByText(/Isso não representa lucro zero/)).toBeInTheDocument()
+})
+
+test('receita fora das 200 primeiras em ordem alfabética aparece no ranking (B02)', async () => {
+  // O servidor ordena por lucro sobre o universo completo (task 03 + 17). Um item que
+  // começa com "Z" — que a antiga heurística truncava — vem em primeiro se for o mais
+  // lucrativo.
+  server.use(
+    http.get('http://localhost:8000/locations', () =>
+      HttpResponse.json([
+        {
+          location_id: '1002',
+          name: 'Lymhurst',
+          display_name: 'Lymhurst',
+          kind: 'city',
+          is_royal_city: true,
+        },
+      ]),
+    ),
+    http.get('http://localhost:8000/opportunities/refining', () =>
+      HttpResponse.json({
+        server: 'west',
+        kind: 'refining',
+        opportunities: [
+          {
+            ...opportunity,
+            item: 'T8_METALBAR',
+            item_name: 'Zinco',
+            profit: '90000',
+          },
+        ],
+        total: 5623,
+        limit: 25,
+        offset: 0,
+        coverage: {
+          evaluated_recipes: 5600,
+          priced_recipes: 4100,
+          total_recipes: 5623,
+          computed_at: new Date().toISOString(),
+          stale: false,
+        },
+      }),
+    ),
+  )
+
+  renderWithProviders(<RefiningRankingPage />)
+
+  expect(await screen.findByText('Zinco T8')).toBeInTheDocument()
+  // cobertura do ranking exibida quando o payload a traz (item 2)
+  expect(
+    screen.getByText(/4\.100 receitas com preço · 5\.600 avaliadas de 5\.623/),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByText(/Valores da lista são estimativa/),
+  ).toBeInTheDocument()
+})
+
+test('"Analisar" envia a qualidade do filtro ativo, não um valor fixo (item 5)', async () => {
+  const user = userEvent.setup()
+  let simulationBody: Record<string, unknown> | undefined
+  server.use(
+    http.get('http://localhost:8000/locations', () => HttpResponse.json([])),
+    http.get('http://localhost:8000/opportunities/refining', () =>
+      HttpResponse.json({
+        server: 'west',
+        kind: 'refining',
+        opportunities: [opportunity],
+        total: 1,
+        limit: 25,
+        offset: 0,
+      }),
+    ),
+    http.post('http://localhost:8000/craft/simulate', async ({ request }) => {
+      simulationBody = (await request.json()) as Record<string, unknown>
+      return new HttpResponse(null, { status: 200 })
+    }),
+  )
+
+  renderWithProviders(<RefiningRankingPage />)
+  await screen.findByText('Tecido T4.1')
+
+  await user.selectOptions(screen.getByLabelText('Qualidade'), '5')
+  await user.click(screen.getByRole('button', { name: 'Analisar' }))
+
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(simulationBody?.output_quality).toBe(5)
+})
+
+test('trocar de Refino para Craft preserva os filtros da URL (item 6)', async () => {
+  const user = userEvent.setup()
+  server.use(
+    http.get('http://localhost:8000/locations', () => HttpResponse.json([])),
+    http.get('http://localhost:8000/opportunities/refining', () =>
+      HttpResponse.json({
+        server: 'west',
+        kind: 'refining',
+        opportunities: [opportunity],
+        total: 1,
+        limit: 25,
+        offset: 0,
+      }),
+    ),
+  )
+
+  renderWithProviders(<RefiningRankingPage />)
+  await screen.findByText('Tecido T4.1')
+
+  await user.selectOptions(screen.getByLabelText('Tier'), '6')
+
+  const craftTab = screen.getByRole('tab', { name: 'Craft' })
+  expect(craftTab.getAttribute('href')).toContain('tier=6')
 })
