@@ -127,20 +127,35 @@ alteram o contrato de preço consumido por Market Flip, Refino, Craft e Calculad
 - [x] 20.2 — Client Go e envio de snapshots
 - [x] 20.3 — Projeção da última observação por combinação
 
-> As tasks 20.4-20.11 foram **adiadas para depois da Fase 3.5**, conforme
-> [task 28](../refatoracao/28-retomada-dos-snapshots.md): 20.5 é a mesma camada de "preço
-> atual" que a Fase 3.5 adota como arquitetura, 20.6 depende da decisão de pub/sub, e 20.8/20.9
-> incidiriam sobre telas e motores que a Fase 3.5 reescreve. Executá-las antes seria trabalho
-> perdido; as specs devem ser revalidadas contra o código novo.
+> As tasks 20.4-20.11 foram adiadas para depois da Fase 3.5 e **reconciliadas na
+> [task 3.5/28](../refatoracao/28-retomada-dos-snapshots.md)** (2026-09-06). A arquitetura
+> escolhida foi a **projeção da última observação (20.3), não snapshots persistidos** — a
+> Fase 3.5 já entregou a substância de 20.5/20.7/20.8/20.9/20.10 ao reescrever os motores e as
+> telas sobre essa projeção. Ver a coluna "onde" abaixo.
 
-- [ ] 20.4 — Reconciliação do estado atual
-- [ ] 20.5 — Serviço único de preço atual
-- [ ] 20.6 — Invalidação de cache e pub/sub
-- [ ] 20.7 — Política de frescor
-- [ ] 20.8 — Estados do frontend
-- [ ] 20.9 — Migração dos motores de cálculo
-- [ ] 20.10 — Testes automatizados
-- [ ] 20.11 — Validação real no jogo
+- [~] 20.4 — Reconciliação transacional do estado atual — **bloqueada no client Go**. A
+  inativação de ordem por ausência precisa do client emitir snapshot vazio + `Scope` explícito
+  (adiado na 20.2, "Limitação conhecida"). No interino, "ordem que sumiu" é coberto por
+  expiração + janela de frescor + a projeção da última observação. Reabre quando o client fizer
+  a parte adiada da 20.2.
+- [x] 20.5 — Serviço único de preço atual — **Fase 3.5/05** (`src/craft/quotes.py`, fronteira
+  única de cotação) + projeção 20.3. A camada "e se" do cliente (3.5/23) consome os mesmos
+  componentes neutros.
+- [x] 20.6 — Invalidação de cache e pub/sub — **superada pela Fase 3.5/08** (Opção B: pub/sub
+  removido). Invalidação = `recompute_and_cache_book` + TTL curto; atualização = polling de 30s
+  no front (3.5/15).
+- [x] 20.7 — Política de frescor — **Fase 3.5/03 e 3.5/07**. `latest_order_observation_filter`,
+  `age_seconds`, `freshness_window_seconds`, `coverage.stale`, `require_complete`, warning
+  `dado_velho` no flip, teto de frescor na UI.
+- [x] 20.8 — Estados do frontend — **Fase 3.5/14 e 3.5/21-25**. `EstadoVazio`/`EstadoErro`,
+  `RankingCoverage`, `formatarIdade`, selects de frescor limitados, `axe` verde.
+- [x] 20.9 — Migração dos motores — **Fase 3.5/02, 3.5/03, 3.5/05**. Flip, Refino, Craft e
+  Calculadora rodam sobre a projeção; nenhum consulta ordem histórica direto.
+- [x] 20.10 — Testes automatizados — substituição/remoção/vazio/frescor cobertos em
+  `tests/prices/test_service.py`, `tests/craft/test_quotes.py`, `tests/craft/test_simulate_router.py`,
+  `tests/opportunities/test_flips.py`; os critérios de aceite do 20.1/20.3 no limite HTTP em
+  `tests/prices/test_current_price_projection_acceptance.py` (novo, Fase 3.5/28).
+- [ ] 20.11 — Validação real no jogo — **humana, no gate da task 19** (a spec já diz isso).
 
 ## Convenções específicas desta fase
 

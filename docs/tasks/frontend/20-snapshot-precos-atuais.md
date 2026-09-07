@@ -3,6 +3,15 @@
 > Plano aprovado em 2026-08-24 e revisado em 2026-08-24. Esta extensão é transversal às 19 tasks originais da Fase 3.
 > Ela garante que nenhuma funcionalidade use silenciosamente uma cotação antiga quando já
 > existe uma coleta mais recente.
+>
+> **Reconciliação (2026-09-06, [Fase 3.5/28](../refatoracao/28-retomada-dos-snapshots.md)):**
+> a arquitetura escolhida foi a **projeção da última observação (20.3)**, não a tabela de
+> snapshots persistidos que 20.4-20.6 pressupunham. A Fase 3.5 (tasks 02, 03, 05, 07, 08,
+> 14, 21-25, 23) entregou a substância de 20.5, 20.7, 20.8, 20.9 e 20.10 ao reescrever os
+> motores e as telas sobre essa projeção. **20.4** (inativar ordem por ausência) segue aberta,
+> bloqueada no client Go — precisa do snapshot vazio + `Scope` explícito adiado na 20.2.
+> **20.6** foi superada pela decisão de remover o pub/sub (3.5/08). **20.11** fica no gate da
+> task 19. O checklist real está no [README de frontend](README.md).
 
 ## Objetivo
 

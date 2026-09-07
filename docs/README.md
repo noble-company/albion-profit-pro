@@ -22,8 +22,8 @@
 | [tasks/backend/](tasks/backend/README.md) | Microetapas do backend. **Fase 1 (01-22) ✅ completa** e **Fase 1.5 (23-36) ✅ completa** (correções e remodelagem derivadas dos documentos 03 e 04). Uma task por arquivo, com objetivo, racional, o que implementar, dependências e testes. Os checklists de status são a fonte de verdade do que está pronto. |
 | [tasks/client/](tasks/client/README.md) | Microetapas da **Fase 2 (client Go) ✅ completa** — autenticação/destino de ingest, UX de localização e validação com o jogo real. |
 | [tasks/estabilizacao/](tasks/estabilizacao/README.md) | Microetapas da **Fase 2.5 ✅ completa, 14/14** — estabilização transversal concluída. |
-| [tasks/frontend/](tasks/frontend/README.md) | Microetapas da **Fase 3 — 17/19** — entrega o scanner de oportunidades Market Flip, Refino e Craft. A task 18 foi absorvida pela Fase 3.5; a 19 é o gate final, executado depois dela. |
-| [tasks/refatoracao/](tasks/refatoracao/README.md) | Microetapas da **Fase 3.5 ▶ em andamento, 27/29** — refatoração derivada do documento `12`: corrige os motores de oportunidade, instala o design system que nunca foi instalado e move a camada "e se" para o cliente. |
+| [tasks/frontend/](tasks/frontend/README.md) | Microetapas da **Fase 3 — 18/19** — entrega o scanner de oportunidades Market Flip, Refino e Craft. A task 18 (resiliência + E2E) foi entregue pela Fase 3.5/27; a 19 é o gate final, executado depois da Fase 3.5. |
+| [tasks/refatoracao/](tasks/refatoracao/README.md) | Microetapas da **Fase 3.5 ▶ em andamento, 28/29** — refatoração derivada do documento `12`: corrige os motores de oportunidade, instala o design system que nunca foi instalado e move a camada "e se" para o cliente. |
 
 > A extensão transversal [20 — snapshots e preços atuais](tasks/frontend/20-snapshot-precos-atuais.md)
 > adiciona 11 tasks à Fase 3 para garantir que todas as telas usem somente a coleta mais recente.
