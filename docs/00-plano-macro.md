@@ -67,7 +67,20 @@ observadas. Diagnóstico em [05-revisao-fases-0-a-2.md](05-revisao-fases-0-a-2.m
 [tasks/estabilizacao/](tasks/estabilizacao/README.md). O ensaio integrado Windows/jogo/Swarm foi
 transferido para a Task 19 da Fase 3.
 
-**Fase 3 — ▶ em andamento (17/19). O produto foi reorganizado para rankings de Market Flip, Refino e Craft; Fase 4 — não começou.**
+**Fase 3 — 18/19.** O produto foi reorganizado para rankings de Market Flip, Refino e Craft.
+Só falta a task 19 (gate integrado em jogo), executada depois da Fase 3.5.
+
+**Fase 3.5 (refatoração) — ✅ concluída, 28/29 tasks.** Só a task `10` (antifraude, `S01`)
+segue aberta, adiada por decisão de produto. Derivada da auditoria
+[12-revisao-fase-3.md](12-revisao-fase-3.md): reescreveu os motores de flip (SQL, `B01`) e
+ranking (materializado, `B02`), instalou o design system que a task 09 decidiu e nunca
+instalou (`F01`–`F03`), moveu a camada "e se" para o cliente com vetores dourados travando a
+paridade com o Python, e entregou a suíte E2E Playwright (`A03`). Três decisões de
+arquitetura em [12-revisao-fase-3.md](12-revisao-fase-3.md#decisões-de-arquitetura-da-fase-35):
+o cálculo é dividido por *o que muda* (não *onde roda*), o frontend é reconstruído por cima
+(não recomeçado), e a antifraude é adiada conscientemente para o pré-lançamento.
+
+**Fase 4 — não começou.**
 
 ## Contexto
 
@@ -200,12 +213,13 @@ saída estão em [tasks/estabilizacao/README.md](tasks/estabilizacao/README.md).
 Esta fase não implementa frontend. Ela estabiliza o contrato que as 19 tasks da Fase 3 vão
 consumir, evitando consolidar APIs enganosas ou chaves sem realm na SPA.
 
-## Fase 3 — Calculadora web (API de craft + React/Vite) ▶ em andamento
+## Fase 3 — Calculadora web (API de craft + React/Vite) — 18/19
 
 O escopo detalhado e a ordem de implementação estão em
 [tasks/frontend/](tasks/frontend/README.md): **19 microtasks**, revisadas contra o código real em
-2026-08-23. A fase começa completando o backend (catálogo, API de receitas, contrato monetário,
-simulação e comparação) e só então cria a SPA.
+2026-08-23. A fase começou completando o backend (catálogo, API de receitas, contrato monetário,
+simulação e comparação) e então criou a SPA. A task 18 (resiliência + E2E) foi entregue pela
+Fase 3.5/27; só falta a **task 19** — o gate integrado em jogo.
 
 Decisões centrais:
 
@@ -218,6 +232,17 @@ Decisões centrais:
 - Vitest/RTL/MSW e Playwright contra backend/datastores reais;
 - build de produção servido em mesma origem, com a decisão final conferida contra o padrão real de
   Swarm/Traefik antes da task 18.
+
+## Fase 3.5 — Refatoração ✅ 28/29
+
+Fase transversal criada a partir da auditoria [12-revisao-fase-3.md](12-revisao-fase-3.md)
+(2026-08-30). Corrige os motores de oportunidade (flip em SQL, ranking materializado),
+instala o design system que a Fase 3 decidiu e nunca instalou, move a camada "e se" para o
+cliente e entrega a suíte E2E. Ordem e status em
+[tasks/refatoracao/README.md](tasks/refatoracao/README.md); desfecho de cada achado e quadro
+de performance antes/depois em
+[12-revisao-fase-3.md](12-revisao-fase-3.md#desfecho-dos-achados-2026-09-06). As tasks `10`
+(antifraude, `S01`) e `19` (gate em jogo) ficam abertas por decisão.
 
 ## Fase 4 — UI embutida no client (fast-follow, não bloqueia o MVP)
 
@@ -248,11 +273,14 @@ Trocar o "abrir navegador" da Fase 2 por um webview nativo embutido (`github.com
 4. ~~Recipes: decidir onde `ITEM DUMP.json` mora no repo, escrever o import pra `Recipe`/`RecipeIngredient`~~ ✅ **Completo** (Fase 1b, task 19) — falta só torná-lo reexecutável (task 35).
 5. ~~Fase 2.5 — estabilização~~ ✅ **Completa, 14/14 tasks**, ver
    [tasks/estabilizacao/](tasks/estabilizacao/README.md).
-6. **Próximo passo:** Fase 3 — API de craft + frontend completo, já especificada em
+6. ~~Fase 3 — API de craft + frontend completo~~ ✅ **18/19**, ver
    [tasks/frontend/](tasks/frontend/README.md).
-7. Deploy no Swarm é materializado dentro da Fase 2.5 (seed/filas/processos) e finalizado na Fase
-   3 com o frontend/Traefik, usando o padrão real do usuário.
-8. (Depois) Fase 4 — webview embutido no client.
+7. ~~Fase 3.5 — refatoração~~ ✅ **28/29**, ver [tasks/refatoracao/](tasks/refatoracao/README.md).
+8. **Próximo passo:** task 19 — gate integrado em jogo (Albion + Npcap + systray + Swarm/Traefik
+   reais), validando a jornada inteira de uma vez.
+9. Deploy no Swarm é materializado dentro da Fase 2.5 (seed/filas/processos) e finalizado no gate
+   19 com o frontend/Traefik, usando o padrão real do usuário.
+10. (Depois) Fase 4 — webview embutido no client.
 
 ## Próximos passos em aberto (do mapeamento do client)
 Ficaram pendências da investigação de craft/refino em tempo real (fora do MVP, ver [01-mapeamento-albiondata-client.md](01-mapeamento-albiondata-client.md) seção 8) — não bloqueiam o MVP da calculadora baseada em mercado, mas ficam registradas pra quando entrarmos nessa fase:

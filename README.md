@@ -4,9 +4,11 @@ Plataforma própria para calcular lucro de crafting e refino no Albion Online a 
 coletados pelo jogador no mercado do jogo.
 
 > [!WARNING]
-> O projeto está na Fase 2.5 de estabilização. Backend e coleta funcionam ponta a ponta, mas o
-> client ainda não deve ser distribuído amplamente até concluir os gates restantes de configuração
-> no ambiente real e validação E2E.
+> O projeto está na **Fase 3.5** (refatoração). Backend, coleta e frontend funcionam ponta a
+> ponta; a suíte E2E roda contra a stack real. Falta o gate final (task 19 da Fase 3): a
+> validação integrada em jogo (Albion + Npcap + systray + Swarm/Traefik reais). O client não
+> deve ser distribuído amplamente até lá. `S06` (catálogo sem login) e a antifraude de
+> mercado (`S01`) são decisões conscientemente adiadas para o pré-lançamento.
 
 ## Arquitetura
 
@@ -25,8 +27,8 @@ FastAPI ──► RabbitMQ ──► Celery worker ──► PostgreSQL
 | Diretório | Responsabilidade | Estado |
 |---|---|---|
 | `albiondata-client/` | Captura preços do tráfego local e envia ao backend | Fase 2 e estabilização concluídas |
-| `backend/` | Auth, ingest, preços, receitas, filas e persistência | Fases 1, 1.5 e estabilização concluídas |
-| `frontend/` | SPA da calculadora | Ainda não criado; próximo passo |
+| `backend/` | Auth, ingest, preços, receitas, filas e persistência | Fases 1, 1.5, 2.5 e o bloco de backend da 3.5 concluídos (350 testes) |
+| `frontend/` | SPA de oportunidades (Market Flip, Refino, Craft, Calculadora, Preços) | Fase 3.5 concluída — 200 testes unitários + suíte E2E Playwright; falta só o gate em jogo |
 | `docs/` | Decisões, contratos, auditorias e specs executáveis | Fonte de verdade do projeto |
 
 PostgreSQL é a fonte de verdade. Redis é somente cache e pode ser esvaziado sem perda de dados.
@@ -107,6 +109,18 @@ no boot e mostra o estado no systray. No Windows, confirme que o Npcap está ins
 troca de zona no jogo antes de abrir o mercado; sem localização/realm válidos o client segura os
 eventos capturados.
 
+### 5. Frontend
+
+```powershell
+Set-Location '..\frontend'
+Copy-Item '.env.example' '.env'   # VITE_API_BASE_URL=http://localhost:8000
+npm ci
+npm run dev                        # http://localhost:5173
+```
+
+Precisa do backend no ar (passo 3) para dados reais. `npm run build && npm run preview` serve
+o bundle de produção em `http://127.0.0.1:4173`.
+
 ## Desenvolvimento e testes
 
 Backend, a partir de `backend/`:
@@ -115,6 +129,16 @@ Backend, a partir de `backend/`:
 uv run ruff check .
 uv run pytest tests/ -v
 docker build -t profitpro-backend .
+```
+
+Frontend, a partir de `frontend/`:
+
+```powershell
+npm run lint
+npm run typecheck
+npm run test           # Vitest — unitário, com MSW
+npm run test:coverage  # + gate de cobertura dos módulos de lógica
+npm run test:e2e       # Playwright — precisa da stack real; ver frontend/e2e/README.md
 ```
 
 Client, a partir de `albiondata-client/`:
@@ -131,26 +155,30 @@ prejudica comparações futuras. Patches próprios devem continuar marcados com
 
 ## Status e limitações conhecidas
 
-- Fases 1 e 1.5: backend concluído.
-- Fase 2: integração do client concluída e validada no jogo real.
-- Fase 2.5: estabilização concluída, 14/14 tasks. O gate automatizado está verde.
-- Fase 3: frontend especificado e liberado como próximo passo.
-- O ensaio integrado com Albion/Npcap, systray, domínio e Swarm reais será executado após o
-  frontend completo, para validar toda a jornada de uma vez.
+- Fases 1, 1.5 e 2 concluídas (backend; integração do client validada em jogo).
+- Fase 2.5 (estabilização): concluída, 14/14 tasks, gate automatizado verde.
+- **Fase 3.5 (refatoração): concluída, 28/29 tasks** — só a `10` (antifraude, `S01`) segue
+  aberta, adiada por decisão de produto. O backend foi reescrito nos motores de flip e ranking;
+  o design system foi de fato instalado; a camada "e se" roda no cliente; a suíte E2E Playwright
+  roda contra API + PostgreSQL + Redis reais. O desfecho de cada achado da revisão está em
+  [`docs/12-revisao-fase-3.md`](docs/12-revisao-fase-3.md#desfecho-dos-achados-2026-09-06).
+- **Falta o gate final:** o ensaio integrado com Albion/Npcap, systray, domínio e Swarm reais
+  (task 19 da Fase 3), executado após a Fase 3.5 para validar a jornada inteira de uma vez.
+- **Adiado conscientemente:** antifraude de mercado (`S01`), JWT em cookie `httpOnly` (`S03`),
+  catálogo sem login (`S06`) — todos pré-requisitos de lançamento público, não de uso interno.
 - West, East e Europe estão isolados no wire autenticado, persistência, cache e leitura desde a
-  Task 03.
+  Task 2.5/03.
 - O updater é desabilitado por padrão e rejeita qualquer origem diferente do repositório do
   Profit Pro. A publicação real ainda exige autorização e assinatura manual.
-- O seed estático reproduzível foi fechado na Task 10. A semântica parcial e a escala da leitura
-  do livro foram fechadas na Task 12; a janela padrão de 6h ainda requer validação de produto.
-- Filas e processos de produção foram fechados na Task 11; o stack de referência ainda precisa ser
-  adaptado às redes, secrets e labels reais do Swarm/Traefik.
-- A Task 13 tornou releases fail-closed e adicionou autenticação no boot; ainda falta definir a URL
-  oficial e validar visualmente os estados do systray no Windows.
+- Não há push de preço em tempo real — o pub/sub foi removido na Fase 3.5 (task 08); o frontend
+  faz polling de 30 s com cache e visibilidade de aba.
+- Filas e processos de produção foram fechados na Task 2.5/11; o stack de referência ainda
+  precisa ser adaptado às redes, secrets e labels reais do Swarm/Traefik.
 
 O plano, os contratos medidos e os checklists ficam em [`docs/README.md`](docs/README.md). A
-prioridade atual é [`docs/tasks/estabilizacao/`](docs/tasks/estabilizacao/README.md).
-O procedimento e as evidências do fechamento estão no
+prioridade atual é o gate final (task 19). O gate automatizado da fase é
+`python scripts/verify_repository.py` mais os workflows `backend-ci`, `frontend-ci` e
+`frontend-e2e`; o procedimento do fechamento da 2.5 está em
 [`docs/10-gate-final-fase-2-5.md`](docs/10-gate-final-fase-2-5.md).
 
 ## Git, upstream e releases

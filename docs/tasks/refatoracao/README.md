@@ -133,7 +133,7 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [x] 26 — Testes proporcionais
 - [x] 27 — E2E Playwright
 - [x] 28 — Retomada dos snapshots (20.4-20.11) *(20.4 e 20.11 seguem abertas — ver o doc)*
-- [ ] 29 — Fechamento documental
+- [x] 29 — Fechamento documental
 
 ## Convenções específicas desta fase
 
