@@ -42,10 +42,47 @@ async def catalog_version(session: AsyncSession) -> str:
     return row or "sem-dataset"
 
 
-def etag_for(version: str, kind: str | None) -> str:
+def shape_digest(modelos: list[tuple[str, list[str]]]) -> str:
+    """Identidade do **formato** da resposta: nome do schema + campos, ordenados.
+
+    Ordenado de propósito — reordenar um campo não muda o corpo de forma relevante, e fazer o
+    digest depender disso invalidaria o cache de todo mundo a cada refactor cosmético.
+    """
+    assinatura = "|".join(f"{nome}:{','.join(sorted(campos))}" for nome, campos in sorted(modelos))
+    return hashlib.sha256(assinatura.encode()).hexdigest()[:8]
+
+
+def _shape_atual() -> str:
+    return shape_digest(
+        [
+            (modelo.__name__, list(modelo.model_fields))
+            for modelo in (
+                CatalogRecipesOut,
+                CatalogRecipeOut,
+                CatalogItemOut,
+                CatalogIngredientOut,
+                CatalogUpgradeResourceOut,
+            )
+        ]
+    )
+
+
+def etag_for(version: str, kind: str | None, shape: str | None = None) -> str:
     """`kind` entra no ETag: `?kind=refining` e `?kind=crafting` são corpos diferentes da mesma
-    versão de catálogo e não podem compartilhar validador."""
-    digest = hashlib.sha256(f"{version}|{kind or 'all'}".encode()).hexdigest()[:32]
+    versão de catálogo e não podem compartilhar validador.
+
+    O **formato** também entra, e isso custou um incidente para aprender: quando
+    `crafting_category` entrou no schema (task 4/17), o dataset estático não mudou — o dado do
+    jogo era o mesmo — então o `ETag` não mudou, o navegador recebeu `304` e continuou servindo
+    um corpo **sem o campo novo**. O cliente calculava o custo de foco como se ninguém tivesse
+    especialização, sem erro em lugar nenhum.
+
+    O digest é **derivado dos schemas**, não uma constante para alguém lembrar de incrementar:
+    campo novo já muda o validador sozinho.
+    """
+    digest = hashlib.sha256(
+        f"{shape or _shape_atual()}|{version}|{kind or 'all'}".encode()
+    ).hexdigest()[:32]
     return f'"{digest}"'
 
 

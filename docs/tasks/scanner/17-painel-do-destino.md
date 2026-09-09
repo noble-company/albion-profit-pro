@@ -204,3 +204,39 @@ o porquê escrito no arquivo, e a existência do índice conferida no banco depo
   linha do cajado amaldiçoado contra o painel real, não o conjunto.
 - **`POST /craft/simulate` e o foco.** Continua sem conhecer eficiência — ver a recomendação na
   seção de riscos.
+
+## Incidente: o painel salvou e a tabela não mudou (2026-09-09)
+
+Painel preenchido, 5 nós no banco, `crafting_category` populado — e a coluna `Foco` continuava
+mostrando o custo de quem não tem especialização nenhuma.
+
+### A causa
+
+O `ETag` do catálogo dependia só da **versão do dataset estático**. `crafting_category` entrou
+no `CatalogItemOut`, mas o dado do jogo não mudou — então o `ETag` não mudou, o navegador
+revalidou, recebeu `304` e serviu **o corpo antigo do próprio cache**, sem o campo novo. O
+IndexedDB (task 07) regravava esse mesmo corpo antigo, concordando com o erro.
+
+`saida.crafting_category` chegava `undefined` no engine, `focoPorExecucao` caía no
+`return recipe.crafting_focus`, e o número saía como se o painel estivesse vazio. **Sem erro em
+lugar nenhum** — o pior tipo de defeito de cache.
+
+### A correção
+
+O `ETag` passa a carregar o **formato** da resposta, derivado dos próprios schemas:
+
+```
+etag = sha256( digest(campos dos schemas) | versão do dataset | kind )
+```
+
+Derivado, e não uma constante para alguém lembrar de incrementar: campo novo já muda o
+validador sozinho. Ordenado por nome, para reordenar campo não invalidar cache à toa.
+
+### O que isso ensina além desta task
+
+Toda vez que o schema do catálogo crescer, o cliente com cache quente ia continuar cego — e
+`crafting_category` foi o **primeiro** campo novo desde que o cache existe. O guard está em
+`tests/catalog/test_catalog_etag_shape.py`.
+
+Vale a pena olhar se `GET /prices/snapshot` tem o mesmo buraco quando ganhar um campo; ele não
+usa `ETag` hoje (política `market`, 30 s), então provavelmente não — mas é a mesma família.
