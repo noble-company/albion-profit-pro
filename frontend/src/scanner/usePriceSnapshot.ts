@@ -7,6 +7,58 @@ export type PriceSnapshot = components['schemas']['PriceSnapshotOut']
 type Realm = components['schemas']['AlbionServer']
 
 /**
+ * As colunas que carregam preço. `generated_at` fica de fora de propósito — ver `mesmosPrecos`.
+ */
+const COLUNAS_DE_PRECO = [
+  'item',
+  'location',
+  'quality',
+  'enchantment',
+  'sell_min',
+  'sell_observed_at',
+  'sell_source',
+  'buy_max',
+  'buy_observed_at',
+  'buy_source',
+] as const
+
+function mesmaLista(a: readonly unknown[], b: readonly unknown[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false
+  return true
+}
+
+/**
+ * Duas respostas trazem os **mesmos preços**?
+ *
+ * O servidor carimba `generated_at = datetime.now()` em toda resposta (`prices/router.py`).
+ * A igualdade estrutural padrão da biblioteca olha a resposta inteira, então esse carimbo
+ * sozinho bastava para o snapshot ganhar identidade nova a cada polling — com o mercado
+ * inteiramente parado.
+ *
+ * No craft, identidade nova custa o catálogo inteiro: medido, **2.703 ms** no Worker mais
+ * **496 ms de thread principal** reconstruindo os `Decimal` de 44.184 linhas. A tela travava
+ * sozinha, em intervalo regular, sem ninguém tocar em nada.
+ *
+ * Aqui a comparação é sobre o que muda o número. Preço que se move continua trocando a
+ * identidade — aí recalcular é o certo.
+ */
+export function mesmosPrecos(
+  anterior: PriceSnapshot | undefined,
+  nova: PriceSnapshot,
+): boolean {
+  if (!anterior) return false
+  if (anterior.server !== nova.server) return false
+  if (anterior.row_count !== nova.row_count) return false
+  if (!mesmaLista(anterior.items, nova.items)) return false
+  if (!mesmaLista(anterior.locations, nova.locations)) return false
+  if (!mesmaLista(anterior.sources, nova.sources)) return false
+  return COLUNAS_DE_PRECO.every((coluna) =>
+    mesmaLista(anterior.columns[coluna], nova.columns[coluna]),
+  )
+}
+
+/**
  * Snapshot de preço do realm (task 4/03).
  *
  * Política `market` (`staleTime` 30 s) — e **nada de IndexedDB**, ao contrário do catálogo: o
@@ -32,7 +84,16 @@ export function usePriceSnapshot(realm: Realm | null, locations: string[]) {
       return response.data as PriceSnapshot
     },
     enabled: realm !== null,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
     ...queryPolicies.market,
+    // O polling de 30 s (task 11.2.2) fica: ele existe para a captura do jogo aparecer na
+    // tela, e uma requisição por meio minuto é barata. O que não pode ficar é o recálculo
+    // que ele disparava sem nenhum preço ter mudado.
+    structuralSharing: (anterior, nova) =>
+      mesmosPrecos(anterior as PriceSnapshot | undefined, nova as PriceSnapshot)
+        ? (anterior as PriceSnapshot)
+        : (nova as PriceSnapshot),
   })
 
   return {

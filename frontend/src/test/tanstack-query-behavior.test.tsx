@@ -7,6 +7,7 @@ import type { OpportunityQuery } from '@/opportunities/service'
 import { useLocations } from '@/prices/hooks'
 import { useDemand } from '@/prices/demand'
 import { server } from '@/test/msw/server'
+import { usePriceSnapshot } from '@/scanner/usePriceSnapshot'
 
 import {
   createTestQueryClient,
@@ -19,6 +20,28 @@ import {
 // depender do backoff real do cliente de produção.
 
 const BASE_QUERY: OpportunityQuery = { limit: 25, offset: 0 }
+
+/** Formato colunar real de `PriceSnapshotOut` — dicionários mais `columns`, não campos soltos. */
+const SNAPSHOT_VAZIO = {
+  server: 'west',
+  generated_at: '2026-09-09T16:20:00Z',
+  row_count: 0,
+  items: [],
+  locations: [],
+  sources: [],
+  columns: {
+    item: [],
+    location: [],
+    quality: [],
+    enchantment: [],
+    sell_min: [],
+    sell_observed_at: [],
+    sell_source: [],
+    buy_max: [],
+    buy_observed_at: [],
+    buy_source: [],
+  },
+}
 
 afterEach(() => {
   Object.defineProperty(document, 'visibilityState', {
@@ -132,6 +155,68 @@ test('com a aba oculta, nenhum refetch periódico acontece', async () => {
       await vi.advanceTimersByTimeAsync(90_000) // 3x o refetchInterval de 30s
     })
     expect(requests).toBe(1) // refetchIntervalInBackground:false + aba oculta = sem poll
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('o snapshot de preços atualiza a cada 30 segundos com a aba visível', async () => {
+  vi.useFakeTimers()
+  try {
+    let requests = 0
+    server.use(
+      http.get('http://localhost:8000/prices/snapshot', () => {
+        requests += 1
+        return HttpResponse.json(SNAPSHOT_VAZIO)
+      }),
+    )
+    const client = createTestQueryClient()
+    renderHook(() => usePriceSnapshot('west', ['1002']), {
+      wrapper: wrapperWithQueryClient(client),
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(requests).toBe(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(requests).toBe(2)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('o snapshot de preços não faz polling com a aba oculta', async () => {
+  vi.useFakeTimers()
+  try {
+    let requests = 0
+    server.use(
+      http.get('http://localhost:8000/prices/snapshot', () => {
+        requests += 1
+        return HttpResponse.json(SNAPSHOT_VAZIO)
+      }),
+    )
+    Object.defineProperty(document, 'visibilityState', {
+      value: 'hidden',
+      configurable: true,
+    })
+    const client = createTestQueryClient()
+    renderHook(() => usePriceSnapshot('west', ['1002']), {
+      wrapper: wrapperWithQueryClient(client),
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(requests).toBe(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(90_000)
+    })
+    expect(requests).toBe(1)
   } finally {
     vi.useRealTimers()
   }

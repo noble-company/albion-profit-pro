@@ -46,6 +46,28 @@ import { DEFAULT_QUANTITY, useScannerFilters } from './useScannerFilters'
  * Não há chave de query envolvida, então nada disso dispara rede.
  */
 
+/**
+ * **Recalcular não é carregar.** Trocar a tabela pelo estado de carregando a cada recálculo
+ * perde a rolagem, fecha a linha aberta e — com 2,7 s de cálculo no craft — lê como travamento.
+ * Só a primeira carga esconde a tabela; depois dela, as linhas do cenário anterior continuam
+ * sendo a melhor informação que existe até a conta nova chegar.
+ */
+export function estadoDaTela({
+  dadosCarregando,
+  calculando,
+  temLinhas,
+}: {
+  dadosCarregando: boolean
+  calculando: boolean
+  temLinhas: boolean
+}): 'carregando' | 'recalculando' | 'pronto' {
+  if (dadosCarregando) return 'carregando'
+  // Sem nenhuma linha ainda, mostrar a tabela escreveria "0 linhas" — uma afirmação sobre o
+  // mercado que a conta inacabada não autoriza.
+  if (calculando) return temLinhas ? 'recalculando' : 'carregando'
+  return 'pronto'
+}
+
 const TIERS = [2, 3, 4, 5, 6, 7, 8]
 const ENCANTAMENTOS = [0, 1, 2, 3, 4]
 
@@ -346,7 +368,11 @@ export function ScannerPage({
     )
   }
 
-  const carregando = catalogo.loading || precos.loading || (noWorker && doWorker.calculando)
+  const estado = estadoDaTela({
+    dadosCarregando: catalogo.loading || precos.loading,
+    calculando: noWorker && doWorker.calculando,
+    temLinhas: linhas.length > 0,
+  })
   const erro = catalogo.error ?? precos.error
 
   return (
@@ -557,7 +583,7 @@ export function ScannerPage({
         <h1 className="text-2xl font-black tracking-tight">{title}</h1>
         <p className="mt-1 text-sm text-foreground-muted">{description}</p>
         <p className="mt-2 text-xs text-foreground-subtle">
-          {carregando ? (
+          {estado === 'carregando' ? (
             'Carregando catálogo e preços…'
           ) : (
             <>
@@ -566,6 +592,11 @@ export function ScannerPage({
               <span title="O scanner usa o topo do livro. O número exato, com profundidade, é o 'Analisar'.">
                 estimativa de topo de livro
               </span>
+              {/* O aviso substitui a tabela em branco: os números abaixo são do cenário
+                  anterior, e dizer isso é mais honesto que esconder tudo por 2,7 s. */}
+              {estado === 'recalculando' && (
+                <span className="text-foreground-muted"> · recalculando…</span>
+              )}
             </>
           )}
         </p>
@@ -575,7 +606,7 @@ export function ScannerPage({
         <EstadoErro title="Não foi possível carregar o scanner">
           O catálogo ou os preços não vieram. A navegação ao lado continua funcionando.
         </EstadoErro>
-      ) : carregando ? (
+      ) : estado === 'carregando' ? (
         <Carregando />
       ) : (
         <div className="min-h-0 flex-1">

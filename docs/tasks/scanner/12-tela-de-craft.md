@@ -155,3 +155,71 @@ mudou.
 
 Este é o tipo de defeito que nenhum teste de comportamento pega — a tela mostra os números
 certos, só demora 2,5 s para isso. Só aparece medindo identidade.
+
+## Correção: a tela travava sozinha, a cada 30 segundos (2026-09-09)
+
+Reportado como "ainda travando" depois da correção acima. Não era a mesma causa.
+
+### A medida
+
+Ciclo completo do craft, 5.523 receitas × 8 cidades = 44.184 linhas:
+
+```
+compute = 2.703 ms   (Worker)
+serialize =  157 ms   (Worker)
+revive  =   496 ms   (THREAD PRINCIPAL)
+```
+
+O Worker tirou os 2,7 s da thread principal, mas deixou **496 ms** nela: `reviveRow`
+reconstrói os `Decimal` de 44 mil linhas do outro lado do `postMessage`. Meio segundo de
+congelamento real, no fim de cada cálculo.
+
+### A causa: o carimbo, não o preço
+
+O polling de 30 s do snapshot (task 11.2.2) fica — ele existe para a captura do jogo aparecer
+na tela. O que não podia ficar era o efeito colateral dele.
+
+`GET /prices/snapshot` carimba `generated_at = datetime.now(UTC)` em **toda** resposta
+(`prices/router.py`). A igualdade estrutural padrão do TanStack Query compara a resposta
+inteira, então esse carimbo sozinho bastava para o snapshot ganhar identidade nova a cada meio
+minuto — **com o mercado inteiramente parado**. Identidade nova reenviava o catálogo ao Worker
+e disparava o ciclo completo: 2,7 s de cálculo mais 496 ms de thread principal travada.
+
+A cada 30 segundos, sem ninguém tocar em nada.
+
+É o mesmo defeito da correção anterior (`URLSearchParams` com identidade nova a cada mudança de
+URL), numa fronteira diferente: **identidade trocando sem o conteúdo ter mudado**.
+
+### A correção
+
+`structuralSharing` própria: a identidade do snapshot segue os **preços** — dicionários,
+`row_count` e as dez colunas —, não o carimbo. Preço que se move continua trocando a
+identidade, e aí recalcular é o certo.
+
+E `estadoDaTela` separa **recalcular de carregar**. A tela tratava os dois como a mesma coisa e
+trocava a tabela inteira pelo `Carregando` a cada recálculo: a rolagem voltava ao topo, a linha
+aberta fechava, e por 2,7 s não havia nada na tela. Agora só a primeira carga esconde a tabela;
+depois dela as linhas do cenário anterior ficam, com um `recalculando…` no cabeçalho. A exceção
+é a primeira conta do craft, que continua escondendo — mostrar a tabela vazia ali escreveria
+"0 linhas", que é uma afirmação sobre o mercado que uma conta inacabada não autoriza.
+
+### Os guards
+
+- `mercado parado: o polling NÃO troca a identidade do snapshot` — vermelho verificado
+  desligando a `structuralSharing`. O par (`preço que se move TROCA a identidade`) fica verde
+  nos dois mundos, provando que a correção não passa do ponto.
+- `recálculo COM linhas na tela mantém a tabela`, com `a PRIMEIRA conta do craft ainda esconde`
+  ao lado.
+
+O teste de identidade custou três versões erradas antes de valer: a primeira passava por não
+ter feito nada (o refetch ficava preso no timer falso), a segunda indexava a resposta por
+contagem de pedidos e entregava a errada, e a terceira lia o estado antes da resposta assentar.
+O sync point que funciona é `dataUpdatedAt` — ele avança em toda resposta, inclusive quando o
+objeto de dados é, de propósito, o mesmo.
+
+### O que sobra
+
+Os **496 ms de revive** continuam lá, agora só quando o cálculo é de verdade (mudança de
+cenário, ou preço que se moveu) em vez de a cada 30 s. Baixar isso significa parar de reviver
+44 mil linhas para mostrar trinta — as linhas ficariam serializadas e só a janela visível
+viraria `Decimal`. Não está feito, e `sortRows`/`applyFilters` teriam que mudar junto.
