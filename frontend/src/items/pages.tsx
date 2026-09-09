@@ -4,11 +4,9 @@ import { useNavigate } from 'react-router'
 import { ItemAutocomplete } from '@/components/ItemAutocomplete'
 import { traduzirCategoria } from '@/i18n/categories'
 import { useCategories } from '@/opportunities/hooks'
+// Task 4/09: as classes vêm do módulo canônico; a cópia local daqui foi a terceira do projeto.
+import { filterControl, filterLabel } from '@/components/filters'
 
-const fieldLabel =
-  'flex flex-col gap-1 text-xs font-bold uppercase tracking-wide text-foreground-subtle'
-const fieldControl =
-  'mt-1 min-h-11 rounded-lg border border-border-strong bg-background px-3 py-2 text-sm font-medium normal-case tracking-normal text-foreground'
 
 export function BuscaItem() {
   const navigate = useNavigate()
@@ -50,13 +48,13 @@ export function BuscaItem() {
             filters={filters}
           />
         </div>
-        <label className={fieldLabel}>
+        <label className={`${filterLabel} flex flex-col gap-1`}>
           Tier
           <select
             aria-label="Filtrar por tier"
             value={tier}
             onChange={(event) => setTier(event.target.value)}
-            className={fieldControl}
+            className={filterControl}
           >
             <option value="">Todos</option>
             {[1, 2, 3, 4, 5, 6, 7, 8].map((value) => (
@@ -66,13 +64,13 @@ export function BuscaItem() {
             ))}
           </select>
         </label>
-        <label className={fieldLabel}>
+        <label className={`${filterLabel} flex flex-col gap-1`}>
           Encantamento
           <select
             aria-label="Filtrar por encantamento"
             value={enchantment}
             onChange={(event) => setEnchantment(event.target.value)}
-            className={fieldControl}
+            className={filterControl}
           >
             <option value="">Todos</option>
             {[0, 1, 2, 3, 4].map((value) => (
@@ -82,13 +80,13 @@ export function BuscaItem() {
             ))}
           </select>
         </label>
-        <label className={fieldLabel}>
+        <label className={`${filterLabel} flex flex-col gap-1`}>
           Categoria
           <select
             aria-label="Filtrar por categoria"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
-            className={fieldControl}
+            className={filterControl}
           >
             <option value="">Todas</option>
             {categoryOptions.map((option) => (

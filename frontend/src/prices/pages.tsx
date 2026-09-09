@@ -11,12 +11,11 @@ import {
 import { useLocationName } from '@/lib/locations'
 
 import { DemandaItem } from './demand'
+// Task 4/09: as classes vêm do módulo canônico de filtros, não de uma cópia local.
+import { filterControl, filterLabel } from '@/components/filters'
+
 import { useItem, useItemPrices, useLocations } from './hooks'
 
-const filterField =
-  'flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-foreground-subtle'
-const filterControl =
-  'min-h-11 rounded-lg border border-border-strong bg-background px-3 py-2 text-sm font-medium normal-case tracking-normal text-foreground'
 
 export function ItemPricesPage() {
   const { uniqueName = '' } = useParams()
@@ -89,7 +88,7 @@ export function ItemPricesPage() {
       </p>
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <label className={filterField}>
+        <label className={`${filterLabel} flex items-center gap-2`}>
           Escopo
           <select
             aria-label="Escopo"
@@ -101,7 +100,7 @@ export function ItemPricesPage() {
             <option value="mine">Minha cobertura</option>
           </select>
         </label>
-        <label className={filterField}>
+        <label className={`${filterLabel} flex items-center gap-2`}>
           Cidade
           <select
             aria-label="Cidade"
@@ -117,7 +116,7 @@ export function ItemPricesPage() {
             ))}
           </select>
         </label>
-        <label className={filterField}>
+        <label className={`${filterLabel} flex items-center gap-2`}>
           Qualidade
           <select
             aria-label="Qualidade"
@@ -133,7 +132,7 @@ export function ItemPricesPage() {
             ))}
           </select>
         </label>
-        <label className={filterField}>
+        <label className={`${filterLabel} flex items-center gap-2`}>
           Encantamento
           <select
             aria-label="Encantamento"

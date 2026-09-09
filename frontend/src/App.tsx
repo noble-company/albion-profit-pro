@@ -20,9 +20,11 @@ const ItemPricesPage = lazy(() =>
 const CalculadoraPage = lazy(() =>
   import('@/craft/pages').then((m) => ({ default: m.CalculadoraPage })),
 )
-const RefiningRankingPage = lazy(() =>
-  import('@/opportunities/production-pages').then((m) => ({
-    default: m.RefiningRankingPage,
+// Task 4/11: `/refino` passou para o scanner. A tela antiga (`production-pages`) segue
+// servindo `/craft` até a task 4/12, e some com o ranking materializado na 4/15.
+const RefiningScannerPage = lazy(() =>
+  import('@/scanner/ScannerPage').then((m) => ({
+    default: m.RefiningScannerPage,
   })),
 )
 const CraftingRankingPage = lazy(() =>
@@ -95,7 +97,7 @@ export function App() {
             path="/refino"
             element={
               <Boundary>
-                <RefiningRankingPage />
+                <RefiningScannerPage />
               </Boundary>
             }
           />

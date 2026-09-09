@@ -22,6 +22,14 @@ const CANON: Record<string, string> = {
   FilterToggle: '/src/components/opportunities/FilterPanel.tsx',
   FilterNumber: '/src/components/opportunities/FilterPanel.tsx',
   useOpportunityParams: '/src/opportunities/useOpportunityParams.ts',
+  // Primitivos verticais da sidebar (task 4/09). A família horizontal de `FilterPanel` não
+  // cabe numa coluna de 288 px, e espremer geraria a quarta cópia de `fieldLabel`.
+  FilterSearch: '/src/components/filters/index.tsx',
+  FilterChips: '/src/components/filters/index.tsx',
+  FilterCheckbox: '/src/components/filters/index.tsx',
+  FilterNumberField: '/src/components/filters/index.tsx',
+  FilterSelectField: '/src/components/filters/index.tsx',
+  FilterGroup: '/src/components/filters/index.tsx',
 }
 
 test('cada primitivo compartilhado é declarado uma única vez, no lugar canônico', () => {
@@ -34,6 +42,25 @@ test('cada primitivo compartilhado é declarado uma única vez, no lugar canôni
         offenders.push(`${path}: redeclara ${name} (canônico: ${home})`)
       }
     }
+  }
+  expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
+})
+
+// F05 de novo, pela outra ponta: as strings de classe do campo de filtro estavam copiadas à
+// mão em `items/pages.tsx` e `prices/pages.tsx`, além do canônico. Copiar a string é copiar o
+// componente sem o nome — o guard acima não veria.
+test('as classes de campo de filtro não são recopiadas à mão', () => {
+  const offenders: string[] = []
+  const permitido = new Set([
+    '/src/components/filters/index.tsx',
+    '/src/components/opportunities/FilterPanel.tsx',
+  ])
+  for (const [path, raw] of Object.entries(sources)) {
+    if (path.endsWith('.test.ts') || path.endsWith('.test.tsx')) continue
+    if (permitido.has(path)) continue
+    const declara =
+      /\b(const|let)\s+(fieldLabel|fieldControl|filterField|filterControl)\b/
+    if (declara.test(stripComments(raw))) offenders.push(path)
   }
   expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
 })

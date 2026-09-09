@@ -39,6 +39,48 @@ export function formatarNomeItem(
   return `${base} T${tier}${enchantment && Number(enchantment) > 0 ? `.${enchantment}` : ''}`
 }
 
+/**
+ * Substantivo curto por família de recurso — bruto e refinado.
+ *
+ * O nome do jogo diz a espécie e o adjetivo de encantamento ("Minério de Titânio
+ * Excepcional"), e **os dois já estão ditos** pelo tier e pelo `.3` que vêm logo depois. Numa
+ * tabela de 15 colunas isso é a diferença entre ler a linha e não ler.
+ *
+ * A chave é a família no `unique_name`, não o texto localizado: `T5_ORE_LEVEL3@3` → `ORE`.
+ * Assim o encurtamento não depende de idioma nem de como a Sandbox escreve o nome no próximo
+ * patch. Cobre exatamente 248 itens — todo o refino e nada além dele (medido no banco).
+ *
+ * **Só para tabela.** Onde o item é o assunto — autocomplete, tela de Preços, gaveta de
+ * detalhe — vale `formatarNomeItem`: ali o nome do jogo é o que a pessoa digitou e o que ela
+ * confere. Encurtar equipamento nunca: "Espada" serve para dezenas de armas diferentes,
+ * enquanto "Minério" é sempre a mesma coisa dentro do tier.
+ */
+const RECURSO_CURTO: Record<string, string> = {
+  ORE: 'Minério',
+  METALBAR: 'Barra',
+  WOOD: 'Madeira',
+  PLANKS: 'Tábua',
+  FIBER: 'Fibra',
+  CLOTH: 'Tecido',
+  HIDE: 'Pelego',
+  LEATHER: 'Couro',
+  ROCK: 'Pedra',
+  STONEBLOCK: 'Bloco',
+}
+
+export function formatarNomeCurto(
+  name: string | null | undefined,
+  uniqueName: string,
+) {
+  const match = uniqueName.match(/^T(\d+)_([A-Z]+)(?:_LEVEL\d+)?(?:@(\d+))?$/i)
+  const familia = match?.[2]
+  const curto = familia ? RECURSO_CURTO[familia.toUpperCase()] : undefined
+  if (!match || !curto) return formatarNomeItem(name, uniqueName)
+
+  const [, tier, , enchantment] = match
+  return `${curto} T${tier}${enchantment && Number(enchantment) > 0 ? `.${enchantment}` : ''}`
+}
+
 export function formatarQualidade(value: number | null | undefined) {
   const labels = ['Normal', 'Bom', 'Excelente', 'Excepcional', 'Obra-prima']
   return value != null && value >= 1 && value <= labels.length
