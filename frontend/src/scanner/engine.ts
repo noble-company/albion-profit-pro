@@ -7,6 +7,7 @@ import {
   calculateIngredientRequirement,
   calculateProduction,
   calculateSaleRevenue,
+  calculateStationFee,
   type AcquisitionMode,
   type SaleMode,
 } from '@/lib/craft-formulas'
@@ -75,8 +76,12 @@ export interface ScannerParams {
   premium: boolean
   /** taxa em [0,1] — já convertida de percentual por `percentageToRate` */
   returnRate: string
-  /** silver por execução */
-  stationCostPerExecution: string
+  /**
+   * Taxa de uso da estação **por 100 de nutrição consumida** — como o jogo cobra (task 4/18).
+   * Prata fixa por execução não existe: a nutrição sai do valor do item, e um recurso T4 e uma
+   * arma T8 diferem por três ordens de grandeza.
+   */
+  stationFeePer100Nutrition: string
   useFocus: boolean
   /** qualidade da saída a cotar */
   outputQuality: number
@@ -277,8 +282,11 @@ function prepararReceita(
       params.useFocus,
     ),
     recipeSilver: multiplyByQuantity(recipe.silver_cost, production.executions),
-    stationTotal: multiplyByQuantity(
-      money(params.stationCostPerExecution),
+    // O valor do item vem da SAÍDA, e é ele que decide o tamanho da taxa. Item sem valor
+    // (trade pack de facção) não paga estação — ver `calculateStationFee`.
+    stationTotal: calculateStationFee(
+      saida?.item_value ?? null,
+      params.stationFeePer100Nutrition,
       production.executions,
     ),
     salesTaxRate: salesTaxRateFor(params.premium),

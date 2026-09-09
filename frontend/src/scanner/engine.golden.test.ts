@@ -28,13 +28,14 @@ interface Vector {
     crafting_focus: number
     amount_crafted: number
     output_weight: string | null
+    item_value: string | null
     ingredients: Array<{ item: string; count: number; enchantment_level: number }>
   }
   prices: Record<string, { sell: string | null; buy: string | null }>
   params: {
     premium: boolean
     return_rate: string
-    station_cost_per_execution: string
+    station_fee_per_100_nutrition: string
     use_focus: boolean
     output_quality: number
     quantity: number
@@ -67,6 +68,9 @@ function catalogFor(vector: Vector): ScannerCatalog {
       {
         unique_name: vector.recipe.output_item,
         weight: vector.recipe.output_weight,
+        // A taxa da estação sai daqui (task 4/18): sem o valor do item, o cliente cobraria
+        // zero e divergiria do servidor exatamente na linha da estação.
+        item_value: vector.recipe.item_value,
         enchantment_level: vector.recipe.enchantment_level,
       },
     ] as ScannerCatalog['items'],
@@ -102,7 +106,7 @@ function paramsFor(vector: Vector): ScannerParams {
     },
     premium: vector.params.premium,
     returnRate: vector.params.return_rate,
-    stationCostPerExecution: vector.params.station_cost_per_execution,
+    stationFeePer100Nutrition: vector.params.station_fee_per_100_nutrition,
     useFocus: vector.params.use_focus,
     outputQuality: vector.params.output_quality,
     quantity: vector.params.quantity,

@@ -183,7 +183,7 @@ def _payload(**overrides) -> dict:
         "quantity": 4,
         "location_id": "1002",
         "return_rate": "0",
-        "station_cost_per_execution": "0",
+        "station_fee_per_100_nutrition": "0",
         "use_focus": True,
         "premium": True,
     }

@@ -17,6 +17,16 @@ export const NON_PREMIUM_SALES_TAX_RATE = new Decimal('0.08')
 /** Taxa de montagem, cobrada ao **postar** uma ordem (de compra ou de venda). */
 export const SETUP_FEE_RATE = new Decimal('0.025')
 
+/**
+ * Nutrição consumida por execução = valor do item × este fator, e a estação cobra uma taxa
+ * **por 100 de nutrição** (task 4/18). Verificado contra a estação no jogo: Couro T4.2
+ * (`@itemvalue` 64) a 390 por 100 de nutrição dá 28,08, e o jogo cobra 28.
+ */
+export const NUTRITION_PER_ITEM_VALUE = new Decimal('0.1125')
+
+/** A taxa é cotada por 100 de nutrição, não por 1. */
+export const NUTRITION_FEE_BASIS = new Decimal('100')
+
 export function salesTaxRateFor(premium: boolean): Decimal {
   return premium ? PREMIUM_SALES_TAX_RATE : NON_PREMIUM_SALES_TAX_RATE
 }

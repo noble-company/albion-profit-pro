@@ -91,7 +91,7 @@ test('calcula o catálogo de craft inteiro numa cidade sem estourar a ordem de g
       byItemCity: new Map(),
       manualSale: new Map(),
     },
-    stationCostPerExecution: '0', useFocus: true, outputQuality: 1, quantity: 1,
+    stationFeePer100Nutrition: '0', useFocus: true, outputQuality: 1, quantity: 1,
   })
   const duracao = performance.now() - inicio
 

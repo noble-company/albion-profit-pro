@@ -7,7 +7,13 @@ primitives with executable order-book quotes.
 from dataclasses import dataclass
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 
-from src.craft.constants import DISPLAY_DECIMAL_PLACES, AcquisitionMode, SaleMode
+from src.craft.constants import (
+    DISPLAY_DECIMAL_PLACES,
+    NUTRITION_FEE_BASIS,
+    NUTRITION_PER_ITEM_VALUE,
+    AcquisitionMode,
+    SaleMode,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +144,36 @@ def calculate_focus_consumed(crafting_focus: int, executions: int, *, use_focus:
     if executions < 0:
         raise ValueError("executions must be non-negative")
     return crafting_focus * executions if use_focus else 0
+
+
+def calculate_station_fee(
+    item_value: Decimal | None, fee_per_100_nutrition: Decimal, executions: int
+) -> Decimal:
+    """Silver charged by the crafting station for `executions` runs of a recipe.
+
+    The game does not charge a flat amount per run: it charges per **nutrition consumed**, and
+    each recipe consumes an amount derived from the item's value
+    (`nutrition = item_value × 0.1125`). A T4 refined resource and a T8 weapon differ by three
+    orders of magnitude, so no single per-run number can be right for both.
+
+    `item_value` is `None` for the faction trade packs, whose ingredients are tokens with no
+    value anywhere in the chain. Those are untradeable, so the row has no sale price either —
+    charging an invented fee there would add cost to a line nobody can sell.
+
+    Not rounded on purpose: where the game rounds a partial silver (it shows 28 for 28.08) is
+    not established, and inventing a rule would fake precision the measurement does not have.
+    """
+    _validate_non_negative(fee_per_100_nutrition, "fee_per_100_nutrition")
+    if item_value is None or executions <= 0:
+        return Decimal("0")
+    _validate_non_negative(item_value, "item_value")
+
+    nutrition = item_value * NUTRITION_PER_ITEM_VALUE
+    fee = nutrition * fee_per_100_nutrition / NUTRITION_FEE_BASIS * executions
+    # A cadeia de multiplicações acumula casas (`28.08000000`). O valor é o mesmo, mas o fio
+    # carrega dinheiro como string decimal (`F09`) e o zero à direita vira ruído no contrato —
+    # e faria a string do servidor divergir da do cliente nos vetores dourados.
+    return fee.quantize(Decimal(1)) if fee == fee.to_integral_value() else fee.normalize()
 
 
 def calculate_percentage_charge(base: Decimal, rate: Decimal) -> Decimal:

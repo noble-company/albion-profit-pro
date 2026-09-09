@@ -82,7 +82,8 @@ function snapshot(
 /** Refino de T4_CLOTH: 2×T4_FIBER + 1×T3_CLOTH, 1 produzido, sem custo de prata. */
 const CATALOGO: ScannerCatalog = {
   items: [
-    { unique_name: 'T4_CLOTH', weight: '0.51', enchantment_level: 0, tier: 4, crafting_category: 'fiber' },
+    // `item_value` é o `@itemvalue` real do T4_CLOTH — a base da taxa da estação (task 4/18).
+    { unique_name: 'T4_CLOTH', weight: '0.51', enchantment_level: 0, tier: 4, crafting_category: 'fiber', item_value: '16' },
     { unique_name: 'T4_FIBER', weight: '0.51', enchantment_level: 0 },
     { unique_name: 'T3_CLOTH', weight: '0.38', enchantment_level: 0 },
   ] as ScannerCatalog['items'],
@@ -117,7 +118,7 @@ const PADRAO: ScannerParams = {
   destinyBoard: new Map(),
   premium: true,
   returnRate: '0',
-  stationCostPerExecution: '0',
+  stationFeePer100Nutrition: '0',
   useFocus: false,
   outputQuality: 1,
   quantity: 1,
@@ -269,21 +270,22 @@ describe('computeScanner — o cálculo que saiu do servidor', () => {
   })
 
   test('custo médio por item junta TODOS os custos, não só a compra', () => {
-    // 100 refinos com estação a 30 por execução: fibras 200×100 = 20.000,
-    // tecidos 100×200 = 20.000, estação 100×30 = 3.000 -> custo 43.000.
-    // médio = 43.000 / 100 = 430 por item.
+    // 100 refinos numa estação que cobra 390 por 100 de nutrição — a taxa do print do jogo.
+    // Fibras 200×100 = 20.000, tecidos 100×200 = 20.000.
+    // Estação: 16 (valor do item) × 0,1125 = 1,8 de nutrição por execução; 1,8 × 390/100 = 7,02
+    // por execução; × 100 = 702. Custo 40.702, médio 407,02 por item.
     const linha = rodar(
       snapshot([
         { item: 'T4_FIBER', location: '1002', sell: '100' },
         { item: 'T3_CLOTH', location: '1002', sell: '200' },
         { item: 'T4_CLOTH', location: '1002', buy: '1000' },
       ]),
-      { quantity: 100, stationCostPerExecution: '30' },
+      { quantity: 100, stationFeePer100Nutrition: '390' },
     )[0]!
 
-    expect(linha.totalCost?.toString()).toBe('43000')
+    expect(linha.totalCost?.toString()).toBe('40702')
     expect(linha.producedQuantity).toBe(100)
-    expect(linha.averageUnitCost?.toString()).toBe('430')
+    expect(linha.averageUnitCost?.toString()).toBe('407.02')
   })
 
   test('o percentual digitado entra como decimal exato (regressão da task 3.6/01)', () => {
@@ -388,11 +390,12 @@ describe('sessão de refino (task 11.6)', () => {
     const linha = rodar(SNAP_SESSAO(), {
       quantity: 1000,
       returnRate: '0.152',
-      stationCostPerExecution: '30',
+      stationFeePer100Nutrition: '390',
     })[0]!
 
-    // compra 2000×100 + 1000×200 = 400.000; estação 30 × 1179 = 35.370.
-    expect(linha.totalCost?.toString()).toBe('435370')
+    // compra 2000×100 + 1000×200 = 400.000; estação 7,02 por execução × 1179 = 8.276,58.
+    // Cobrar pelas 1000 iniciais daria 7.020 — 18% a menos.
+    expect(linha.totalCost?.toString()).toBe('408276.58')
   })
 
   test('sem retorno, receitas iniciais e execuções são a mesma coisa', () => {
@@ -701,7 +704,7 @@ describe('lista de compras (task 4/11.2)', () => {
   test('a soma dos subtotais fecha com o custo total', () => {
     // O teste que impede a lista de compras de divergir do número que a linha exibe. Se um dia
     // as duas contas usarem caminhos diferentes, é aqui que aparece.
-    const linha = rodar(snap, { quantity: 1000, stationCostPerExecution: '7' })[0]!
+    const linha = rodar(snap, { quantity: 1000, stationFeePer100Nutrition: '390' })[0]!
 
     const somaIngredientes = linha.ingredients.reduce(
       (total, i) => total.plus(i.subtotal!),
@@ -709,10 +712,10 @@ describe('lista de compras (task 4/11.2)', () => {
     )
     // custo total = ingredientes + taxa de aquisição + prata da receita + estação.
     // Neste cenário a aquisição é imediata (sem taxa) e a receita não cobra prata; sobra a
-    // estação: 7 × 1000 execuções.
+    // estação: 7,02 por execução × 1000 execuções.
     expect(linha.acquisitionMode).toBe('immediate')
     expect(linha.totalCost?.toString()).toBe(
-      somaIngredientes.plus(7 * 1000).toString(),
+      somaIngredientes.plus(7.02 * 1000).toString(),
     )
   })
 

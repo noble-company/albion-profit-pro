@@ -292,7 +292,7 @@ export function ScannerPage({
                   output_quality: scenario.outputQuality,
                   scope: 'all',
                   return_rate: scenario.returnRate,
-                  station_cost_per_execution: scenario.stationCostPerExecution,
+                  station_fee_per_100_nutrition: scenario.stationFeePer100Nutrition,
                   use_focus: scenario.useFocus,
                   premium: scenario.premium,
                   // As exceções de preço da barra viajam junto: sem elas o "exato" ignoraria
@@ -554,11 +554,22 @@ export function ScannerPage({
               </p>
             )}
             <FilterNumberField
-              label="Estação por execução"
-              value={scenario.stationCostPerExecution === '0' ? '' : scenario.stationCostPerExecution}
-              onChange={(v) => setParam('station_cost', v)}
+              label="Taxa da estação"
+              value={
+                scenario.stationFeePer100Nutrition === '0'
+                  ? ''
+                  : scenario.stationFeePer100Nutrition
+              }
+              onChange={(v) => setParam('station_fee', v)}
               placeholder="0"
+              suffix="/100 nut."
             />
+            <p className="text-xs text-foreground-subtle">
+              A <strong>taxa de uso por 100 de nutrição</strong> que a estação cobra — o número
+              que aparece no topo da janela dela no jogo. Quanto cada receita consome sai do
+              valor do item, então a mesma taxa custa centavos num recurso T4 e milhares numa
+              arma T8.
+            </p>
             <FilterCheckbox
               label="Conta Premium"
               description="Imposto de venda 4% em vez de 8%"

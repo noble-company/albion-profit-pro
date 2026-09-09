@@ -37,6 +37,11 @@ class Item(Base):
     # Decimal, não float: entra na divisão `lucro / peso`, cujo resultado o usuário lê — a
     # regra F09 vale pra toda aritmética exibida. Nulo pra item sem `@weight` no dump.
     weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
+    # Valor do item (`@itemvalue` do dump, ou derivado da receita quando o dump não publica —
+    # ver `scripts/_item_values.py`). É a base da taxa da estação: o jogo cobra por nutrição
+    # consumida, e `nutrição = item_value × 0,1125` (task 4/18). Nulo para item cuja cadeia de
+    # receita não resolve — os trade packs de facção, feitos de token sem valor.
+    item_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
     busca_normalizada: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))
 
 

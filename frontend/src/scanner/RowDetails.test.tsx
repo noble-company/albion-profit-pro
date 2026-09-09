@@ -74,7 +74,7 @@ const PARAMS: ScannerParams = {
   destinyBoard: new Map(),
   premium: true,
   returnRate: '0',
-  stationCostPerExecution: '0',
+  stationFeePer100Nutrition: '0',
   useFocus: false,
   outputQuality: 1,
   quantity: 1,

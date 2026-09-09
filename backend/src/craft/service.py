@@ -12,6 +12,7 @@ from src.craft.formulas import (
     calculate_ingredient_requirement,
     calculate_production,
     calculate_sale_revenue,
+    calculate_station_fee,
 )
 from src.craft.quotes import QuoteResult, manual_side, ordered_warnings, quote
 from src.craft.schemas import CraftSimulationRequest
@@ -273,7 +274,9 @@ async def simulate_craft(
     )
 
     recipe_silver_cost = Decimal(recipe["silver_cost"] * production.executions)
-    station_cost = request.station_cost_per_execution * production.executions
+    station_cost = calculate_station_fee(
+        recipe["item_value"], request.station_fee_per_100_nutrition, production.executions
+    )
     scenarios = [
         _build_scenario(
             ingredient_rows,

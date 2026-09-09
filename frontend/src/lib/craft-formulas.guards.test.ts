@@ -7,6 +7,7 @@ import {
   calculateIngredientRequirement,
   calculateProduction,
   calculateSaleRevenue,
+  calculateStationFee,
 } from './craft-formulas'
 
 // task 3.5/26: os vetores dourados (craft-formulas.golden.test.ts) travam os caminhos
@@ -62,4 +63,37 @@ test('calculateFinancialResult devolve roi null quando o custo é zero', () => {
   const r = calculateFinancialResult('0', '100', 4)
   expect(r.roi).toBeNull()
   expect(r.profit.toString()).toBe('100')
+})
+
+// task 4/18 — a estação cobra por nutrição consumida, não por execução.
+
+test('calculateStationFee bate com o número que o jogo cobra', () => {
+  // Estação aberta no jogo: taxa de uso 390 por 100 de nutrição, refinando Couro T4.2
+  // (`@itemvalue` 64). O jogo cobrou 28; a tela mostrava 400.
+  expect(calculateStationFee('64', '390', 1).toString()).toBe('28.08')
+})
+
+test('calculateStationFee escala com as execuções', () => {
+  expect(calculateStationFee('64', '390', 100).toString()).toBe('2808')
+})
+
+test('o valor do item manda no tamanho da taxa — por isso prata fixa não servia', () => {
+  // O erro do modelo antigo trocava de sinal: uma taxa fixa de 400 cobrava 56× demais num
+  // recurso T4 e 9× de menos numa arma T8.
+  const couroT4 = calculateStationFee('16', '400', 1)
+  const machadoT8 = calculateStationFee('8192', '400', 1)
+
+  expect(couroT4.toString()).toBe('7.2')
+  expect(machadoT8.toString()).toBe('3686.4')
+  expect(couroT4.lessThan(400) && machadoT8.greaterThan(400)).toBe(true)
+})
+
+test('sem valor de item a estação não cobra, e não inventa', () => {
+  // Trade pack de facção: os ingredientes são tokens sem valor em ponto nenhum da cadeia.
+  expect(calculateStationFee(null, '390', 10).toString()).toBe('0')
+})
+
+test('calculateStationFee rejeita taxa negativa', () => {
+  expect(() => calculateStationFee('64', '-1', 1)).toThrow(RangeError)
+  expect(() => calculateStationFee('-64', '390', 1)).toThrow(RangeError)
 })

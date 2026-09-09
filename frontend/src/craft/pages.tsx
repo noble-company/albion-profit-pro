@@ -22,7 +22,7 @@ const BASE_DEFAULTS: FormValues = {
   output_quality: 1,
   scope: 'all',
   return_rate: '0',
-  station_cost_per_execution: '0',
+  station_fee_per_100_nutrition: '0',
   use_focus: false,
   premium: true,
   sales_tax_rate: null,
@@ -178,7 +178,7 @@ export function CalculadoraPage() {
       quantity: Number(values.quantity),
       output_quality: Number(values.output_quality),
       return_rate: String(values.return_rate),
-      station_cost_per_execution: String(values.station_cost_per_execution),
+      station_fee_per_100_nutrition: String(values.station_fee_per_100_nutrition),
     })
   }
 
@@ -273,13 +273,15 @@ export function CalculadoraPage() {
           />
         </label>
         <label>
-          Custo da estação
+          {/* Taxa de uso por 100 de nutrição, que é como a estação cobra no jogo — não prata
+              fixa por execução (task 4/18). */}
+          Taxa da estação (por 100 de nutrição)
           <input
             type="number"
             step="0.01"
             min="0"
             className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
-            {...register('station_cost_per_execution')}
+            {...register('station_fee_per_100_nutrition')}
           />
         </label>
         <label className="flex items-center gap-2">

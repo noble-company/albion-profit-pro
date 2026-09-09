@@ -14,6 +14,7 @@ from src.craft.formulas import (
     calculate_ingredient_requirement,
     calculate_production,
     calculate_sale_revenue,
+    calculate_station_fee,
 )
 from src.craft.quotes import QuoteResult, manual_side, ordered_warnings, quote
 from src.craft.schemas import CraftCompareRequest
@@ -26,7 +27,7 @@ from src.prices.service import (
     query_executable_book_levels,
 )
 from src.recipes.models import Recipe
-from src.recipes.service import get_recipe_family
+from src.recipes.service import get_item_values, get_recipe_family
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,6 +267,11 @@ async def compare_craft(
 ) -> dict:
     locations = await list_eligible_craft_locations(session)
     family = await get_recipe_family(session, request.output_item)
+    # Base da taxa da estação (task 4/18). Uma consulta para a família toda: a rota direta e a
+    # de upgrade produzem itens diferentes, com valores diferentes.
+    item_values = await get_item_values(
+        session, [recipe.output_item_unique_name for recipe in family.values()]
+    )
     target_recipe = family[max(family)]
     target_level = target_recipe.enchantment_level
     base_recipe = family.get(0)
@@ -410,7 +416,11 @@ async def compare_craft(
                 use_focus=request.use_focus,
             ),
             recipe_silver_cost=Decimal(target_recipe.silver_cost * direct_production.executions),
-            station_cost=request.station_cost_per_execution * direct_production.executions,
+            station_cost=calculate_station_fee(
+                item_values.get(target_recipe.output_item_unique_name),
+                request.station_fee_per_100_nutrition,
+                direct_production.executions,
+            ),
             upgrade_steps=[],
             levels_by_combo=levels_by_combo,
             coverage=coverage,
@@ -442,8 +452,12 @@ async def compare_craft(
                 else Decimal("0")
             ),
             station_cost=(
-                request.station_cost_per_execution * base_production.executions
-                if base_production is not None
+                calculate_station_fee(
+                    item_values.get(base_recipe.output_item_unique_name),
+                    request.station_fee_per_100_nutrition,
+                    base_production.executions,
+                )
+                if base_recipe is not None and base_production is not None
                 else Decimal("0")
             ),
             upgrade_steps=upgrade_steps,

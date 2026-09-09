@@ -73,6 +73,7 @@ BLOCO 3 — o resto do produto
 13 Comida & Poções                         ── depende de 12
 14 Calculadora sobre o engine              ── depende de 05
 17 Painel do Destino (eficiencia de foco)  ── depende de 11
+18 Taxa da estacao por nutricao            ── depende de 01, 05
 15 Aposentar o ranking materializado       ── depende de 11, 12
 16 Documentos reconciliados                ── depende de 15
 ```
@@ -108,6 +109,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | 13 | Comida & Poções | — | Aba própria, mesmo motor |
 | 14 | Calculadora sobre o engine | — | Instantânea ao digitar |
 | [17](17-painel-do-destino.md) | Painel do Destino | — | Custo de foco real: `Lucro/foco` deixa de errar por ate 16x |
+| [18](18-taxa-da-estacao-por-nutricao.md) | Taxa da estação por nutrição | `W5` | A estação cobra por nutrição consumida; prata fixa errava por 56x pra mais e 44x pra menos |
 | 15 | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
 | 16 | Documentos reconciliados | — | Specs param de descrever a arquitetura revogada |
 
@@ -139,7 +141,8 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [x] 12 — Tela de Craft (Worker, colunas do craft)
 - [ ] 13 — Comida & Poções
 - [ ] 14 — Calculadora sobre o engine
-- [ ] 17 — Painel do Destino (eficiência de foco)
+- [x] 17 — Painel do Destino (eficiência de foco)
+- [x] 18 — Taxa da estação por nutrição consumida
 - [ ] 15 — Aposentar o ranking materializado
 - [ ] 16 — Documentos reconciliados
 
@@ -186,4 +189,5 @@ A [Fase 3.6](../correcoes/README.md) é substituída por esta. Destino de cada t
 | `W1` | **Taxa de montagem por ingrediente.** `_build_scenario` soma `part.setup_fee` de cada ingrediente; o motor do cliente cobrava `ceil()` uma vez sobre o total somado. Dois ingredientes de 100 dão 6 no servidor e davam 5 no cliente. | task 06 |
 | `W4` | **Virtualização não é testável em jsdom.** `@tanstack/react-virtual` depende de layout real; nem stub de `getBoundingClientRect`, nem polyfill de `ResizeObserver`, nem `initialRect` fazem o virtualizador renderizar em jsdom. Teste removido em favor de guard textual + verificação no navegador. | task 10 |
 | `W3` | **Guard textual verde testando nada.** O `` de uma regex virou byte backspace (`0x08`) ao passar por heredoc de shell; o teste passava sem casar nada. Só apareceu porque o guard *deveria* nascer vermelho. Escrever regex de guard pelo editor, não por script. | task 09 |
+| `W5` | **A taxa da estação não é prata por execução.** O jogo cobra por **nutrição consumida**, e a nutrição sai do valor do item (`itemvalue × 0,1125`). Prata fixa cobrava 56× demais num recurso T4 e 44× de menos numa arma T8 Avalon — o erro **troca de sinal**, então nenhum valor digitado ficava certo em duas linhas ao mesmo tempo. `@itemvalue` nunca tinha sido importado, e o dump não o publica para arma nem equipamento. | task 18 |
 | `W2` | **Encantamento da saída tem duas fontes.** O servidor usa `recipe["enchantment_level"]` (coluna); o cliente derivava do sufixo `@N` do nome. Coincidem no dado real, mas o modo de falha seria silencioso — combo inexistente virando "sem preço". | task 06 |

@@ -46,6 +46,7 @@ from src.craft.formulas import (
     calculate_ingredient_requirement,
     calculate_production,
     calculate_sale_revenue,
+    calculate_station_fee,
 )
 
 OUTPUT = (
@@ -74,7 +75,11 @@ def compose_scenarios(recipe: dict, prices: dict, params: dict) -> dict | None:
         recipe["crafting_focus"], production.executions, use_focus=params["use_focus"]
     )
     recipe_silver = Decimal(recipe["silver_cost"]) * production.executions
-    station_total = Decimal(params["station_cost_per_execution"]) * production.executions
+    station_total = calculate_station_fee(
+        Decimal(recipe["item_value"]) if recipe.get("item_value") is not None else None,
+        Decimal(params["station_fee_per_100_nutrition"]),
+        production.executions,
+    )
     sales_tax_rate = (
         DEFAULT_PREMIUM_SALES_TAX_RATE if params["premium"] else DEFAULT_NON_PREMIUM_SALES_TAX_RATE
     )
@@ -191,6 +196,8 @@ _REFINO = {
     "production_kind": "refining",
     "enchantment_level": 0,
     "silver_cost": 0,
+    # `@itemvalue` real do dump — a base da taxa da estação (task 4/18).
+    "item_value": "16",
     "crafting_focus": 100,
     "amount_crafted": 1,
     "output_weight": "0.51",
@@ -205,6 +212,7 @@ _CRAFT_MULTIPLO = {
     "production_kind": "refining",
     "enchantment_level": 0,
     "silver_cost": 37,
+    "item_value": "32",
     "crafting_focus": 78,
     "amount_crafted": 5,  # exercita produced_quantity != executions
     "output_weight": "0.76",
@@ -219,6 +227,9 @@ _ENCANTADO = {
     "production_kind": "refining",
     "enchantment_level": 2,
     "silver_cost": 120,
+    # O valor DOBRA por nível de encantamento: T6_CLOTH vale 64, o nível 2 vale 256. É o caso
+    # que o modelo antigo (prata fixa por execução) não conseguia representar.
+    "item_value": "256",
     "crafting_focus": 320,
     "amount_crafted": 1,
     "output_weight": "1.14",
@@ -251,7 +262,7 @@ _CASES: list[tuple[dict, dict, dict]] = [
         {
             "premium": True,
             "return_rate": "0",
-            "station_cost_per_execution": "0",
+            "station_fee_per_100_nutrition": "0",
             "use_focus": False,
             "output_quality": 1,
             "quantity": 1,
@@ -271,7 +282,7 @@ _CASES: list[tuple[dict, dict, dict]] = [
         {
             "premium": True,
             "return_rate": "0",
-            "station_cost_per_execution": "0",
+            "station_fee_per_100_nutrition": "0",
             "use_focus": False,
             "output_quality": 1,
             "quantity": 1,
@@ -291,7 +302,7 @@ _CASES: list[tuple[dict, dict, dict]] = [
         {
             "premium": False,
             "return_rate": "0",
-            "station_cost_per_execution": "0",
+            "station_fee_per_100_nutrition": "0",
             "use_focus": True,
             "output_quality": 1,
             "quantity": 1,
@@ -311,7 +322,7 @@ _CASES: list[tuple[dict, dict, dict]] = [
         {
             "premium": True,
             "return_rate": "0.367",
-            "station_cost_per_execution": "137",
+            "station_fee_per_100_nutrition": "137",
             "use_focus": True,
             "output_quality": 1,
             "quantity": 1,
@@ -331,7 +342,7 @@ _CASES: list[tuple[dict, dict, dict]] = [
         {
             "premium": True,
             "return_rate": "0.248",
-            "station_cost_per_execution": "53",
+            "station_fee_per_100_nutrition": "53",
             "use_focus": True,
             "output_quality": 1,
             "quantity": 7,
@@ -351,7 +362,7 @@ _CASES: list[tuple[dict, dict, dict]] = [
         {
             "premium": False,
             "return_rate": "0.088",
-            "station_cost_per_execution": "1200",
+            "station_fee_per_100_nutrition": "1200",
             "use_focus": True,
             "output_quality": 3,
             "quantity": 3,
@@ -371,7 +382,7 @@ _CASES: list[tuple[dict, dict, dict]] = [
         {
             "premium": False,
             "return_rate": "0",
-            "station_cost_per_execution": "500",
+            "station_fee_per_100_nutrition": "500",
             "use_focus": False,
             "output_quality": 1,
             "quantity": 1,
@@ -385,7 +396,7 @@ _CASES: list[tuple[dict, dict, dict]] = [
         {
             "premium": True,
             "return_rate": "0",
-            "station_cost_per_execution": "0",
+            "station_fee_per_100_nutrition": "0",
             "use_focus": False,
             "output_quality": 1,
             "quantity": 1,

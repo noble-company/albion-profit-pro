@@ -1,7 +1,8 @@
 """Contrato do catálogo estático (task 4/02).
 
 Inglês em toda a superfície HTTP (`B09`). Dinheiro e grandezas derivadas viajam como string
-decimal (`F09`) — aqui isso vale para `weight`, que entra na divisão `lucro / peso` do scanner.
+decimal (`F09`) — aqui isso vale para `weight`, que entra na divisão `lucro / peso` do scanner,
+e para `item_value`, que multiplica a taxa da estação.
 
 Formato deliberado: **dicionário de itens + receitas que o referenciam**. Um mesmo ingrediente
 aparece em centenas de receitas; repetir nome/tier/peso em cada uma multiplicaria o payload sem
@@ -24,14 +25,19 @@ class CatalogItemOut(BaseModel):
     tier: int | None = None
     enchantment_level: int = 0
     weight: Decimal | None = None
+    # Base da taxa da estação: o jogo cobra por nutrição consumida, e
+    # `nutrição = item_value × 0,1125` (task 4/18). Nulo para item cuja cadeia de receita não
+    # resolve — os trade packs de facção.
+    item_value: Decimal | None = None
     shop_category: str | None = None
     shop_subcategory: str | None = None
     # Ramo do Painel do Destino — o cliente usa para achar o nó que reduz o foco (task 4/17).
     crafting_category: str | None = None
 
-    @field_serializer("weight")
-    def _weight_as_string(self, value: Decimal | None) -> str | None:
-        # F09: grandeza que entra em divisão exibida nunca vira float no fio.
+    @field_serializer("weight", "item_value")
+    def _decimal_as_string(self, value: Decimal | None) -> str | None:
+        # F09: grandeza que entra em conta exibida nunca vira float no fio. `item_value`
+        # multiplica a taxa da estação, que o usuário lê como prata cobrada.
         return None if value is None else format(value.normalize(), "f")
 
 

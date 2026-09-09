@@ -154,7 +154,7 @@ function ProductionRankingPage({ config }: { config: PageConfig }) {
       output_quality: query.quality ?? row.quality_level ?? 1,
       scope: 'all',
       return_rate: query.returnRate,
-      station_cost_per_execution: query.stationCostPerExecution,
+      station_fee_per_100_nutrition: query.stationCostPerExecution,
       use_focus: query.useFocus,
       premium: query.premium,
       sales_tax_rate: null,

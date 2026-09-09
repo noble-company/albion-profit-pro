@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scripts._dumps import iter_category_entries, load_item_dump_items, load_items_json
+from scripts._item_values import resolve_item_values
 from src.database import async_session_maker
 from src.items.models import Item
 from src.items.normalization import normalize_item_search
@@ -94,7 +95,10 @@ def load_dump_metadata(dump_path: Path) -> dict[str, dict]:
 
 
 def build_items(
-    items_json_path: Path, dump_metadata: dict[str, dict], skipped_too_long: list[str]
+    items_json_path: Path,
+    dump_metadata: dict[str, dict],
+    skipped_too_long: list[str],
+    item_values: dict[str, Decimal] | None = None,
 ) -> list[dict]:
     data = load_items_json(items_json_path)
     rows = []
@@ -116,6 +120,9 @@ def build_items(
                 "name_en": localized_names.get("EN-US"),
                 "tier": meta.get("tier"),
                 "weight": meta.get("weight"),
+                # Pelo nome COMPLETO, não pelo base: o valor dobra a cada nível de encantamento,
+                # e `T4_ARMOR@2` vale quatro vezes `T4_ARMOR` (task 4/18).
+                "item_value": (item_values or {}).get(unique_name),
                 "enchantment_level": _enchantment_level(unique_name),
                 "shop_category": meta.get("shop_category"),
                 "shop_subcategory": meta.get("shop_subcategory"),
@@ -135,10 +142,17 @@ def build_items(
 def prepare_item_import(
     items_json_path: Path = ITEMS_JSON_PATH, item_dump_path: Path = ITEM_DUMP_PATH
 ) -> ItemImportPlan:
-    source_count = len(load_items_json(items_json_path))
+    entries = load_items_json(items_json_path)
+    source_count = len(entries)
     dump_metadata = load_dump_metadata(item_dump_path)
+    # A lista autoritativa de nomes é `items.json`; o dump sozinho não enumera todas as
+    # variantes `@N` (três extratos de alquimia não declaram o nível).
+    item_values = resolve_item_values(
+        load_item_dump_items(item_dump_path),
+        names={e["UniqueName"] for e in entries if e.get("UniqueName")},
+    )
     skipped_too_long: list[str] = []
-    rows = build_items(items_json_path, dump_metadata, skipped_too_long)
+    rows = build_items(items_json_path, dump_metadata, skipped_too_long, item_values)
     return ItemImportPlan(rows, source_count, skipped_too_long)
 
 
@@ -160,6 +174,7 @@ async def apply_item_import(
                     "name_en": stmt.excluded.name_en,
                     "tier": stmt.excluded.tier,
                     "weight": stmt.excluded.weight,
+                    "item_value": stmt.excluded.item_value,
                     "enchantment_level": stmt.excluded.enchantment_level,
                     "shop_category": stmt.excluded.shop_category,
                     "shop_subcategory": stmt.excluded.shop_subcategory,

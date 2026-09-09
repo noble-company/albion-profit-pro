@@ -126,7 +126,7 @@ def _payload(**overrides) -> dict:
         "output_item": "T4_SWORD@2",
         "quantity": 2,
         "return_rate": "0",
-        "station_cost_per_execution": "0",
+        "station_fee_per_100_nutrition": "0",
         "acquisition_mode": "immediate",
         "sale_mode": "immediate",
     }

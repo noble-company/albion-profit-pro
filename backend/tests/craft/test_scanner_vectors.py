@@ -50,7 +50,7 @@ def test_arquivo_committado_esta_atualizado() -> None:
     )
 
 
-def _item(unique_name: str, weight: str | None = None) -> Item:
+def _item(unique_name: str, weight: str | None = None, item_value: str | None = None) -> Item:
     _, sep, suffix = unique_name.rpartition("@")
     return Item(
         unique_name=unique_name,
@@ -59,6 +59,7 @@ def _item(unique_name: str, weight: str | None = None) -> Item:
         tier=4,
         enchantment_level=int(suffix) if sep else 0,
         weight=Decimal(weight) if weight else None,
+        item_value=Decimal(item_value) if item_value else None,
         busca_normalizada=unique_name.casefold(),
     )
 
@@ -92,7 +93,18 @@ async def test_composicao_bate_com_simulate_craft(db_session, indice: int) -> No
 
     # --- catálogo ---
     nomes = {receita_dados["output_item"]} | {i["item"] for i in receita_dados["ingredients"]}
-    db_session.add_all([_item(nome, receita_dados.get("output_weight")) for nome in sorted(nomes)])
+    # `item_value` só na SAÍDA: é dela que sai a nutrição consumida, e é o que faz a taxa da
+    # estação do `simulate_craft` bater com a do script (task 4/18).
+    db_session.add_all(
+        [
+            _item(
+                nome,
+                receita_dados.get("output_weight"),
+                receita_dados.get("item_value") if nome == receita_dados["output_item"] else None,
+            )
+            for nome in sorted(nomes)
+        ]
+    )
 
     receita = Recipe(
         output_item_unique_name=receita_dados["output_item"],
@@ -133,7 +145,7 @@ async def test_composicao_bate_com_simulate_craft(db_session, indice: int) -> No
             output_quality=params["output_quality"],
             scope="all",
             return_rate=Decimal(params["return_rate"]),
-            station_cost_per_execution=Decimal(params["station_cost_per_execution"]),
+            station_fee_per_100_nutrition=Decimal(params["station_fee_per_100_nutrition"]),
             use_focus=params["use_focus"],
             premium=params["premium"],
         ),

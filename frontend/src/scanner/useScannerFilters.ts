@@ -26,7 +26,12 @@ export interface ScannerScenario {
   quantityMeans: 'initial_recipes'
   /** taxa em [0,1], já convertida do percentual digitado */
   returnRate: string
-  stationCostPerExecution: string
+  /**
+   * Taxa de uso da estação **por 100 de nutrição consumida** (task 4/18). A chave na URL mudou
+   * de `station_cost` junto: mantendo o nome antigo, um link salvo com `station_cost=400`
+   * passaria a significar outra coisa em silêncio — e o número certo para aquele refino era 28.
+   */
+  stationFeePer100Nutrition: string
   useFocus: boolean
   outputQuality: number
   quantity: number
@@ -117,7 +122,7 @@ export function useScannerFilters() {
   const chaveDoCenario = chaveDe(params, [
     'premium',
     'return_rate',
-    'station_cost',
+    'station_fee',
     'focus',
     'quality',
     'qty',
@@ -128,7 +133,7 @@ export function useScannerFilters() {
       premium: params.get('premium') !== 'false',
       quantityMeans: 'initial_recipes',
       returnRate: taxaSegura(percentageToRate(params.get('return_rate') ?? '0')),
-      stationCostPerExecution: params.get('station_cost') || '0',
+      stationFeePer100Nutrition: params.get('station_fee') || '0',
       useFocus: params.get('focus') === 'true',
       outputQuality: Number(params.get('quality') ?? 1) || 1,
       // Padrão em LOTE, não em unidade. Com `qty=1`, `ceil` engole o retorno de recurso
