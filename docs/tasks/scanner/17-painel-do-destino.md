@@ -240,3 +240,14 @@ Toda vez que o schema do catálogo crescer, o cliente com cache quente ia contin
 
 Vale a pena olhar se `GET /prices/snapshot` tem o mesmo buraco quando ganhar um campo; ele não
 usa `ETag` hoje (política `market`, 30 s), então provavelmente não — mas é a mesma família.
+
+## Ajuste: foco é ponto inteiro (2026-09-09)
+
+A tela mostrava `45,472` de foco. O jogo cobra **ponto inteiro por craft**, então um número
+quebrado ali é um valor que o jogador não vê em lugar nenhum para conferir.
+
+Arredondado **para cima, por execução** — e não no total. Três refinos de 15 custam 45, não
+`ceil(3 × 14,3587) = 44`: cada craft é uma cobrança separada no jogo.
+
+O arredondamento fica no engine, não em `focusCostFor`: a grade do Painel do Destino usa a mesma
+função para mostrar a **porcentagem** que sobra (`7.9% do foco`), e arredondar lá viraria 8%.

@@ -294,6 +294,10 @@ function prepararReceita(
 /**
  * Foco por execução com a especialização do jogador aplicada.
  *
+ * **Inteiro, arredondado para cima, por execução.** O jogo cobra ponto inteiro de foco por
+ * craft; mostrar `14,36` seria um número que o jogador não vê em lugar nenhum. E o arredondamento
+ * é por execução, não no total: três refinos de 15 custam 45, não `ceil(3 × 14,3587) = 44`.
+ *
  * Só refino por enquanto: o craft usa a mesma fórmula, mas a árvore tem outra forma e outros
  * coeficientes (ver `focus-efficiency.ts`). Chamar a conta do refino para uma receita de craft
  * daria zero de eficiência — silenciosamente certo hoje, silenciosamente errado amanhã —, então
@@ -307,9 +311,11 @@ function focoPorExecucao(
   if (recipe.production_kind !== 'refining') return recipe.crafting_focus
   if (!saida?.crafting_category || saida.tier == null) return recipe.crafting_focus
 
-  return focusCostFor(
-    recipe.crafting_focus,
-    refiningEfficiency(saida.crafting_category, saida.tier, params.destinyBoard),
+  return Math.ceil(
+    focusCostFor(
+      recipe.crafting_focus,
+      refiningEfficiency(saida.crafting_category, saida.tier, params.destinyBoard),
+    ),
   )
 }
 

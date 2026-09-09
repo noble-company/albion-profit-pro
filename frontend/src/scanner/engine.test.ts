@@ -320,7 +320,9 @@ describe('painel do destino (task 17)', () => {
     const semPainel = rodar(SNAP_FOCO(), { useFocus: true })[0]!
 
     expect(semPainel.focusConsumed).toBe(100)
-    expect(comPainel.focusConsumed).toBeCloseTo(14.36, 2)
+    // 14,3587 vira 15: o jogo cobra ponto inteiro de foco por craft, e cobrar "14,36" seria
+    // um número que o jogador não vê em lugar nenhum.
+    expect(comPainel.focusConsumed).toBe(15)
     // Mesmo lucro, muito menos foco: a métrica que ranqueia o dia muda de patamar.
     expect(comPainel.profit?.toString()).toBe(semPainel.profit?.toString())
     expect(Number(comPainel.profitPerFocus)).toBeGreaterThan(
@@ -330,6 +332,24 @@ describe('painel do destino (task 17)', () => {
 
   test('painel vazio deixa o custo base — ninguém ganha desconto que não conquistou', () => {
     expect(rodar(SNAP_FOCO(), { useFocus: true })[0]!.focusConsumed).toBe(100)
+  })
+
+  test('o foco cobrado é inteiro, arredondado para CIMA, por execução', () => {
+    // Por execução, e não no total: o jogo cobra cada craft separadamente, então 3 refinos de
+    // 15 custam 45 — não `ceil(3 × 14,3587) = 44`.
+    const uma = rodar(SNAP_FOCO(), {
+      useFocus: true,
+      quantity: 1,
+      destinyBoard: new Map([['refine:fiber:4', 100]]),
+    })[0]!
+    const tres = rodar(SNAP_FOCO(), {
+      useFocus: true,
+      quantity: 3,
+      destinyBoard: new Map([['refine:fiber:4', 100]]),
+    })[0]!
+
+    expect(uma.focusConsumed).toBe(15)
+    expect(tres.focusConsumed).toBe(45)
   })
 
   test('nó de outra família não reduz nada', () => {
