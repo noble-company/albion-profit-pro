@@ -142,6 +142,48 @@ describe('lista de compras', () => {
   })
 })
 
+describe('colunas do craft (task 12)', () => {
+  const quatro = [
+    { item: 'T4_PLANKS', enchantmentLevel: 0, purchaseQuantity: 80, unitPrice: money('10'), subtotal: money('800') },
+    { item: 'T4_METALBAR', enchantmentLevel: 0, purchaseQuantity: 48, unitPrice: money('20'), subtotal: money('960') },
+    { item: 'T4_LEATHER', enchantmentLevel: 0, purchaseQuantity: 12, unitPrice: money('30'), subtotal: money('360') },
+    { item: 'T4_ARTEFACT', enchantmentLevel: 0, purchaseQuantity: 1, unitPrice: money('5000'), subtotal: money('5000') },
+  ]
+
+  const colunaCraft = (key: string) =>
+    buildColumns(locationName, nomeItem, { modo: 'craft' }).find((c) => c.key === key)!
+
+  test('resume TODOS os ingredientes numa coluna — o craft tem de 1 a 4', () => {
+    // As colunas fixas do refino cobrem 105 das 110 receitas porque lá são sempre 2. Aqui um
+    // par de colunas por ingrediente daria oito colunas para mostrar quatro números.
+    render(<>{colunaCraft('ingredientes').cell(row({ ingredients: quatro }), item)}</>)
+
+    expect(screen.getByText(/T4_PLANKS ×80/)).toBeInTheDocument()
+    expect(screen.getByText(/T4_ARTEFACT ×1/)).toBeInTheDocument()
+  })
+
+  test('o investimento é a soma dos ingredientes, não o de um deles', () => {
+    render(<>{colunaCraft('investimento').cell(row({ ingredients: quatro }), item)}</>)
+
+    // 800 + 960 + 360 + 5.000 = 7.120
+    expect(screen.getByText('7.120 silver')).toBeInTheDocument()
+  })
+
+  test('ingrediente sem preço não vira zero na soma', () => {
+    const semUm = [...quatro.slice(0, 3), { ...quatro[3]!, unitPrice: null, subtotal: null }]
+    render(<>{colunaCraft('investimento').cell(row({ ingredients: semUm }), item)}</>)
+
+    // Some o que dá para somar e **avisa** que falta — 2.120 com a marca de incompleto.
+    expect(screen.getByText(/2\.120 silver/)).toBeInTheDocument()
+    expect(screen.getByTitle(/sem preço/i)).toBeInTheDocument()
+  })
+
+  test('no refino as colunas por ingrediente continuam como estavam', () => {
+    expect(buildColumns(locationName, nomeItem).some((c) => c.key === 'ing0')).toBe(true)
+    expect(buildColumns(locationName, nomeItem).some((c) => c.key === 'ingredientes')).toBe(false)
+  })
+})
+
 describe('rendimento da sessão (task 11.6)', () => {
   test('mostra quantos itens saem no fim, não quantas receitas foram compradas', () => {
     // É o número que responde "vou terminar com quanto?". Com 1000 receitas e 15,2% de
@@ -155,7 +197,7 @@ describe('estratégia na linha (task 11.5)', () => {
   test('a coluna diz em que cenário o número foi feito', () => {
     // Sem isso, "lucro 658" some com a premissa: ele supõe a ordem de compra E a de venda
     // sendo aceitas. É a expectativa falsa que a leitura por cima cria.
-    const column = buildColumns(locationName, nomeItem, new Date(), true).find(
+    const column = buildColumns(locationName, nomeItem, { mostrarEstrategia: true }).find(
       (c) => c.key === 'estrategia',
     )!
     render(<>{column.cell(row({ acquisitionMode: 'buy_order', saleMode: 'sell_order' }), item)}</>)

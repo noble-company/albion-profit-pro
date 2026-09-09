@@ -30,6 +30,7 @@ import { RowDetails } from './RowDetails'
 import { ScannerTable } from './ScannerTable'
 import { DEFAULT_SORT, sortRows, type SortState } from './sorting'
 import { usePriceSnapshot } from './usePriceSnapshot'
+import { useScannerWorker } from './useScannerWorker'
 import { IngredientPrices } from './IngredientPrices'
 import { RETORNOS_PADRAO, rendimentoPorCemRecursos } from './return-rates'
 import { DEFAULT_QUANTITY, useScannerFilters } from './useScannerFilters'
@@ -135,17 +136,45 @@ export function ScannerPage({
     [scenario, cidadesDeVenda, cidades, pricing, strategy, painelDoDestino],
   )
 
-  // O cálculo inteiro. Refino são 110 receitas × cidades — roda na thread principal sem
-  // Worker; o craft (5.523) usa o Worker da task 05 quando chegar a task 12.
-  const linhas = useMemo(() => {
-    if (!catalogo.catalog || !indice) return []
-    const todas = computeScanner(
+  /**
+   * **Onde a conta roda.** Refino são 110 receitas (~30 ms): na thread principal, sem latência
+   * de mensagem nem estado de "calculando" piscando. Craft são 5.523 × 8 cidades — medido em
+   * **2.583 ms**, que na thread principal congela a interface a cada mudança de cenário.
+   */
+  const noWorker = kind === 'crafting'
+
+  const entradaDoWorker = useMemo(
+    () =>
+      noWorker && catalogo.catalog && precos.snapshot
+        ? {
+            catalog: {
+              recipes: catalogo.catalog.recipes,
+              items: catalogo.catalog.items,
+            },
+            snapshot: precos.snapshot,
+            canonical: cidades.flatMap((c) =>
+              c.ids.map((id) => [id, c.id] as [string, string]),
+            ),
+            params: paramsDoEngine,
+          }
+        : null,
+    [noWorker, catalogo.catalog, precos.snapshot, cidades, paramsDoEngine],
+  )
+  const doWorker = useScannerWorker(entradaDoWorker)
+
+  const naThreadPrincipal = useMemo(() => {
+    if (noWorker || !catalogo.catalog || !indice) return []
+    return computeScanner(
       { recipes: catalogo.catalog.recipes, items: catalogo.catalog.items },
       indice,
       paramsDoEngine,
     )
+  }, [noWorker, catalogo.catalog, indice, paramsDoEngine])
+
+  const linhas = useMemo(() => {
+    const todas = noWorker ? doWorker.rows : naThreadPrincipal
     return sellIn === 'best' ? bestPerRecipe(todas) : todas
-  }, [catalogo.catalog, indice, paramsDoEngine, sellIn])
+  }, [noWorker, doWorker.rows, naThreadPrincipal, sellIn])
 
   /**
    * O filtro de cidade só vale no modo de comparação. Fora dele a cidade já foi decidida pelo
@@ -174,13 +203,11 @@ export function ScannerPage({
 
   const columns = useMemo(
     () =>
-      buildColumns(
-        locationName,
-        nomeItem,
-        new Date(),
-        strategy.acquisition === 'best' || strategy.sale === 'best',
-      ),
-    [locationName, nomeItem, strategy],
+      buildColumns(locationName, nomeItem, {
+        mostrarEstrategia: strategy.acquisition === 'best' || strategy.sale === 'best',
+        modo: kind === 'crafting' ? 'craft' : 'refino',
+      }),
+    [locationName, nomeItem, strategy, kind],
   )
 
   /**
@@ -319,7 +346,7 @@ export function ScannerPage({
     )
   }
 
-  const carregando = catalogo.loading || precos.loading
+  const carregando = catalogo.loading || precos.loading || (noWorker && doWorker.calculando)
   const erro = catalogo.error ?? precos.error
 
   return (
@@ -576,6 +603,16 @@ export function RefiningScannerPage() {
       kind="refining"
       title="O que vale a pena refinar"
       description="Todas as receitas de refino, em todas as cidades — inclusive as que ainda não têm preço."
+    />
+  )
+}
+
+export function CraftingScannerPage() {
+  return (
+    <ScannerPage
+      kind="crafting"
+      title="O que vale a pena craftar"
+      description="As 5.523 receitas de craft, em todas as cidades — inclusive as que ainda não têm preço."
     />
   )
 }

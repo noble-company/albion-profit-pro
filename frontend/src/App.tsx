@@ -27,9 +27,9 @@ const RefiningScannerPage = lazy(() =>
     default: m.RefiningScannerPage,
   })),
 )
-const CraftingRankingPage = lazy(() =>
-  import('@/opportunities/production-pages').then((m) => ({
-    default: m.CraftingRankingPage,
+const CraftingScannerPage = lazy(() =>
+  import('./scanner/ScannerPage').then((m) => ({
+    default: m.CraftingScannerPage,
   })),
 )
 const DestinyBoardPage = lazy(() =>
@@ -116,7 +116,7 @@ export function App() {
             path="/craft"
             element={
               <Boundary>
-                <CraftingRankingPage />
+                <CraftingScannerPage />
               </Boundary>
             }
           />

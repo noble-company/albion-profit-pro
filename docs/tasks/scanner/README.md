@@ -104,7 +104,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | [11.4](11.4-linha-expansivel.md) | Linha expansível | — | Extrato, procedência, cenários, edição de preço |
 | [11.5](11.5-estrategia-e-analise-exata.md) | Estratégia e análise exata | — | Premissa declarada; ponte para `/craft/simulate` |
 | [11.6](11.6-sessao-de-refino.md) | Sessão de refino | — | Compra pelas receitas iniciais; coluna Rendimento |
-| 12 | Tela de Craft | — | 5.523 receitas virtualizadas |
+| [12](12-tela-de-craft.md) | Tela de Craft | — | 5.523 receitas no Worker; ingredientes resumidos |
 | 13 | Comida & Poções | — | Aba própria, mesmo motor |
 | 14 | Calculadora sobre o engine | — | Instantânea ao digitar |
 | [17](17-painel-do-destino.md) | Painel do Destino | — | Custo de foco real: `Lucro/foco` deixa de errar por ate 16x |
@@ -136,7 +136,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [x] 11.4 — Linha expansível (extrato, procedência, cenários, edição)
 - [x] 11.5 — Estratégia declarada e análise exata
 - [x] 11.6 — Sessão de refino (compra cheia, rendimento, estação por execução total)
-- [ ] 12 — Tela de Craft
+- [x] 12 — Tela de Craft (Worker, colunas do craft)
 - [ ] 13 — Comida & Poções
 - [ ] 14 — Calculadora sobre o engine
 - [ ] 17 — Painel do Destino (eficiência de foco)

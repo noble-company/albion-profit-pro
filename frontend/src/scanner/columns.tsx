@@ -1,6 +1,6 @@
 import { ItemImage } from '@/components/ItemImage'
 import { formatarIdade, formatarNomeCurto } from '@/lib/formatters'
-import { formatPercent, formatQuantity, formatSilver } from '@/lib/money'
+import { add, formatPercent, formatQuantity, formatSilver } from '@/lib/money'
 
 import type { ScannerRow } from './engine'
 import type { ScannerColumn } from './ScannerTable'
@@ -89,15 +89,82 @@ const MODO_CURTO: Record<string, string> = {
   sell_order: 'ordem',
 }
 
-export function buildColumns(
-  locationName: (id: string) => string,
-  nomeItem: NomeItem,
-  agora: Date = new Date(),
+/**
+ * Resumo de todos os ingredientes numa coluna (task 4/12).
+ *
+ * O refino tem 2 ingredientes em 105 das 110 receitas, e por isso as colunas fixas
+ * `Ingrediente 1/2` funcionam lá. O craft tem **de 1 a 4**, variados: um par de colunas por
+ * ingrediente daria oito colunas para mostrar quatro números, quase sempre vazias. O detalhe
+ * completo — preço unitário, procedência, subtotal — já está no painel expandido.
+ */
+function colunaIngredientes(nomeItem: NomeItem): ScannerColumn {
+  return {
+    key: 'ingredientes',
+    header: 'Ingredientes',
+    width: 'minmax(16rem, 1.6fr)',
+    cell: (row) =>
+      row.ingredients.length === 0 ? (
+        TRACO
+      ) : (
+        <span className="truncate">
+          {row.ingredients
+            .map(
+              (ingrediente) =>
+                `${nomeItem(ingrediente.item)} ×${ingrediente.purchaseQuantity.toLocaleString('pt-BR')}`,
+            )
+            .join(' · ')}
+        </span>
+      ),
+  }
+}
+
+/** O investimento do craft é a soma dos ingredientes — no refino cada um tem sua coluna. */
+function colunaInvestimentoTotal(): ScannerColumn {
+  return {
+    key: 'investimento',
+    header: 'Investimento',
+    numeric: true,
+    width: '9rem',
+    cell: (row) => {
+      const comPreco = row.ingredients.filter((i) => i.subtotal !== null)
+      if (comPreco.length === 0) return TRACO
+      const soma = add(...comPreco.map((i) => i.subtotal!))
+      const falta = comPreco.length < row.ingredients.length
+
+      return (
+        <span className={falta ? 'text-foreground-subtle' : ''}>
+          {formatSilver(soma)}
+          {/* Somar só o que tem preço e não dizer nada seria um total que parece completo.
+              O aviso é o que impede a soma parcial de virar decisão. */}
+          {falta && (
+            <span
+              className="ml-1 text-danger"
+              title={`${row.ingredients.length - comPreco.length} ingrediente(s) sem preço`}
+            >
+              *
+            </span>
+          )}
+        </span>
+      )
+    },
+  }
+}
+
+export interface OpcoesDeColuna {
+  agora?: Date
   /**
    * Só quando a estratégia está em "melhor cenário". Com a estratégia travada na barra, a
    * coluna repetiria o que o controle já diz — e largura de tabela é cara.
    */
-  mostrarEstrategia = false,
+  mostrarEstrategia?: boolean
+  /** `refino` tem 2 ingredientes fixos; `craft` tem de 1 a 4 e resume numa coluna só. */
+  modo?: 'refino' | 'craft'
+}
+
+export function buildColumns(
+  locationName: (id: string) => string,
+  nomeItem: NomeItem,
+  { agora = new Date(), mostrarEstrategia = false, modo = 'refino' }: OpcoesDeColuna = {},
 ): ScannerColumn[] {
   return [
     {
@@ -126,10 +193,14 @@ export function buildColumns(
         <span className="truncate text-buy-side">{locationName(row.locationId)}</span>
       ),
     },
-    colunaIngrediente(0, nomeItem),
-    colunaSubtotal(0),
-    colunaIngrediente(1, nomeItem),
-    colunaSubtotal(1),
+    ...(modo === 'craft'
+      ? [colunaIngredientes(nomeItem), colunaInvestimentoTotal()]
+      : [
+          colunaIngrediente(0, nomeItem),
+          colunaSubtotal(0),
+          colunaIngrediente(1, nomeItem),
+          colunaSubtotal(1),
+        ]),
     {
       key: 'rendimento',
       header: 'Rendimento',

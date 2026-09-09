@@ -9,7 +9,10 @@ const app = readFileSync('src/App.tsx', 'utf8')
 
 const PAGE_MODULES = [
   '@/opportunities/pages',
-  '@/opportunities/production-pages',
+  // `@/opportunities/production-pages` saiu daqui na task 4/12: `/refino` e `/craft` passaram
+  // para o scanner e nenhuma rota aponta mais para a tela antiga. O módulo em si é apagado na
+  // task 15, junto do ranking materializado que ele consome.
+  './scanner/ScannerPage',
   '@/items/pages',
   '@/prices/pages',
   '@/craft/pages',
