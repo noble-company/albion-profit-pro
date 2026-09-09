@@ -2,7 +2,12 @@ import Decimal from 'decimal.js'
 
 import type { components } from '@/api/schema'
 
-import { money, percentageCharge, type Money } from './money'
+import {
+  NON_PREMIUM_SALES_TAX_RATE,
+  PREMIUM_SALES_TAX_RATE,
+  SETUP_FEE_RATE,
+} from './craft-constants'
+import { divide, money, percentageCharge, type Money } from './money'
 
 /**
  * Camada "e se" do cliente (task 3.5/23) — porte de `ranking_service.py::_project_row`.
@@ -19,9 +24,6 @@ import { money, percentageCharge, type Money } from './money'
 
 type RankingComponents = components['schemas']['RankingComponentsOut']
 
-const PREMIUM_SALES_TAX_RATE = new Decimal('0.04')
-const NON_PREMIUM_SALES_TAX_RATE = new Decimal('0.08')
-const SETUP_FEE_RATE = new Decimal('0.025')
 const ZERO = new Decimal(0)
 const ONE = new Decimal(1)
 
@@ -117,8 +119,7 @@ export function projectRankingRow(
       const netRevenue = grossRevenue.minus(salesTax).minus(saleSetupFee)
       const profit = netRevenue.minus(totalCost)
       const roi = totalCost.greaterThan(0)
-        ? profit
-            .div(totalCost)
+        ? divide(profit, totalCost)
             .times(100)
             .toDecimalPlaces(4, Decimal.ROUND_HALF_EVEN)
         : null
@@ -180,9 +181,11 @@ export function applyProjection(
     station_cost: projected.stationCost.toString(),
     focus_consumed: projected.focusConsumed,
     oldest_observed_at: projected.oldestObservedAt,
-    buy_price: produced ? projected.totalCost.div(produced).toString() : null,
+    buy_price: produced
+      ? divide(projected.totalCost, produced).toString()
+      : null,
     sell_price: produced
-      ? projected.grossRevenue.div(produced).toString()
+      ? divide(projected.grossRevenue, produced).toString()
       : null,
   }
 }

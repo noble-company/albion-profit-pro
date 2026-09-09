@@ -41,6 +41,7 @@ import { usePageVisible } from '@/lib/usePageVisible'
 import { useLocations } from '@/prices/hooks'
 
 import { useProductionOpportunities } from './hooks'
+import { readProductionExtra } from './production-params'
 import type { Opportunity, ProductionKind } from './service'
 import { useOpportunityParams } from './useOpportunityParams'
 
@@ -59,20 +60,6 @@ const KINDS: ReadonlyArray<{
   { kind: 'refining', label: 'Refino', path: '/refino' },
   { kind: 'crafting', label: 'Craft', path: '/craft' },
 ]
-
-function percentageToRate(value: string) {
-  if (!value) return '0'
-  const numeric = Number(value.replace(',', '.'))
-  return Number.isFinite(numeric) ? String(numeric / 100) : '0'
-}
-
-function readProductionExtra(params: URLSearchParams) {
-  return {
-    returnRate: percentageToRate(params.get('return_rate') || '0'),
-    stationCostPerExecution: params.get('station_cost') || '0',
-    useFocus: params.get('focus') === 'true',
-  }
-}
 
 /** Alterna entre Refino e Craft carregando os filtros da URL (task 3.5/22 item 6). */
 function KindToggle({ current }: { current: ProductionKind }) {

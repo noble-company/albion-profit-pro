@@ -268,6 +268,117 @@
     },
     {
       "components": {
+        "recipe_silver_cost": 12,
+        "crafting_focus": 180,
+        "executions": 4,
+        "produced_quantity": 4,
+        "ingredient_cost_immediate": "6000",
+        "ingredient_cost_order": "5400",
+        "output_gross_immediate": "10000",
+        "output_gross_order": "11200",
+        "ingredients_oldest_observed_at": "2026-09-01T09:30:00+00:00",
+        "output_immediate_observed_at": "2026-09-01T12:00:00+00:00",
+        "output_order_observed_at": "2026-09-01T15:45:00+00:00"
+      },
+      "params": {
+        "premium": true,
+        "return_rate_percent": "36.7",
+        "station_cost_per_execution": "0",
+        "use_focus": false
+      },
+      "expected": {
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "gross_revenue": "11200",
+        "sales_tax": "448",
+        "sale_setup_fee": "280",
+        "net_revenue": "10472",
+        "acquisition_setup_fee": "86",
+        "total_fees": "814",
+        "total_cost": "3552.2",
+        "profit": "6919.8",
+        "roi": "194.8032",
+        "station_cost": "0",
+        "focus_consumed": 0,
+        "oldest_observed_at": "2026-09-01T09:30:00+00:00"
+      }
+    },
+    {
+      "components": {
+        "recipe_silver_cost": 12,
+        "crafting_focus": 180,
+        "executions": 4,
+        "produced_quantity": 4,
+        "ingredient_cost_immediate": "6000",
+        "ingredient_cost_order": "5400",
+        "output_gross_immediate": "10000",
+        "output_gross_order": "11200",
+        "ingredients_oldest_observed_at": "2026-09-01T09:30:00+00:00",
+        "output_immediate_observed_at": "2026-09-01T12:00:00+00:00",
+        "output_order_observed_at": "2026-09-01T15:45:00+00:00"
+      },
+      "params": {
+        "premium": false,
+        "return_rate_percent": "8.8",
+        "station_cost_per_execution": "250",
+        "use_focus": true
+      },
+      "expected": {
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "gross_revenue": "11200",
+        "sales_tax": "896",
+        "sale_setup_fee": "280",
+        "net_revenue": "10024",
+        "acquisition_setup_fee": "124",
+        "total_fees": "1300",
+        "total_cost": "6096.8",
+        "profit": "3927.2",
+        "roi": "64.4141",
+        "station_cost": "1000",
+        "focus_consumed": 720,
+        "oldest_observed_at": "2026-09-01T09:30:00+00:00"
+      }
+    },
+    {
+      "components": {
+        "recipe_silver_cost": 12,
+        "crafting_focus": 180,
+        "executions": 4,
+        "produced_quantity": 4,
+        "ingredient_cost_immediate": "6000",
+        "ingredient_cost_order": "5400",
+        "output_gross_immediate": "10000",
+        "output_gross_order": "11200",
+        "ingredients_oldest_observed_at": "2026-09-01T09:30:00+00:00",
+        "output_immediate_observed_at": "2026-09-01T12:00:00+00:00",
+        "output_order_observed_at": "2026-09-01T15:45:00+00:00"
+      },
+      "params": {
+        "premium": true,
+        "return_rate_percent": "2.9",
+        "station_cost_per_execution": "0",
+        "use_focus": false
+      },
+      "expected": {
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "gross_revenue": "11200",
+        "sales_tax": "448",
+        "sale_setup_fee": "280",
+        "net_revenue": "10472",
+        "acquisition_setup_fee": "132",
+        "total_fees": "860",
+        "total_cost": "5423.4",
+        "profit": "5048.6",
+        "roi": "93.0892",
+        "station_cost": "0",
+        "focus_consumed": 0,
+        "oldest_observed_at": "2026-09-01T09:30:00+00:00"
+      }
+    },
+    {
+      "components": {
         "recipe_silver_cost": 0,
         "crafting_focus": 180,
         "executions": 1,

@@ -2,6 +2,7 @@ import Decimal from 'decimal.js'
 
 import {
   ceilToInteger,
+  divide,
   money,
   percentageCharge,
   type Money,
@@ -197,7 +198,7 @@ export function calculateFinancialResult(
   const profit = net.minus(cost)
   return {
     profit,
-    profitPerUnit: profit.div(producedQuantity),
-    roi: cost.isZero() ? null : profit.div(cost),
+    profitPerUnit: divide(profit, producedQuantity),
+    roi: cost.isZero() ? null : divide(profit, cost),
   }
 }

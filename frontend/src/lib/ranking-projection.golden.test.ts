@@ -4,6 +4,8 @@ import { expect, test } from 'vitest'
 
 import type { components } from '@/api/schema'
 
+import { percentageToRate } from '@/opportunities/production-params'
+
 import { projectRankingRow, type ProjectionParams } from './ranking-projection'
 
 // Task 3.5/23: os vetores são gerados por `_project_row` do servidor
@@ -17,7 +19,10 @@ type Vector = {
   components: Record<string, unknown>
   params: {
     premium: boolean
-    return_rate: string
+    /** taxa já normalizada em [0,1]; ausente quando o caso traz `return_rate_percent` */
+    return_rate?: string
+    /** percentual digitado pelo usuário (task 3.6/01, E01) — convertido por `percentageToRate` */
+    return_rate_percent?: string
     station_cost_per_execution: string
     use_focus: boolean
   }
@@ -37,7 +42,12 @@ function run(
 ): Record<string, unknown> | null {
   const projectionParams: ProjectionParams = {
     premium: params.premium,
-    returnRate: params.return_rate,
+    // Quando o caso traz o percentual digitado, a conversão do cliente (`percentageToRate`)
+    // faz parte do que o vetor trava — não só a projeção que vem depois.
+    returnRate:
+      params.return_rate_percent != null
+        ? percentageToRate(params.return_rate_percent)
+        : (params.return_rate ?? '0'),
     stationCostPerExecution: params.station_cost_per_execution,
     useFocus: params.use_focus,
   }

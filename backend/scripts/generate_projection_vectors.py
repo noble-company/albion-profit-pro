@@ -43,6 +43,20 @@ def _dt(iso: str | None) -> datetime | None:
     return datetime.fromisoformat(iso) if iso else None
 
 
+def _return_rate(params: dict) -> Decimal:
+    """Resolve a taxa de retorno do caso.
+
+    Aceita ``return_rate`` já normalizada (``"0.15"``) **ou** ``return_rate_percent`` — o
+    percentual que o usuário digita na tela (``"36.7"``), convertido aqui por
+    ``Decimal(pct) / 100``. Essa é a mesma conta que ``percentageToRate`` faz no cliente com
+    ``money.divide(pct, 100)`` (task 3.6/01, ``E01``): manter os dois casos no fixture trava a
+    conversão como parte do contrato, não só a projeção que vem depois dela.
+    """
+    if "return_rate_percent" in params:
+        return Decimal(params["return_rate_percent"]) / Decimal(100)
+    return Decimal(params["return_rate"])
+
+
 _T0 = "2026-09-01T12:00:00+00:00"
 _T1 = "2026-09-01T09:30:00+00:00"
 _T2 = "2026-09-01T15:45:00+00:00"
@@ -86,7 +100,7 @@ def _run(components: dict, params: dict) -> dict | None:
     result = _project_row(
         row,
         premium=params["premium"],
-        return_rate=Decimal(params["return_rate"]),
+        return_rate=_return_rate(params),
         station_cost_per_execution=Decimal(params["station_cost_per_execution"]),
         use_focus=params["use_focus"],
     )
@@ -191,6 +205,37 @@ _CASES: list[tuple[dict, dict]] = [
             "premium": False,
             "return_rate": "0",
             "station_cost_per_execution": "9000",
+            "use_focus": False,
+        },
+    ),
+    # task 3.6/01 (E01): o retorno entra como o percentual digitado, não a taxa normalizada.
+    # `36.7` é a taxa de retorno de refino com bônus de cidade — não é valor de laboratório.
+    # A conversão `Decimal(pct) / 100` vira parte do contrato travado; o cliente tem que
+    # fazer `money.divide(pct, 100)`, não `Number(pct) / 100`.
+    (
+        _components(),
+        {
+            "premium": True,
+            "return_rate_percent": "36.7",
+            "station_cost_per_execution": "0",
+            "use_focus": False,
+        },
+    ),
+    (
+        _components(),
+        {
+            "premium": False,
+            "return_rate_percent": "8.8",
+            "station_cost_per_execution": "250",
+            "use_focus": True,
+        },
+    ),
+    (
+        _components(),
+        {
+            "premium": True,
+            "return_rate_percent": "2.9",
+            "station_cost_per_execution": "0",
             "use_focus": False,
         },
     ),

@@ -4,11 +4,15 @@ Plataforma própria para calcular lucro de crafting e refino no Albion Online a 
 coletados pelo jogador no mercado do jogo.
 
 > [!WARNING]
-> O projeto está na **Fase 3.5** (refatoração). Backend, coleta e frontend funcionam ponta a
-> ponta; a suíte E2E roda contra a stack real. Falta o gate final (task 19 da Fase 3): a
-> validação integrada em jogo (Albion + Npcap + systray + Swarm/Traefik reais). O client não
-> deve ser distribuído amplamente até lá. `S06` (catálogo sem login) e a antifraude de
-> mercado (`S01`) são decisões conscientemente adiadas para o pré-lançamento.
+> O projeto está na **Fase 3.6** (correções da revisão da 3.5). Backend, coleta e frontend
+> funcionam ponta a ponta; a suíte E2E roda contra a stack real. A auditoria
+> [`docs/14-revisao-fase-3-5.md`](docs/14-revisao-fase-3-5.md) confirmou a Fase 3.5 como
+> entregue, mas achou defeitos de usuário abertos — um cálculo do cliente que diverge do motor
+> Python e duas telas que caem em branco — e nenhum caminho de deploy do frontend. Depois disso
+> vem o gate final (task 19 da Fase 3): a validação integrada em jogo (Albion + Npcap + systray +
+> Swarm/Traefik reais). O client não deve ser distribuído amplamente até lá. `S06` (catálogo sem
+> login) e a antifraude de mercado (`S01`) são decisões conscientemente adiadas para o
+> pré-lançamento.
 
 ## Arquitetura
 
@@ -162,8 +166,13 @@ prejudica comparações futuras. Patches próprios devem continuar marcados com
   o design system foi de fato instalado; a camada "e se" roda no cliente; a suíte E2E Playwright
   roda contra API + PostgreSQL + Redis reais. O desfecho de cada achado da revisão está em
   [`docs/12-revisao-fase-3.md`](docs/12-revisao-fase-3.md#desfecho-dos-achados-2026-09-06).
+- **Fase 3.6 (correções): 0/17 tasks** — derivada de
+  [`docs/14-revisao-fase-3-5.md`](docs/14-revisao-fase-3-5.md). As tasks 01-04 são defeitos que o
+  usuário encontra hoje (`E01`-`E05`); a 13 constrói o serving/deploy do frontend, que não existe;
+  a 14 constrói o item de systray que a Fase 4 pressupõe. Ver
+  [`docs/tasks/correcoes/`](docs/tasks/correcoes/README.md).
 - **Falta o gate final:** o ensaio integrado com Albion/Npcap, systray, domínio e Swarm reais
-  (task 19 da Fase 3), executado após a Fase 3.5 para validar a jornada inteira de uma vez.
+  (task 19 da Fase 3), executado após a Fase 3.6 para validar a jornada inteira de uma vez.
 - **Adiado conscientemente:** antifraude de mercado (`S01`), JWT em cookie `httpOnly` (`S03`),
   catálogo sem login (`S06`) — todos pré-requisitos de lançamento público, não de uso interno.
 - West, East e Europe estão isolados no wire autenticado, persistência, cache e leitura desde a
@@ -176,7 +185,8 @@ prejudica comparações futuras. Patches próprios devem continuar marcados com
   precisa ser adaptado às redes, secrets e labels reais do Swarm/Traefik.
 
 O plano, os contratos medidos e os checklists ficam em [`docs/README.md`](docs/README.md). A
-prioridade atual é o gate final (task 19). O gate automatizado da fase é
+prioridade atual são as tasks 01-04 da Fase 3.6 (defeitos de usuário), e depois o gate final
+(task 19). O gate automatizado da fase é
 `python scripts/verify_repository.py` mais os workflows `backend-ci`, `frontend-ci` e
 `frontend-e2e`; o procedimento do fechamento da 2.5 está em
 [`docs/10-gate-final-fase-2-5.md`](docs/10-gate-final-fase-2-5.md).

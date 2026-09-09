@@ -46,6 +46,19 @@ export function subtract(a: MoneyInput, b: MoneyInput): Money {
   return money(a).minus(money(b))
 }
 
+/**
+ * Divisão monetária — a fronteira única para `a / b` (ROI = `lucro / custo`, custo por
+ * unidade, e a conversão do percentual de retorno digitado em taxa). `decimal.js` divide sob
+ * o mesmo contexto (prec 28, `ROUND_HALF_EVEN`) que o `Decimal` do Python, então o quociente
+ * arredonda igual dos dois lados — o que os vetores dourados comparam string a string.
+ *
+ * Não protege contra `b == 0` (devolve `Infinity`, como o `.div()` solto já fazia); quem
+ * calcula ROI checa `isZero` antes.
+ */
+export function divide(a: MoneyInput, b: MoneyInput): Money {
+  return money(a).div(money(b))
+}
+
 /** Multiplica por uma quantidade inteira não-negativa (unidades produzidas/compradas). */
 export function multiplyByQuantity(value: MoneyInput, quantity: number): Money {
   if (!Number.isInteger(quantity) || quantity < 0) {
