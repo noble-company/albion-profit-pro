@@ -251,3 +251,17 @@ Arredondado **para cima, por execução** — e não no total. Três refinos de 
 
 O arredondamento fica no engine, não em `focusCostFor`: a grade do Painel do Destino usa a mesma
 função para mostrar a **porcentagem** que sobra (`7.9% do foco`), e arredondar lá viraria 8%.
+
+## Seções colapsáveis, e por que só Refino por enquanto
+
+O painel do jogo tem 44 ramos; lista plana viraria rolagem infinita. A tela passou a ter uma
+**seção por categoria**, que fechada ainda responde "eu já mexi aqui?" pelo contador
+(`2 de 25 preenchidos`) — senão o jogador abre uma por uma para descobrir onde parou.
+
+**Só Refino tem conteúdo hoje, de propósito.** A tela de Craft é a task 12; `Lucro/foco` só
+existe no scanner de refino. Pedir ~200 campos que nenhuma conta consome é trabalho jogado fora
+e envelhece: quando o craft chegar, o jogador teria que revisar o que digitou meses antes.
+
+A seção também acomoda a diferença de **forma** que as duas árvores têm, e é bom que ela nasça
+sabendo disso: refino é uma grade 5 tiers × 5 ramos; craft é uma lista — `Cajado Amaldiçoado` é
+**um número só**, com os tiers desbloqueando por nível dentro do próprio nó.

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { ChevronRight } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 
-import { filterControl, filterLabel } from '@/components/filters'
+import { filterControl } from '@/components/filters'
 import { Button } from '@/components/ui/button'
 import {
   focusCostFor,
@@ -21,10 +22,16 @@ import { useDestinyBoard, useSaveDestinyBoard } from './hooks'
  * paga; o número certo, sim.
  *
  * Cada célula mostra, embaixo do nível, **quanto do foco base aquele refino passa a custar**.
- * É o que transforma a tela de formulário em resposta: dá para ver o 100% virar 14% enquanto
- * se digita, e entender por que vale subir um nó.
+ * É o que transforma a tela de formulário em resposta: dá para ver o 100% virar 8% enquanto se
+ * digita, e entender por que vale subir um nó.
  *
- * Só refino por enquanto — ver a spec da task 17 para craft, comida e poção.
+ * **Seções colapsáveis** porque o painel do jogo tem 44 ramos. Só Refino existe hoje: o resto
+ * chega junto da tela de Craft (task 12), que é quando esses níveis passam a mudar algum
+ * número. Pedir 200 campos que nenhuma conta consome seria trabalho jogado fora.
+ *
+ * Vale notar a diferença de forma, que a seção precisa acomodar: **refino é por tier** (grade
+ * 5×5), **craft é por linha de item** — `Cajado Amaldiçoado` é um número só, com os tiers
+ * desbloqueando por nível dentro do próprio nó.
  */
 
 const RAMO_LABEL: Record<string, string> = {
@@ -51,6 +58,9 @@ export function DestinyBoardPage() {
   }
 
   const sujo = rascunho !== null
+  const chavesDeRefino = RAMOS_DE_REFINO.flatMap((ramo) =>
+    TIERS_DE_REFINO.map((tier) => refineNodeKey(ramo, tier)),
+  )
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -90,54 +100,103 @@ export function DestinyBoardPage() {
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-surface">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-surface-raised text-xs uppercase tracking-wide text-foreground-subtle">
-            <tr>
-              <th className="px-3 py-2 text-left font-semibold">Ramo</th>
-              {TIERS_DE_REFINO.map((tier) => (
-                <th key={tier} className="px-3 py-2 text-left font-semibold">
-                  T{tier}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {RAMOS_DE_REFINO.map((ramo) => (
-              <tr key={ramo} className="border-t border-border/60">
-                <th className="px-3 py-2 text-left font-medium text-foreground">
-                  {RAMO_LABEL[ramo] ?? ramo}
-                </th>
-                {TIERS_DE_REFINO.map((tier) => {
-                  const key = refineNodeKey(ramo, tier)
-                  const restante = focusCostFor(100, refiningEfficiency(ramo, tier, painel))
-                  return (
-                    <td key={tier} className="px-3 py-2 align-top">
-                      <label className={`${filterLabel} sr-only`} htmlFor={key}>
-                        {RAMO_LABEL[ramo] ?? ramo} T{tier}
-                      </label>
-                      <input
-                        id={key}
-                        type="text"
-                        inputMode="numeric"
-                        aria-label={`${RAMO_LABEL[ramo] ?? ramo} T${tier}`}
-                        value={painel.get(key) ?? ''}
-                        placeholder="0"
-                        onChange={(event) => setNivel(key, event.target.value)}
-                        className={`${filterControl} mt-0 w-20 tabular-nums`}
-                      />
-                      {/* O efeito, ao lado da causa: é isso que mostra por que subir o nó. */}
-                      <span className="mt-1 block text-[0.6875rem] tabular-nums text-foreground-subtle">
-                        {restante < 100 ? `${restante.toFixed(1)}% do foco` : 'foco cheio'}
-                      </span>
-                    </td>
-                  )
-                })}
+      <div className="min-h-0 flex-1 space-y-3 overflow-auto">
+        <Secao titulo="Refino" chaves={chavesDeRefino} painel={painel} inicial>
+          <table className="w-full text-sm">
+            <thead className="text-xs uppercase tracking-wide text-foreground-subtle">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold">Ramo</th>
+                {TIERS_DE_REFINO.map((tier) => (
+                  <th key={tier} className="px-3 py-2 text-left font-semibold">
+                    T{tier}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {RAMOS_DE_REFINO.map((ramo) => (
+                <tr key={ramo} className="border-t border-border/60">
+                  <th className="px-3 py-2 text-left font-medium text-foreground">
+                    {RAMO_LABEL[ramo] ?? ramo}
+                  </th>
+                  {TIERS_DE_REFINO.map((tier) => {
+                    const key = refineNodeKey(ramo, tier)
+                    const restante = focusCostFor(100, refiningEfficiency(ramo, tier, painel))
+                    return (
+                      <td key={tier} className="px-3 py-2 align-top">
+                        <input
+                          id={key}
+                          type="text"
+                          inputMode="numeric"
+                          aria-label={`${RAMO_LABEL[ramo] ?? ramo} T${tier}`}
+                          value={painel.get(key) ?? ''}
+                          placeholder="0"
+                          onChange={(event) => setNivel(key, event.target.value)}
+                          className={`${filterControl} mt-0 w-20 tabular-nums`}
+                        />
+                        {/* O efeito, ao lado da causa: é isso que mostra por que subir o nó. */}
+                        <span className="mt-1 block text-[0.6875rem] tabular-nums text-foreground-subtle">
+                          {restante < 100 ? `${restante.toFixed(1)}% do foco` : 'foco cheio'}
+                        </span>
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Secao>
+
+        <p className="px-1 text-xs text-foreground-subtle">
+          Craft, comida e poção usam a mesma fórmula e entram aqui como seções próprias junto da
+          tela de Craft — é quando esses níveis passam a mudar algum número.
+        </p>
       </div>
     </div>
+  )
+}
+
+/**
+ * Uma categoria do painel. Fechada, ela ainda responde "eu já mexi aqui?" pelo contador — senão
+ * o jogador abre uma por uma para descobrir onde parou.
+ */
+function Secao({
+  titulo,
+  chaves,
+  painel,
+  inicial = false,
+  children,
+}: {
+  titulo: string
+  chaves: string[]
+  painel: DestinyBoard
+  inicial?: boolean
+  children: ReactNode
+}) {
+  const [aberta, setAberta] = useState(inicial)
+  const preenchidos = chaves.filter((chave) => (painel.get(chave) ?? 0) > 0).length
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-surface">
+      <button
+        type="button"
+        aria-expanded={aberta}
+        onClick={() => setAberta((valor) => !valor)}
+        className="flex w-full items-center gap-2 px-3 py-3 text-left transition hover:bg-surface-raised"
+      >
+        <ChevronRight
+          className={`size-4 shrink-0 text-foreground-subtle transition-transform ${
+            aberta ? 'rotate-90' : ''
+          }`}
+          aria-hidden="true"
+        />
+        <span className="font-semibold text-foreground">{titulo}</span>
+        <span className="ml-auto text-xs tabular-nums text-foreground-subtle">
+          {preenchidos} de {chaves.length} preenchidos
+        </span>
+      </button>
+
+      {aberta && <div className="border-t border-border px-1 pb-2">{children}</div>}
+    </section>
   )
 }

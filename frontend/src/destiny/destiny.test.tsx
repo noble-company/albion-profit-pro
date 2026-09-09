@@ -102,3 +102,28 @@ test('falha ao salvar não apaga o que o jogador digitou', async () => {
   expect(screen.getByLabelText('Pedra → Bloco T7')).toHaveValue('77')
   consoleError.mockRestore()
 })
+
+test('cada categoria é uma seção que abre e fecha', async () => {
+  // Com 44 ramos no painel do jogo, uma lista plana vira rolagem infinita. A seção também é
+  // o que deixa a tela crescer sem reescrita quando o craft entrar (task 12).
+  const user = userEvent.setup()
+  montarApi({ 'refine:fiber:4': 100 })
+  renderWithProviders(<DestinyBoardPage />)
+
+  const secao = await screen.findByRole('button', { name: /Refino/ })
+  expect(secao).toHaveAttribute('aria-expanded', 'true')
+
+  await user.click(secao)
+
+  expect(secao).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByLabelText('Fibra → Tecido T4')).not.toBeInTheDocument()
+})
+
+test('a seção diz quantos nós já foram preenchidos, sem precisar abrir', async () => {
+  // Fechada, a seção ainda precisa responder "eu já mexi aqui?" — senão o jogador abre uma por
+  // uma para descobrir.
+  montarApi({ 'refine:fiber:4': 100, 'refine:ore:7': 20 })
+  renderWithProviders(<DestinyBoardPage />)
+
+  expect(await screen.findByText('2 de 25 preenchidos')).toBeInTheDocument()
+})
