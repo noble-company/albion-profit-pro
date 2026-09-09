@@ -17,6 +17,7 @@ import { useRecipeCatalog } from '@/catalog/hooks'
 import type { CatalogKind } from '@/catalog/service'
 import { formatarNomeCurto } from '@/lib/formatters'
 import { money } from '@/lib/money'
+import { useDestinyBoard } from '@/destiny/hooks'
 import { useCidades, useLocationName } from '@/lib/locations'
 import { percentageToRate } from '@/opportunities/production-params'
 
@@ -77,6 +78,8 @@ export function ScannerPage({
   const [linhaAberta, setLinhaAberta] = useState<string | null>(null)
 
   const catalogo = useRecipeCatalog(kind)
+  /** O Painel do Destino do jogador — vazio enquanto carrega, que é o custo de foco base. */
+  const painelDoDestino = useDestinyBoard()
 
   /**
    * **Sempre todos os mercados**, independentemente do filtro. Amarrar o pedido à seleção faria
@@ -127,8 +130,9 @@ export function ScannerPage({
       priceLocations: cidades.map((c) => c.id),
       pricing,
       strategy,
+      destinyBoard: painelDoDestino,
     }),
-    [scenario, cidadesDeVenda, cidades, pricing, strategy],
+    [scenario, cidadesDeVenda, cidades, pricing, strategy, painelDoDestino],
   )
 
   // O cálculo inteiro. Refino são 110 receitas × cidades — roda na thread principal sem

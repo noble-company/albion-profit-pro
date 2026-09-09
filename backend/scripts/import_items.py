@@ -88,6 +88,7 @@ def load_dump_metadata(dump_path: Path) -> dict[str, dict]:
             "shop_subcategory": entry.get("@shopsubcategory1"),
             "shop_subcategory2": entry.get("@shopsubcategory2"),
             "shop_subcategory3": entry.get("@shopsubcategory3"),
+            "crafting_category": entry.get("@craftingcategory"),
         }
     return metadata
 
@@ -120,6 +121,7 @@ def build_items(
                 "shop_subcategory": meta.get("shop_subcategory"),
                 "shop_subcategory2": meta.get("shop_subcategory2"),
                 "shop_subcategory3": meta.get("shop_subcategory3"),
+                "crafting_category": meta.get("crafting_category"),
                 "busca_normalizada": normalize_item_search(
                     unique_name,
                     localized_names.get("PT-BR"),
@@ -163,6 +165,7 @@ async def apply_item_import(
                     "shop_subcategory": stmt.excluded.shop_subcategory,
                     "shop_subcategory2": stmt.excluded.shop_subcategory2,
                     "shop_subcategory3": stmt.excluded.shop_subcategory3,
+                    "crafting_category": stmt.excluded.crafting_category,
                     "busca_normalizada": stmt.excluded.busca_normalizada,
                 },
             )

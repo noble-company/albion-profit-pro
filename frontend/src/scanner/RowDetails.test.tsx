@@ -71,6 +71,7 @@ const PARAMS: ScannerParams = {
   },
   strategy: { acquisition: 'best', sale: 'best' },
   quantityMeans: 'initial_recipes',
+  destinyBoard: new Map(),
   premium: true,
   returnRate: '0',
   stationCostPerExecution: '0',

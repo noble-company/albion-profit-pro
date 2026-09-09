@@ -28,6 +28,7 @@ ITEM_DUMP_FIXTURE = {
                 "@weight": "0.51",
                 "@shopcategory": "crafting",
                 "@shopsubcategory1": "resources",
+                "@craftingcategory": "fiber",
             }
         ]
     }
@@ -189,3 +190,16 @@ async def test_import_items_is_idempotent(tmp_path, db_session):
     result = await db_session.execute(select(Item).where(Item.unique_name.in_(UNIQUE_NAMES)))
     rows = result.scalars().all()
     assert len(rows) == len(UNIQUE_NAMES)
+
+
+def test_crafting_category_vem_do_dump(tmp_path):
+    """`@craftingcategory` é o ramo do Painel do Destino (task 4/17): `T5_CLOTH` tem
+    `fiber`, `T5_MAIN_CURSEDSTAFF` tem `cursestaff`. É por ele que o cliente sabe qual nó de
+    especialização se aplica — sem isso, o custo de foco teria que vir de um mapa escrito à
+    mão no cliente, que apodrece no primeiro patch do jogo."""
+    dump = tmp_path / "dump.json"
+    dump.write_text(json.dumps(ITEM_DUMP_FIXTURE), encoding="utf-8")
+
+    metadata = import_items_module.load_dump_metadata(dump)
+
+    assert metadata["ZZFIBER_T2"]["crafting_category"] == "fiber"

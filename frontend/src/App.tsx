@@ -32,6 +32,9 @@ const CraftingRankingPage = lazy(() =>
     default: m.CraftingRankingPage,
   })),
 )
+const DestinyBoardPage = lazy(() =>
+  import('./destiny/DestinyBoardPage').then((m) => ({ default: m.DestinyBoardPage })),
+)
 const TokensPage = lazy(() =>
   import('@/tokens/pages').then((m) => ({ default: m.TokensPage })),
 )
@@ -82,6 +85,14 @@ export function App() {
             element={
               <Boundary>
                 <ItemPricesPage />
+              </Boundary>
+            }
+          />
+          <Route
+            path="/painel"
+            element={
+              <Boundary>
+                <DestinyBoardPage />
               </Boundary>
             }
           />

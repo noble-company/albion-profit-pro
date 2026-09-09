@@ -93,6 +93,7 @@ function paramsFor(vector: Vector): ScannerParams {
     priceLocations: [vector.params.location],
     strategy: { acquisition: 'best', sale: 'best' },
     quantityMeans: 'desired_output',
+    destinyBoard: new Map(),
     pricing: {
       base: { kind: 'sale_city' },
       manual: new Map(),

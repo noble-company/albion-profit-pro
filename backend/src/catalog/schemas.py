@@ -26,6 +26,8 @@ class CatalogItemOut(BaseModel):
     weight: Decimal | None = None
     shop_category: str | None = None
     shop_subcategory: str | None = None
+    # Ramo do Painel do Destino — o cliente usa para achar o nó que reduz o foco (task 4/17).
+    crafting_category: str | None = None
 
     @field_serializer("weight")
     def _weight_as_string(self, value: Decimal | None) -> str | None:

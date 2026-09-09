@@ -13,6 +13,11 @@ import {
 import { SETUP_FEE_RATE, salesTaxRateFor } from '@/lib/craft-constants'
 import { add, divide, money, multiplyByQuantity, type Money } from '@/lib/money'
 
+import {
+  focusCostFor,
+  refiningEfficiency,
+  type DestinyBoard,
+} from './focus-efficiency'
 import type { PriceIndex } from './prices'
 import {
   resolveIngredientPrice,
@@ -90,6 +95,11 @@ export interface ScannerParams {
    * pontas do produto perguntam de jeitos diferentes.
    */
   quantityMeans: 'initial_recipes' | 'desired_output'
+  /**
+   * O Painel do Destino do jogador (task 4/17). Vazio = custo de foco do dump, que é o de quem
+   * nunca especializou nada. Nó preenchido derruba o custo, e muito.
+   */
+  destinyBoard: DestinyBoard
 }
 
 /**
@@ -241,8 +251,9 @@ function producaoDaSessao(
 function prepararReceita(
   recipe: CatalogRecipe,
   params: ScannerParams,
-  weightByItem: Map<string, string | null>,
+  itemsByName: Map<string, CatalogItem>,
 ) {
+  const saida = itemsByName.get(recipe.output_item)
   const sessao = params.quantityMeans === 'initial_recipes'
   const production = sessao
     ? producaoDaSessao(params.quantity, recipe.amount_crafted, params.returnRate)
@@ -261,7 +272,7 @@ function prepararReceita(
       ? { executions: params.quantity, returnRate: '0' }
       : { executions: production.executions, returnRate: params.returnRate },
     focusConsumed: calculateFocusConsumed(
-      recipe.crafting_focus,
+      focoPorExecucao(recipe, saida, params),
       production.executions,
       params.useFocus,
     ),
@@ -276,12 +287,34 @@ function prepararReceita(
     // `craft/service.py:180-184` monta o combo da saída com `recipe["enchantment_level"]`.
     // Derivar do nome seria uma segunda fonte de verdade, livre para divergir.
     outputEnchantment: recipe.enchantment_level,
-    outputWeight: weightByItem.get(recipe.output_item) ?? null,
+    outputWeight: saida?.weight ?? null,
   }
 }
 
-function pesos(catalog: ScannerCatalog): Map<string, string | null> {
-  return new Map(catalog.items.map((item) => [item.unique_name, item.weight ?? null]))
+/**
+ * Foco por execução com a especialização do jogador aplicada.
+ *
+ * Só refino por enquanto: o craft usa a mesma fórmula, mas a árvore tem outra forma e outros
+ * coeficientes (ver `focus-efficiency.ts`). Chamar a conta do refino para uma receita de craft
+ * daria zero de eficiência — silenciosamente certo hoje, silenciosamente errado amanhã —, então
+ * o tipo de produção decide explicitamente.
+ */
+function focoPorExecucao(
+  recipe: CatalogRecipe,
+  saida: CatalogItem | undefined,
+  params: ScannerParams,
+): number {
+  if (recipe.production_kind !== 'refining') return recipe.crafting_focus
+  if (!saida?.crafting_category || saida.tier == null) return recipe.crafting_focus
+
+  return focusCostFor(
+    recipe.crafting_focus,
+    refiningEfficiency(saida.crafting_category, saida.tier, params.destinyBoard),
+  )
+}
+
+function porNome(catalog: ScannerCatalog): Map<string, CatalogItem> {
+  return new Map(catalog.items.map((item) => [item.unique_name, item]))
 }
 
 export function computeScanner(
@@ -289,13 +322,13 @@ export function computeScanner(
   prices: PriceIndex,
   params: ScannerParams,
 ): ScannerRow[] {
-  const weightByItem = pesos(catalog)
+  const itemsByName = porNome(catalog)
   const rows: ScannerRow[] = []
   /** Vive por chamada: um snapshot novo tem médias novas. */
   const cacheDaMedia = new Map<string, ResolvedPrice>()
 
   for (const recipe of catalog.recipes) {
-    const base = prepararReceita(recipe, params, weightByItem)
+    const base = prepararReceita(recipe, params, itemsByName)
     for (const locationId of params.locations) {
       rows.push(evaluate({ ...base, recipe, locationId, prices, params, cacheDaMedia }))
     }
@@ -324,7 +357,7 @@ export function explainRow(
 
   const coletor: Coletor = { scenarios: [], breakdown: null, ingredients: [] }
   const row = evaluate({
-    ...prepararReceita(recipe, params, pesos(catalog)),
+    ...prepararReceita(recipe, params, porNome(catalog)),
     recipe,
     locationId: alvo.locationId,
     prices,

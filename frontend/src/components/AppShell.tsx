@@ -9,6 +9,7 @@ import {
   PanelLeftOpen,
   Recycle,
   Search,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -55,6 +56,7 @@ const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/refino', label: 'Refino', icon: Recycle },
   { to: '/craft', label: 'Craft', icon: Hammer },
   { to: '/item', label: 'Itens', icon: Search },
+  { to: '/painel', label: 'Painel do Destino', icon: Sparkles },
   { to: '/calculadora', label: 'Calculadora', icon: Calculator },
   { to: '/tokens', label: 'Tokens', icon: KeyRound },
 ]

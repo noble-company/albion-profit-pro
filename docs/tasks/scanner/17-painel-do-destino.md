@@ -149,3 +149,58 @@ Task **11**. Independe da 12 (tela de Craft) — o refino já se beneficia sozin
 
 Comparar o consumo de foco da tela com o que a estação do jogo cobra, em duas receitas de tiers
 diferentes.
+
+## Estado da implementação — primeira leva (refino)
+
+**Concluída para refino.** Backend `uv run pytest` **409/409** · `ruff` limpo ·
+frontend `npm run test` **363/363** (+15) · `typecheck` limpo · `lint` 0 erros ·
+`vite build` sem erro. Todos os guards nasceram vermelhos.
+
+### O que existe agora
+
+| Camada | O que entrou |
+|---|---|
+| Dado | `item.crafting_category` importado do dump — 27 itens por família de refino |
+| Modelo | `destiny_node (user_id, node_key, level)`, com `CHECK` de 0 a 100 |
+| API | `GET` / `PUT /me/destiny-board` |
+| Cálculo | `focus-efficiency.ts` — `0,5^(FCE/10000)` e a soma amplo + específico |
+| Tela | aba **Painel do Destino** com a grade 5 ramos × 5 tiers |
+
+### Decisões que valem ficar escritas
+
+- **`node_key` é opaco para o banco.** O formato (`refine:fiber:4`) é do cliente, que é quem
+  conhece a forma da árvore — e ela **não é uniforme**: refino é por tier, craft é por linha.
+  Modelar isso em colunas obrigaria a migrar o banco a cada formato novo.
+- **`PUT` substitui o painel inteiro**, não aplica delta. Quem zera um nó espera que ele suma;
+  um `PATCH` deixaria o nó velho influenciando a conta para sempre. Nível zero **não é
+  gravado** — zero é o padrão de quem nunca subiu nada.
+- **Foco não passa por `decimal.js`.** A regra `F09` existe porque silver precisa bater string a
+  string com o servidor. Foco é número de exibição, e a base da conta é `0,5^x`, que Decimal
+  também aproximaria.
+- **O tipo de produção decide explicitamente.** `focoPorExecucao` só aplica a conta em
+  `production_kind === 'refining'`. Chamar a fórmula do refino numa receita de craft daria zero
+  hoje — silenciosamente certo agora, silenciosamente errado quando o craft entrar.
+- **A tela mostra o efeito, não só o nível.** Cada célula diz quanto do foco base aquele refino
+  passa a custar (`14.4% do foco`). É o que separa formulário de resposta.
+
+### O autogenerate quis derrubar o índice trigram — duas vezes
+
+Nas duas migrações, o Alembic propôs `drop_index('ix_item_busca_normalizada_trgm')`: ele não
+reconhece o índice GIN com `gin_trgm_ops` criado à mão e o lê como sobra. Removido das duas, com
+o porquê escrito no arquivo, e a existência do índice conferida no banco depois de aplicar.
+
+### Pendente pra você testar
+
+1. Abrir **Painel do Destino**, preencher os níveis de fibra e salvar.
+2. Voltar em `/refino` com **"Usar foco"** ligado e conferir a coluna `Foco` contra a estação do
+   jogo — é a comparação que fecha o modelo de ponta a ponta.
+3. Conferir se `Lucro/foco` mudou de patamar (é a métrica que estava errada por até 16×).
+
+### O que falta da task
+
+- **Craft, comida e poção** — mesma fórmula, árvore de outra forma e coeficientes por tipo de nó
+  (normal 30, artefato 15, cristal 2,15). O modelo de dados já comporta; nenhuma migração nova.
+- **A validação da classificação artefato/cristal sobre as 720 receitas.** Validei a amostra da
+  linha do cajado amaldiçoado contra o painel real, não o conjunto.
+- **`POST /craft/simulate` e o foco.** Continua sem conhecer eficiência — ver a recomendação na
+  seção de riscos.

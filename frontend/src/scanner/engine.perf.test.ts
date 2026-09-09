@@ -83,6 +83,7 @@ test('calcula o catálogo de craft inteiro numa cidade sem estourar a ordem de g
     locations: [CIDADE], premium: true, returnRate: '0.367',
     strategy: { acquisition: 'best', sale: 'best' },
     quantityMeans: 'desired_output',
+    destinyBoard: new Map(),
     priceLocations: [CIDADE],
     pricing: {
       base: { kind: 'sale_city' },

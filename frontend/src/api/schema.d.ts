@@ -388,6 +388,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/destiny-board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Destiny Board
+         * @description O painel do jogador. Vazio significa "não preenchi" — e a tela mostra o custo de foco
+         *     base, que é o de quem nunca especializou nada.
+         */
+        get: operations["get_destiny_board_me_destiny_board_get"];
+        /**
+         * Put Destiny Board
+         * @description Substitui o painel inteiro. A tela edita uma grade e salva o conjunto; um `PATCH` por
+         *     nó daria a mesma coisa em N requisições, com estados intermediários que não existem para
+         *     o jogador.
+         */
+        put: operations["put_destiny_board_me_destiny_board_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/prices/snapshot": {
         parameters: {
             query?: never;
@@ -754,6 +781,8 @@ export interface components {
             shop_category?: string | null;
             /** Shop Subcategory */
             shop_subcategory?: string | null;
+            /** Crafting Category */
+            crafting_category?: string | null;
         };
         /** CatalogRecipeOut */
         CatalogRecipeOut: {
@@ -1133,6 +1162,26 @@ export interface components {
             sold: components["schemas"]["SoldOut"];
             /** Series 6H */
             series_6h: components["schemas"]["Series6hPoint"][];
+        };
+        /**
+         * DestinyBoardIn
+         * @description A tela manda o painel **completo**, não um delta: quem zera um nó espera que ele suma.
+         */
+        DestinyBoardIn: {
+            /** Nodes */
+            nodes?: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * DestinyBoardOut
+         * @description O painel inteiro numa resposta: `node_key -> nível`. Nó ausente é nível zero.
+         */
+        DestinyBoardOut: {
+            /** Nodes */
+            nodes?: {
+                [key: string]: number;
+            };
         };
         /** ErrorModel */
         ErrorModel: {
@@ -2617,6 +2666,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogRecipesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_destiny_board_me_destiny_board_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DestinyBoardOut"];
+                };
+            };
+        };
+    };
+    put_destiny_board_me_destiny_board_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DestinyBoardIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DestinyBoardOut"];
                 };
             };
             /** @description Validation Error */

@@ -17,6 +17,7 @@ from src.catalog.router import router as catalog_router
 from src.config import get_settings
 from src.craft.router import router as craft_router
 from src.database import async_session_maker
+from src.destiny.router import router as destiny_router
 from src.ingest.router import router as ingest_router
 from src.items.router import router as items_router
 from src.logging_config import configure_logging
@@ -83,6 +84,7 @@ app.include_router(recipes_router)
 # parâmetros dinâmicos em `/items/{item_id}/...`.
 app.include_router(items_router)
 app.include_router(catalog_router)
+app.include_router(destiny_router)
 app.include_router(prices_snapshot_router)
 app.include_router(prices_router)
 app.include_router(craft_router)

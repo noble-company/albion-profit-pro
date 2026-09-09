@@ -82,7 +82,7 @@ function snapshot(
 /** Refino de T4_CLOTH: 2×T4_FIBER + 1×T3_CLOTH, 1 produzido, sem custo de prata. */
 const CATALOGO: ScannerCatalog = {
   items: [
-    { unique_name: 'T4_CLOTH', weight: '0.51', enchantment_level: 0 },
+    { unique_name: 'T4_CLOTH', weight: '0.51', enchantment_level: 0, tier: 4, crafting_category: 'fiber' },
     { unique_name: 'T4_FIBER', weight: '0.51', enchantment_level: 0 },
     { unique_name: 'T3_CLOTH', weight: '0.38', enchantment_level: 0 },
   ] as ScannerCatalog['items'],
@@ -114,6 +114,7 @@ const PADRAO: ScannerParams = {
     },
   strategy: { acquisition: 'best', sale: 'best' },
   quantityMeans: 'initial_recipes',
+  destinyBoard: new Map(),
   premium: true,
   returnRate: '0',
   stationCostPerExecution: '0',
@@ -298,6 +299,46 @@ describe('computeScanner — o cálculo que saiu do servidor', () => {
     )[0]!
     // 2 fibras × (1−0.367) = 1.266 -> ceil = 2. 1 tecido × 0.633 = 0.633 -> ceil = 1.
     expect(linha.totalCost?.toString()).toBe('400')
+  })
+})
+
+describe('painel do destino (task 17)', () => {
+  const SNAP_FOCO = () =>
+    snapshot([
+      { item: 'T4_FIBER', location: '1002', sell: '100' },
+      { item: 'T3_CLOTH', location: '1002', sell: '200' },
+      { item: 'T4_CLOTH', location: '1002', buy: '1000' },
+    ])
+
+  test('a especialização reduz o foco consumido — e o lucro por foco sobe junto', () => {
+    // `Tecelão de Fibras Adepto` em 100: 28.000 de eficiência ao refinar tecido T4 — 0,5^2,8 do
+    // custo. O catálogo do teste cobra 100 por execução: 100 × 0,143587 = 14,3587.
+    const comPainel = rodar(SNAP_FOCO(), {
+      useFocus: true,
+      destinyBoard: new Map([['refine:fiber:4', 100]]),
+    })[0]!
+    const semPainel = rodar(SNAP_FOCO(), { useFocus: true })[0]!
+
+    expect(semPainel.focusConsumed).toBe(100)
+    expect(comPainel.focusConsumed).toBeCloseTo(14.36, 2)
+    // Mesmo lucro, muito menos foco: a métrica que ranqueia o dia muda de patamar.
+    expect(comPainel.profit?.toString()).toBe(semPainel.profit?.toString())
+    expect(Number(comPainel.profitPerFocus)).toBeGreaterThan(
+      Number(semPainel.profitPerFocus) * 6,
+    )
+  })
+
+  test('painel vazio deixa o custo base — ninguém ganha desconto que não conquistou', () => {
+    expect(rodar(SNAP_FOCO(), { useFocus: true })[0]!.focusConsumed).toBe(100)
+  })
+
+  test('nó de outra família não reduz nada', () => {
+    const linha = rodar(SNAP_FOCO(), {
+      useFocus: true,
+      destinyBoard: new Map([['refine:ore:4', 100]]),
+    })[0]!
+
+    expect(linha.focusConsumed).toBe(100)
   })
 })
 
