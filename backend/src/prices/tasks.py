@@ -2,20 +2,25 @@ import asyncio
 import time
 from datetime import date, datetime, timedelta, timezone
 
+import httpx
 import structlog
 from sqlalchemy import Date, cast, delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from src.celery_app import celery_app
+from src.config import get_settings
 from src.database import create_worker_engine
+from src.prices import aodp
 from src.prices.models import (
     MarketHistoryDaily,
     MarketHistoryEntry,
     MarketHistoryMonthly,
     MarketOrder,
 )
+from src.prices.snapshot import upsert_snapshot
 from src.quarantine.task_base import QuarantinableTask
+from src.recipes.models import Recipe, RecipeIngredient
 from src.tasking import RETRYABLE_EXCEPTIONS
 
 log = structlog.get_logger()
@@ -335,3 +340,81 @@ rollup_mensal.failure_kind = "maintenance"
 rollup_mensal.failure_topic = "rollup_mensal"
 poda.failure_kind = "maintenance"
 poda.failure_topic = "poda"
+
+
+# --- Poller da API pública (task 4/04, achado `X06`) ---
+
+
+async def _itens_para_cotar(session) -> list[str]:
+    """Todo item que o scanner precisa precificar: saída de receita + ingrediente.
+
+    Sai do catálogo, não de `market_order`. Puxar só o que já tem preço seria reproduzir o
+    `X01` na camada de coleta — o item nunca observado continuaria nunca sendo observado.
+    """
+    saidas = select(Recipe.output_item_unique_name.label("item"))
+    ingredientes = select(RecipeIngredient.ingredient_unique_name.label("item"))
+    linhas = await session.scalars(saidas.union(ingredientes))
+    return sorted(set(linhas.all()))
+
+
+async def _sync_aodp_realm(sessionmaker, realm: str) -> dict:
+    settings = get_settings()
+    base_url = aodp.base_url_for(realm, settings.aodp_base_url_template)
+
+    async with sessionmaker() as session:
+        itens = await _itens_para_cotar(session)
+
+    lotes = aodp.build_batches(itens, base_url=base_url)
+    total_linhas = falhas = 0
+
+    async with httpx.AsyncClient() as client:
+        for indice, lote in enumerate(lotes):
+            try:
+                cru = await aodp.fetch_prices(client, base_url, lote)
+            except (httpx.HTTPError, ValueError):
+                # Um lote que falha não pode derrubar os outros: indisponibilidade de um
+                # terceiro não invalida o trabalho já feito nem trava a fila.
+                falhas += 1
+                log.warning("aodp.lote_falhou", realm=realm, lote=indice, exc_info=True)
+                continue
+
+            linhas = aodp.to_snapshot_rows(cru)
+            if not linhas:
+                continue
+            async with sessionmaker() as session:
+                await upsert_snapshot(session, realm, linhas)
+                await session.commit()
+            total_linhas += len(linhas)
+
+    resumo = {
+        "realm": realm,
+        "itens": len(itens),
+        "lotes": len(lotes),
+        "linhas": total_linhas,
+        "lotes_com_falha": falhas,
+    }
+    log.info("aodp.realm_sincronizado", **resumo)
+    return resumo
+
+
+async def _sync_aodp(sessionmaker) -> None:
+    settings = get_settings()
+    if not settings.aodp_enabled:
+        log.info("aodp.desligado")
+        return
+    for realm in settings.aodp_realms:
+        await _sync_aodp_realm(sessionmaker, realm)
+
+
+@celery_app.task(
+    name="prices.sync_aodp",
+    base=QuarantinableTask,
+    bind=True,
+    autoretry_for=RETRYABLE_EXCEPTIONS,
+    retry_backoff=True,
+    retry_backoff_max=60,
+    retry_jitter=True,
+    max_retries=3,
+)
+def sync_aodp(self) -> None:
+    _run_periodic("sync_aodp", _sync_aodp)

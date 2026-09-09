@@ -8,6 +8,7 @@ dependencies = [
     "celery>=5.6.3",
     "fastapi>=0.141.1",
     "fastapi-users[sqlalchemy]>=15.0.5",
+    "httpx>=0.28.1",
     "pydantic-settings>=2.15.0",
     "redis>=8.1.0",
     "sqlalchemy[asyncio]>=2.0.52",
@@ -41,7 +42,6 @@ asyncio_default_test_loop_scope = "session"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",

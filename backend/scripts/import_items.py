@@ -10,6 +10,7 @@ são resolvidos a partir do repositório, nunca do CWD (mesmo problema de
 import asyncio
 import os
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import structlog
@@ -55,6 +56,17 @@ def _base_name(unique_name: str) -> str:
     return unique_name.split("@", 1)[0]
 
 
+def _weight(raw: str | float | None) -> Decimal | None:
+    """`@weight` vem como string no dump ("0.51"). `Decimal(str(...))` preserva o valor
+    escrito; passar por float introduziria erro logo antes de uma divisão que o usuário lê."""
+    if raw is None:
+        return None
+    try:
+        return Decimal(str(raw))
+    except InvalidOperation:
+        return None
+
+
 def _enchantment_level(unique_name: str) -> int:
     if "@" not in unique_name:
         return 0
@@ -71,6 +83,7 @@ def load_dump_metadata(dump_path: Path) -> dict[str, dict]:
         tier = entry.get("@tier")
         metadata[unique_name] = {
             "tier": int(tier) if tier is not None else None,
+            "weight": _weight(entry.get("@weight")),
             "shop_category": entry.get("@shopcategory"),
             "shop_subcategory": entry.get("@shopsubcategory1"),
             "shop_subcategory2": entry.get("@shopsubcategory2"),
@@ -101,6 +114,7 @@ def build_items(
                 "name_pt": localized_names.get("PT-BR"),
                 "name_en": localized_names.get("EN-US"),
                 "tier": meta.get("tier"),
+                "weight": meta.get("weight"),
                 "enchantment_level": _enchantment_level(unique_name),
                 "shop_category": meta.get("shop_category"),
                 "shop_subcategory": meta.get("shop_subcategory"),
@@ -143,6 +157,7 @@ async def apply_item_import(
                     "name_pt": stmt.excluded.name_pt,
                     "name_en": stmt.excluded.name_en,
                     "tier": stmt.excluded.tier,
+                    "weight": stmt.excluded.weight,
                     "enchantment_level": stmt.excluded.enchantment_level,
                     "shop_category": stmt.excluded.shop_category,
                     "shop_subcategory": stmt.excluded.shop_subcategory,

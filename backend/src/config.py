@@ -42,6 +42,15 @@ class Settings(BaseSettings):
     # produto, default proposto (ver docs/tasks/backend/29-precos-por-lado-e-profundidade.md).
     price_freshness_hours: int = 6
 
+    # Poller da API pública do Albion Data Project (task 4/04). Ele dá LARGURA de cobertura —
+    # preço de item que nenhum usuário nosso abriu no jogo. Não dá frescor: mediana medida de
+    # 7 h. Desligável para ambiente sem egress; a URL é template para apontar a um dublê em teste.
+    aodp_enabled: bool = True
+    aodp_base_url_template: str = "https://{realm}.albion-online-data.com"
+    # Realms a sincronizar. Só `west` por padrão: East/Europe não têm usuário nosso hoje, e
+    # varrê-los gastaria request sem ninguém para ler o resultado.
+    aodp_realms: list[str] = ["west"]
+
     @field_validator("trusted_proxy_cidrs")
     @classmethod
     def validate_trusted_proxy_cidrs(cls, values: list[str]) -> list[str]:

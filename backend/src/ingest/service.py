@@ -16,6 +16,7 @@ from src.prices.constants import MarketScanSource
 from src.prices.models import MarketHistoryEntry, MarketOrder
 from src.prices.policy import get_market_book_policy
 from src.prices.service import recompute_and_cache_book, record_scans
+from src.prices.snapshot import refresh_snapshot_from_orders
 
 
 async def save_market_orders(
@@ -74,13 +75,17 @@ async def save_market_orders(
                 session, server_id, uuid.UUID(user_id), MarketScanSource.BOOK, scan_combos
             )
 
-        await session.commit()
-
         # Recalcular da fonte de verdade evita tratar um lote parcial como livro completo.
         combos = {
             (o["item_id"], o["location_id"], o["quality_level"], o["enchantment_level"])
             for o in orders
         }
+        # Topo de livro para o scanner (task 4/03), na mesma transação do upsert do livro: se o
+        # `market_order` foi gravado, o snapshot que o cliente lê já reflete isso.
+        await refresh_snapshot_from_orders(session, server_id, combos)
+
+        await session.commit()
+
         await recompute_and_cache_book(
             session, redis, server_id, combos, get_market_book_policy().freshness_hours
         )

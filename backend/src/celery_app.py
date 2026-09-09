@@ -105,6 +105,14 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/10"),
         "options": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
     },
+    "sync-aodp": {
+        "task": "prices.sync_aodp",
+        # A cada 10 min. A API pública tem mediana de 7 h de idade, então puxar mais rápido não
+        # traria dado mais novo — traria só request gasto. A regra de precedência do snapshot
+        # garante que isto nunca sobrescreva o dado fresco do nosso client.
+        "schedule": crontab(minute="*/10"),
+        "options": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
+    },
     "metricas-das-filas": {
         "task": "operations.log_queue_metrics",
         "schedule": 60.0,

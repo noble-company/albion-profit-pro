@@ -5,6 +5,7 @@ módulo. Mesmo padrão de tests/recipes/test_import_recipes.py.
 """
 
 import json
+from decimal import Decimal
 
 from sqlalchemy import select
 
@@ -24,6 +25,7 @@ ITEM_DUMP_FIXTURE = {
             {
                 "@uniquename": "ZZFIBER_T2",
                 "@tier": "2",
+                "@weight": "0.51",
                 "@shopcategory": "crafting",
                 "@shopsubcategory1": "resources",
             }
@@ -49,10 +51,10 @@ ITEMS_JSON_FIXTURE = [
 ]
 
 
-def _use_fixture_paths(tmp_path):
+def _use_fixture_paths(tmp_path, item_dump=None):
     item_dump_path = tmp_path / "ITEM DUMP.json"
     items_json_path = tmp_path / "items.json"
-    item_dump_path.write_text(json.dumps(ITEM_DUMP_FIXTURE), encoding="utf-8")
+    item_dump_path.write_text(json.dumps(item_dump or ITEM_DUMP_FIXTURE), encoding="utf-8")
     items_json_path.write_text(json.dumps(ITEMS_JSON_FIXTURE), encoding="utf-8")
 
     original_item_dump_path = import_items_module.ITEM_DUMP_PATH
@@ -96,6 +98,65 @@ async def test_import_items_resolves_index_and_dump_metadata(tmp_path, db_sessio
     assert no_dump.albion_id == 900003
     assert no_dump.tier is None
     assert no_dump.shop_category is None
+
+
+# --- Peso (task 4/01): fonte do "lucro por peso" do scanner ---
+
+
+def test_weight_is_parsed_as_decimal_not_float(tmp_path):
+    """`@weight` vem como string no dump. Passar por float introduziria erro logo antes de uma
+    divisão (`lucro / peso`) cujo resultado o usuário lê — a regra F09 vale aqui."""
+    dump_path = tmp_path / "ITEM DUMP.json"
+    dump_path.write_text(json.dumps(ITEM_DUMP_FIXTURE), encoding="utf-8")
+
+    metadata = import_items_module.load_dump_metadata(dump_path)
+
+    peso = metadata["ZZFIBER_T2"]["weight"]
+    assert peso == Decimal("0.51")
+    assert isinstance(peso, Decimal)
+
+
+def test_weight_ausente_ou_invalido_vira_none():
+    assert import_items_module._weight(None) is None
+    assert import_items_module._weight("") is None
+    assert import_items_module._weight("nao-e-numero") is None
+
+
+async def test_import_items_grava_peso_e_variante_encantada_herda(tmp_path, db_session):
+    original_paths = _use_fixture_paths(tmp_path)
+    try:
+        await import_items_module.import_items()
+    finally:
+        import_items_module.ITEM_DUMP_PATH, import_items_module.ITEMS_JSON_PATH = original_paths
+
+    result = await db_session.execute(select(Item).where(Item.unique_name.in_(UNIQUE_NAMES)))
+    items = {i.unique_name: i for i in result.scalars().all()}
+
+    assert items["ZZFIBER_T2"].weight == Decimal("0.51")
+    # Mesma regra de tier/categoria: a variante encantada não tem entrada própria no dump e
+    # herda o peso da base pelo `_base_name` — é o comportamento do jogo.
+    assert items["ZZFIBER_T2@1"].weight == Decimal("0.51")
+    # Item ausente do dump não ganha peso inventado.
+    assert items["ZZNODUMP"].weight is None
+
+
+async def test_reimport_atualiza_peso_de_linha_existente(tmp_path, db_session):
+    """O upsert de `apply_item_import` lista coluna por coluna no `set_`; esquecer `weight` ali
+    faz o import parecer idempotente e nunca corrigir o peso depois de um patch do jogo. Este
+    teste falha se `weight` sair do `set_`."""
+    original_paths = _use_fixture_paths(tmp_path)
+    try:
+        await import_items_module.import_items()
+
+        dump_com_peso_novo = json.loads(json.dumps(ITEM_DUMP_FIXTURE))
+        dump_com_peso_novo["items"]["simpleitem"][0]["@weight"] = "1.25"
+        _use_fixture_paths(tmp_path, item_dump=dump_com_peso_novo)
+        await import_items_module.import_items()
+    finally:
+        import_items_module.ITEM_DUMP_PATH, import_items_module.ITEMS_JSON_PATH = original_paths
+
+    result = await db_session.execute(select(Item).where(Item.unique_name == "ZZFIBER_T2"))
+    assert result.scalar_one().weight == Decimal("1.2500")
 
 
 async def test_import_items_skips_unique_names_over_column_limit(tmp_path, db_session):

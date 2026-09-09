@@ -19,6 +19,60 @@ from sqlalchemy.sql import func
 from src.database import Base
 
 
+class PriceSnapshot(Base):
+    """Topo de livro por combo de mercado — a leitura em massa que o scanner consome (task 4/03).
+
+    **Por que não é `market_order`.** Aquela tabela é o *livro*: uma linha por leilão do jogo,
+    com `source_id` e profundidade, e só o nosso client produz esse dado. A API pública (task
+    4/04) não entrega leilões, entrega topo de livro agregado. São naturezas diferentes; forçar
+    as duas na mesma tabela obrigaria a inventar `source_id` falso e destruiria a profundidade.
+
+    **Os dois lados são independentes.** É comum ter oferta sem procura, e a API pública já dá
+    `sell_price_min_date` e `buy_price_max_date` distintos. Um timestamp único mentiria sobre a
+    idade de um dos lados — e este produto exibe a idade de cada número.
+    """
+
+    __tablename__ = "price_snapshot"
+    __table_args__ = (
+        CheckConstraint("server_id IN ('west', 'east', 'europe')", name="ck_price_snapshot_server"),
+        CheckConstraint("quality_level BETWEEN 1 AND 5", name="ck_price_snapshot_quality"),
+        CheckConstraint("enchantment_level BETWEEN 0 AND 4", name="ck_price_snapshot_enchantment"),
+        CheckConstraint("sell_min IS NULL OR sell_min > 0", name="ck_price_snapshot_sell_positive"),
+        CheckConstraint("buy_max IS NULL OR buy_max > 0", name="ck_price_snapshot_buy_positive"),
+        UniqueConstraint(
+            "server_id",
+            "item_id",
+            "location_id",
+            "quality_level",
+            "enchantment_level",
+            name="uq_price_snapshot_combo",
+        ),
+        # A leitura do scanner é sempre "realm + cidades escolhidas".
+        Index("ix_price_snapshot_read", "server_id", "location_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    server_id: Mapped[str] = mapped_column(String(16))
+    item_id: Mapped[str] = mapped_column(String(64))
+    location_id: Mapped[str] = mapped_column(String(64))
+    quality_level: Mapped[int]
+    enchantment_level: Mapped[int]
+
+    # Menor `offer` — o que o jogador PAGA para comprar agora.
+    sell_min: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    sell_observed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    sell_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+    # Maior `request` — o que o jogador RECEBE vendendo agora.
+    buy_max: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    buy_observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    buy_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class MarketOrder(Base):
     """Estado atual do livro de ofertas: uma linha por leilão do jogo (`source_id`), não um
     log de varreduras. O client reenvia o livro inteiro toda vez que o jogador abre o

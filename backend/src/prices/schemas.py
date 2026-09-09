@@ -89,3 +89,54 @@ class DemandOut(BaseModel):
     book: BookOut
     sold: SoldOut
     series_6h: list[Series6hPoint]
+
+
+class PriceSnapshotColumnsOut(BaseModel):
+    """Arrays paralelos: o índice `i` de cada array descreve a mesma linha.
+
+    ``item`` e ``location`` são **índices** em ``PriceSnapshotOut.items`` / ``.locations``;
+    ``sell_source``/``buy_source`` são índices em ``.sources``. Os ``observed_at`` são **epoch
+    em segundos** (inteiro), não ISO — ISO custa 29 caracteres por lado, por linha.
+
+    ``null`` em qualquer lado significa **ausência de preço**, nunca preço zero.
+    """
+
+    item: list[int]
+    location: list[int]
+    quality: list[int]
+    enchantment: list[int]
+
+    # Menor `offer`: o que o jogador paga para comprar agora.
+    sell_min: list[str | None]
+    sell_observed_at: list[int | None]
+    sell_source: list[int | None]
+
+    # Maior `request`: o que o jogador recebe vendendo agora.
+    buy_max: list[str | None]
+    buy_observed_at: list[int | None]
+    buy_source: list[int | None]
+
+
+class PriceSnapshotOut(BaseModel):
+    """Snapshot de um realm. **Sem filtro de frescor e sem paginação** — a idade viaja em cada
+    linha e quem decide o que esconder é a tela (`X02`).
+
+    **Formato colunar, por medição.** A versão legível (array de objetos) custou 23 B/linha
+    gzipped, o que extrapola para ~67 KB numa cidade e ~560 KB nas oito — caro demais para algo
+    que o cliente busca a cada 30 s. Trocar chaves repetidas por arrays, strings por índices de
+    dicionário e ISO por epoch resolve isso. Os números medidos estão no estado da task 4/03.
+
+    Preço continua **string decimal** (`F09`) — a compactação não passa por cima da regra do
+    dinheiro.
+    """
+
+    server: AlbionServer
+    generated_at: datetime
+    row_count: int
+
+    # Dicionários: o payload referencia por índice.
+    items: list[str]
+    locations: list[str]
+    sources: list[str]
+
+    columns: PriceSnapshotColumnsOut

@@ -64,3 +64,6 @@ albiondata-client/.secrets
 .idea/
 .DS_Store
 Thumbs.db
+
+# Agenda do Celery beat (shelve) — artefato de execução local
+celerybeat-schedule*
