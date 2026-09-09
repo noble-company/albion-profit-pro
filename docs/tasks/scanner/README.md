@@ -72,6 +72,7 @@ BLOCO 3 — o resto do produto
 12 Tela de Craft                           ── depende de 11
 13 Comida & Poções                         ── depende de 12
 14 Calculadora sobre o engine              ── depende de 05
+17 Painel do Destino (eficiencia de foco)  ── depende de 11
 15 Aposentar o ranking materializado       ── depende de 11, 12
 16 Documentos reconciliados                ── depende de 15
 ```
@@ -106,6 +107,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | 12 | Tela de Craft | — | 5.523 receitas virtualizadas |
 | 13 | Comida & Poções | — | Aba própria, mesmo motor |
 | 14 | Calculadora sobre o engine | — | Instantânea ao digitar |
+| [17](17-painel-do-destino.md) | Painel do Destino | — | Custo de foco real: `Lucro/foco` deixa de errar por ate 16x |
 | 15 | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
 | 16 | Documentos reconciliados | — | Specs param de descrever a arquitetura revogada |
 
@@ -137,6 +139,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [ ] 12 — Tela de Craft
 - [ ] 13 — Comida & Poções
 - [ ] 14 — Calculadora sobre o engine
+- [ ] 17 — Painel do Destino (eficiência de foco)
 - [ ] 15 — Aposentar o ranking materializado
 - [ ] 16 — Documentos reconciliados
 
