@@ -152,3 +152,45 @@ describe('escrita na URL', () => {
     expect(result.current.filters.showUnpriced).toBe(true)
   })
 })
+
+describe('o que dispara recálculo (task 12)', () => {
+  test('filtro de EXIBIÇÃO não troca a identidade do que alimenta o engine', () => {
+    // No craft o cálculo leva 2,5 s e roda no Worker. Se digitar na busca trocar a referência
+    // de `scenario`/`pricing`/`strategy`, a tela recalcula 5.523 receitas para esconder linhas
+    // que já estavam calculadas — foi exatamente o que o usuário sentiu como "demora a cada
+    // alteração nos filtros".
+    const { result } = render('/refino?qty=100')
+
+    const cenario = result.current.scenario
+    const precos = result.current.pricing
+    const estrategia = result.current.strategy
+
+    act(() => result.current.setParam('q', 'tecido'))
+
+    expect(result.current.scenario).toBe(cenario)
+    expect(result.current.pricing).toBe(precos)
+    expect(result.current.strategy).toBe(estrategia)
+    // E o filtro em si mudou, senão o teste passaria por não ter feito nada.
+    expect(result.current.filters.search).toBe('tecido')
+  })
+
+  test('mexer no cenário TROCA a identidade — aí recalcular é o certo', () => {
+    const { result } = render('/refino?qty=100')
+    const antes = result.current.scenario
+
+    act(() => result.current.setParam('qty', '500'))
+
+    expect(result.current.scenario).not.toBe(antes)
+    expect(result.current.scenario.quantity).toBe(500)
+  })
+
+  test('fixar preço de ingrediente troca a política, e só ela', () => {
+    const { result } = render('/refino')
+    const cenario = result.current.scenario
+
+    act(() => result.current.setExcecao('px', 'T5_FIBER', '250'))
+
+    expect(result.current.pricing.manual.get('T5_FIBER')).toBe('250')
+    expect(result.current.scenario).toBe(cenario)
+  })
+})

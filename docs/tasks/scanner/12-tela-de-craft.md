@@ -121,3 +121,37 @@ ingredientes faltam. Somar parcial em silêncio seria um total que parece comple
 
 `/craft` era o último consumidor de `recipe_ranking`. A tabela, o job, o beat de 10 minutos e a
 tela antiga podem ser apagados agora.
+
+## Correção: recálculo em todo filtro (2026-09-09)
+
+Reportado logo no primeiro uso: "está demorando muito pra carregar toda vez que faço alguma
+alteração nos filtros".
+
+### A causa
+
+`scenario`, `pricing` e `strategy` memoizavam em `[params]` — e `URLSearchParams` **ganha
+identidade nova a cada mudança de URL**. Digitar uma letra na busca criava objetos novos, que
+mudavam `paramsDoEngine`, que disparava o Worker: **2,5 s recalculando 5.523 receitas para
+esconder linhas que já estavam calculadas**.
+
+O filtro de exibição nunca precisou de recálculo. Ele mexe em `applyFilters`, que roda sobre o
+resultado — medido agora: **38 ms para filtrar e ordenar 44.184 linhas**. O custo estava todo no
+recálculo desnecessário.
+
+### A correção
+
+Cada memo passa a depender de uma **chave de conteúdo** dos parâmetros que ele de fato lê
+(`chaveDe(params, ['qty', 'return_rate', …])`), não da referência do `URLSearchParams`.
+
+O mesmo defeito estava em `useDestinyBoard`, que devolvia `new Map()` a cada render enquanto o
+painel carregava — identidade nova, recálculo novo. Agora é uma constante.
+
+### O guard
+
+`filtro de EXIBIÇÃO não troca a identidade do que alimenta o engine`: digita na busca e compara
+as **referências** de `scenario`, `pricing` e `strategy`. Junto dele, o par que impede o guard de
+ser vazio: mexer no cenário **troca** a identidade (aí recalcular é o certo), e o filtro de fato
+mudou.
+
+Este é o tipo de defeito que nenhum teste de comportamento pega — a tela mostra os números
+certos, só demora 2,5 s para isso. Só aparece medindo identidade.

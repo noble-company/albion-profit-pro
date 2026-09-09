@@ -8,6 +8,13 @@ import { getDestinyBoard, putDestinyBoard } from './service'
 const CHAVE = ['destiny-board'] as const
 
 /**
+ * Uma única instância vazia: `new Map()` a cada render trocaria a identidade e invalidaria o
+ * `useMemo` que alimenta o engine — no craft isso é um recálculo de 2,5 s por render enquanto
+ * o painel carrega.
+ */
+const VAZIO: DestinyBoard = new Map()
+
+/**
  * Política `catalog`: o painel muda quando o jogador sobe de nível no jogo, não a cada minuto.
  * Enquanto carrega, devolve painel **vazio** — que significa "custo de foco base", nunca um
  * desconto que o jogador não tem.
@@ -18,7 +25,7 @@ export function useDestinyBoard(): DestinyBoard {
     queryFn: ({ signal }) => getDestinyBoard(signal),
     ...queryPolicies.catalog,
   })
-  return data ?? new Map<string, number>()
+  return data ?? VAZIO
 }
 
 export function useSaveDestinyBoard() {

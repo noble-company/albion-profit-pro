@@ -73,6 +73,18 @@ function pares(raw: string[]): Map<string, string> {
   return mapa
 }
 
+/**
+ * Chave de conteúdo de um punhado de parâmetros.
+ *
+ * `URLSearchParams` ganha **identidade nova a cada mudança de URL**, então memoizar em `[params]`
+ * refaz o objeto ao digitar qualquer coisa — inclusive um filtro de exibição. No craft isso
+ * custava um recálculo de 5.523 receitas (2,5 s) para esconder linhas que já estavam
+ * calculadas. Aqui a dependência é o **valor**, não a referência.
+ */
+function chaveDe(params: URLSearchParams, chaves: string[]): string {
+  return chaves.map((chave) => `${chave}=${params.getAll(chave).join(',')}`).join('&')
+}
+
 function numbers(raw: string | null): number[] {
   if (!raw) return []
   return raw
@@ -102,6 +114,15 @@ export function useScannerFilters() {
     [params],
   )
 
+  const chaveDoCenario = chaveDe(params, [
+    'premium',
+    'return_rate',
+    'station_cost',
+    'focus',
+    'quality',
+    'qty',
+  ])
+
   const scenario = useMemo<ScannerScenario>(
     () => ({
       premium: params.get('premium') !== 'false',
@@ -116,7 +137,8 @@ export function useScannerFilters() {
       // padrão escondendo um efeito que muda o lucro em dois dígitos percentuais.
       quantity: quantidadeSegura(params.get('qty')),
     }),
-    [params],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
+    [chaveDoCenario],
   )
 
   /**
@@ -124,6 +146,8 @@ export function useScannerFilters() {
    * a maioria dos players que refinam usa preço médio". `sale` reproduz o comportamento antigo
    * (cotar na cidade da venda), e um `location_id` fixa uma cidade.
    */
+  const chaveDosPrecos = chaveDe(params, ['ing_price', 'px', 'pc', 'sx'])
+
   const pricing = useMemo<PricingPolicy>(() => {
     const bruto = params.get('ing_price')
     const base: PriceBasis =
@@ -139,7 +163,8 @@ export function useScannerFilters() {
       byItemCity: pares(params.getAll('pc')),
       manualSale: pares(params.getAll('sx')),
     }
-  }, [params])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
+  }, [chaveDosPrecos])
 
   const sellIn: SellIn = params.get('sell_in') || 'best'
 
@@ -148,6 +173,8 @@ export function useScannerFilters() {
    * duas ordens sendo aceitas**. Quem compra e vende na hora vê outro número, e a tela precisa
    * saber mostrar esse também, senão a leitura por cima cria expectativa que o mercado não paga.
    */
+  const chaveDaEstrategia = chaveDe(params, ['buy', 'sell'])
+
   const strategy = useMemo<ScannerStrategy>(() => {
     const compra = params.get('buy')
     const venda = params.get('sell')
@@ -159,7 +186,8 @@ export function useScannerFilters() {
       sale:
         venda === 'immediate' || venda === 'sell_order' ? venda : DEFAULT_STRATEGY.sale,
     }
-  }, [params])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
+  }, [chaveDaEstrategia])
 
   const setParam = useCallback(
     (key: string, value: string | null) => {
