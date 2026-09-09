@@ -97,3 +97,66 @@ equipe de infraestrutura deve precriar a extensão antes de `alembic upgrade hea
 O endpoint `/ready` permanece indisponível enquanto não existir uma versão ativa do dataset. Em
 produção, a ordem obrigatória é `migrate → seed → API/worker/beat`; a materialização dos processos
 e filas no stack é escopo da task 11 da Fase 2.5.
+
+## Arte dos itens — serviço de render oficial
+
+> Investigado em 2026-09-07, durante a Fase 4. Consumido pela task 4/10 (tabela do scanner).
+
+Não existe dump de imagem, e não precisamos de um. A Sandbox Interactive mantém um serviço de
+render público cujo identificador **é exatamente o `Item.unique_name` que já está no banco** —
+inclusive com o sufixo de encantamento:
+
+```text
+https://render.albiononline.com/v1/item/{unique_name}.png?size=64&quality=3
+https://render.albiononline.com/v1/item/T6_FIBER_LEVEL3@3.png?size=64
+```
+
+Nenhuma tabela de-para, nenhuma coluna nova, nenhum asset hospedado por nós.
+
+### Parâmetros e custo (medidos)
+
+| Parâmetro | Valores aceitos |
+|---|---|
+| `size` | **32, 64, 96, 128, 217**. Qualquer outro (16, 256, 512) devolve `502`. |
+| `quality` | `1`–`5` — desenha a borda de qualidade do item. |
+
+| `size` | Peso do PNG |
+|---:|---:|
+| 32 | 2,2 KB |
+| **64** | **7,9 KB** ← usar em tabela |
+| 128 | 28 KB ← usar em detalhe |
+| 217 | 75 KB |
+
+`Cache-Control: no-transform, max-age=86400` (24 h), servido de um edge cache (`Age` observado:
+33.430 s). Latência ~0,3–0,5 s quando quente.
+
+### Os dois modos de falha são diferentes — e parecidos
+
+- **`502` = render frio, transitório.** A primeira renderização de uma variante pode levar
+  **17–24 s** e falhar; a tentativa seguinte volta `200`. Observado com
+  `T4_MAIN_MACE_CRYSTAL@4` e `T6_HEAD_GATHERER_ROCK@3` (502 → 200 no retry).
+- **`404` = o item não tem arte.** Itens internos/protótipo que existem no dump e não no jogo —
+  ex.: `T8_HEAD_CLOTH_PROTOTYPE`, que dá 404 até sem sufixo de encantamento.
+
+Consequência de design: o mesmo `onError` cobre os dois casos. Não vale distinguir no cliente.
+
+### Decisão de consumo
+
+`<img>` direto do navegador, **sem proxy no backend**:
+
+- `loading="lazy"` — só a linha visível baixa. Numa tabela de 5.523 receitas é a diferença entre
+  ~44 MB e ~200 KB.
+- `onError` → ícone neutro de fallback (cobre 404 real e 502 frio).
+- `size=64` em tabela, `size=128` no detalhe.
+- O cache de 24 h do navegador absorve a repetição.
+
+Um proxy nosso (para aquecer cache ou não depender de terceiro no caminho quente) é otimização
+deliberadamente adiada — sem sinal de que seja necessário.
+
+### Alternativas locais descartadas
+
+| Fonte | Por que não serve |
+|---|---|
+| `@uisprite` / `@uispriteoverlay1-2` no `ITEM DUMP.json` (3.503 entradas) | É o **nome do sprite dentro do atlas de assets do client**, não uma imagem. Exigiria extrair os assets do jogo — esforço e licença. |
+| `albiondata-client` | Só tem o ícone da própria bandeja (`icon/iconwin.go`, `icon/icondarwin.go`). Nenhuma arte de item. |
+| `items.json` | Só localização, `Index` e `UniqueName`. Nenhum campo de imagem. |

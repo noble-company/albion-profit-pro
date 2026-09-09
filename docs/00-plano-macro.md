@@ -80,7 +80,17 @@ arquitetura em [12-revisao-fase-3.md](12-revisao-fase-3.md#decisões-de-arquitet
 o cálculo é dividido por *o que muda* (não *onde roda*), o frontend é reconstruído por cima
 (não recomeçado), e a antifraude é adiada conscientemente para o pré-lançamento.
 
-**Fase 4 — não começou.**
+**Fase 3.6 (correções) — 0/17 tasks.** Derivada da auditoria
+[14-revisao-fase-3-5.md](14-revisao-fase-3-5.md), feita a partir da execução real dos gates. A
+Fase 3.5 foi confirmada como entregue — os números declarados batem no dígito — mas sobreviveram
+a ela um cálculo do cliente que diverge do motor Python (`E01`), dois caminhos de tela branca
+(`E02`/`E03`, sem `ErrorBoundary` no projeto, `E04`), um formulário que falha em silêncio na
+Calculadora (`E05`), o `client-ci` vermelho desde 31/08 (`E06`) e guards que passam sem verificar
+o que prometem (`E10`). A fase também tira a implementação de dentro da task 19 (`P01`) e
+constrói a premissa que falta para a Fase 4 (`P02`). Ordem e status em
+[tasks/correcoes/](tasks/correcoes/README.md).
+
+**Fase 4 — não começou.** Depende da task 19 e do deploy; ver a ordem de implementação abaixo.
 
 ## Contexto
 
@@ -276,8 +286,12 @@ Trocar o "abrir navegador" da Fase 2 por um webview nativo embutido (`github.com
 6. ~~Fase 3 — API de craft + frontend completo~~ ✅ **18/19**, ver
    [tasks/frontend/](tasks/frontend/README.md).
 7. ~~Fase 3.5 — refatoração~~ ✅ **28/29**, ver [tasks/refatoracao/](tasks/refatoracao/README.md).
-8. **Próximo passo:** task 19 — gate integrado em jogo (Albion + Npcap + systray + Swarm/Traefik
-   reais), validando a jornada inteira de uma vez.
+8. **Próximo passo:** Fase 3.6 — correções da revisão da 3.5, ver
+   [tasks/correcoes/](tasks/correcoes/README.md). As tasks 01-04 são defeitos de usuário final e
+   vêm antes de tudo; a task 13 tira do gate 19 a implementação de serving/deploy do frontend, e
+   a 14 constrói o item de systray que a Fase 4 pressupõe.
+8b. Task 19 — gate integrado em jogo (Albion + Npcap + systray + Swarm/Traefik reais), validando
+   a jornada inteira de uma vez, já sobre o frontend publicado pela task 3.6/13.
 9. Deploy no Swarm é materializado dentro da Fase 2.5 (seed/filas/processos) e finalizado no gate
    19 com o frontend/Traefik, usando o padrão real do usuário.
 10. (Depois) Fase 4 — webview embutido no client.
