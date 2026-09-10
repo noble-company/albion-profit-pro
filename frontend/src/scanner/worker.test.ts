@@ -153,3 +153,43 @@ describe('runScanner', () => {
     expect(resposta.durationMs).toBeGreaterThanOrEqual(0)
   })
 })
+
+describe('a taxa da estação atravessa o Worker (task 4/18)', () => {
+  test('o craft cobra estação igual ao refino — o valor do item viaja no catálogo', () => {
+    // O refino calcula na thread principal e o craft no Worker. Se a mensagem `data` um dia
+    // deixar de levar `item_value`, o refino continua certo e **só o craft** para de cobrar a
+    // estação — o tipo mapeado de `ScannerRow` não cobre isso, porque o valor do item viaja no
+    // catálogo, não na linha.
+    const catalogoComValor: ScannerCatalog = {
+      ...CATALOGO,
+      items: CATALOGO.items.map((item) =>
+        item.unique_name === 'T4_CLOTH' ? { ...item, item_value: '16' } : item,
+      ),
+    }
+    const params: ScannerParams = { ...PARAMS, stationFeePer100Nutrition: '390', quantity: 1 }
+
+    const pelaThreadPrincipal = computeScanner(
+      catalogoComValor,
+      buildPriceIndex(SNAPSHOT),
+      params,
+    )[0]!
+    const peloWorker = runScanner({
+      id: 1,
+      catalog: catalogoComValor,
+      snapshot: SNAPSHOT,
+      params,
+    }).rows[0]!
+
+    // 16 × 0,1125 = 1,8 de nutrição; 1,8 × 390/100 = 7,02.
+    expect(pelaThreadPrincipal.totalCost).not.toBeNull()
+    expect(peloWorker.totalCost).toBe(pelaThreadPrincipal.totalCost?.toString())
+
+    const semEstacao = computeScanner(catalogoComValor, buildPriceIndex(SNAPSHOT), {
+      ...params,
+      stationFeePer100Nutrition: '0',
+    })[0]!
+    expect(
+      pelaThreadPrincipal.totalCost!.minus(semEstacao.totalCost!).toString(),
+    ).toBe('7.02')
+  })
+})

@@ -179,6 +179,18 @@ Lymhurst passou a ter dois mercados (`1002` e `1301`) na 11.2.2, e o endpoint de
 ranqueia por mercado. Não corrigida aqui — é outra decisão (fundir mercados no servidor, como o
 cliente faz, ou aceitar duas linhas de Lymhurst).
 
+### As duas telas, um caminho só
+
+`/refino` e `/craft` são o mesmo `ScannerPage` com o mesmo `computeScanner` — a diferença é que
+o craft roda no Worker. O valor do item viaja na mensagem `data`, dentro do catálogo, e **não**
+na linha, então o tipo mapeado de `ScannerRow` (a rede que a task 12 armou contra campo que
+some) não cobre este caso: se a mensagem um dia deixar de levar `item_value`, o refino continua
+certo e só o craft para de cobrar a estação.
+
+Guard `o craft cobra estação igual ao refino`: roda o mesmo cenário pelos dois caminhos e compara
+as strings, mais a diferença contra a mesma conta sem estação. Verificado vermelho cortando o
+valor do item no engine.
+
 ### Pendente pra você testar
 
 1. Abrir a mesma receita na estação do jogo e conferir o "Custo em prata" contra o extrato.
