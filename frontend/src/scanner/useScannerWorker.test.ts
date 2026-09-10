@@ -40,6 +40,8 @@ class WorkerFalso {
             outputItem: 'T4_CLOTH',
             locationId: '1002',
             productionKind: 'crafting',
+            tier: 4,
+            enchantmentLevel: 0,
             state: 'priced',
             acquisitionMode: 'immediate',
             saleMode: 'immediate',

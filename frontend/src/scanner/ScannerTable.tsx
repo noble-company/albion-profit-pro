@@ -6,7 +6,7 @@ import type { components } from '@/api/schema'
 import { EstadoVazio } from '@/components/ui/states'
 
 import type { ScannerRow } from './engine'
-import type { SortField, SortState } from './sorting'
+import { CAMPOS_ESTRUTURAIS, type SortField, type SortState } from './sorting'
 
 /**
  * Tabela do scanner (task 4/10).
@@ -112,11 +112,12 @@ export function ScannerTable({
     [columns],
   )
 
+  // Campo novo começa pelo lado útil: lucro do maior para o menor, tier do T2 ao T8.
   const toggleSort = (field: SortField) => {
     onSortChange(
       sort.field === field
         ? { field, direction: sort.direction === 'desc' ? 'asc' : 'desc' }
-        : { field, direction: 'desc' },
+        : { field, direction: CAMPOS_ESTRUTURAIS.has(field) ? 'asc' : 'desc' },
     )
   }
 

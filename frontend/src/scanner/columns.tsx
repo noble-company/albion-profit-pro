@@ -170,7 +170,7 @@ export function buildColumns(
     {
       key: 'item',
       header: 'Item',
-      sortField: 'item',
+      sortField: 'tier',
       width: 'minmax(13rem, 1.4fr)',
       cell: (row, item) => (
         <span className="flex min-w-0 items-center gap-2">

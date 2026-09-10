@@ -41,6 +41,8 @@ function row(
     outputItem,
     locationId: '1002',
     productionKind: 'refining',
+    tier: 4,
+    enchantmentLevel: 0,
     state: 'priced',
     acquisitionMode: 'immediate',
     saleMode: 'immediate',
@@ -166,16 +168,6 @@ describe('filtros de identidade', () => {
       'T5_B',
     ])
   })
-
-  test('cidade', () => {
-    const linhas = [
-      row('A', { locationId: '1002' }),
-      row('B', { locationId: '4002' }),
-    ]
-    expect(
-      filtrar(linhas, { locations: ['4002'] }).map((r) => r.outputItem),
-    ).toEqual(['B'])
-  })
 })
 
 describe('filtros financeiros', () => {
@@ -220,7 +212,7 @@ describe('desempenho', () => {
         search: 'item',
         tiers: [4, 5, 6],
         enchantments: [0, 1],
-        locations: ['1002'],
+        profitableOnly: true,
         minProfit: '100',
       },
       mapa,

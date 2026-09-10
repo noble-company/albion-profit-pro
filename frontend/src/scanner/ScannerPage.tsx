@@ -92,7 +92,6 @@ export function ScannerPage({
     setExcecao,
     setParam,
     toggleNumber,
-    toggleText,
     reset,
   } = useScannerFilters()
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT)
@@ -115,12 +114,11 @@ export function ScannerPage({
   const precos = usePriceSnapshot(realm, mercadosPedidos)
 
   /**
-   * Onde se **vende**. Em `best` e `all` o engine avalia todas as cidades; a diferença é que
-   * `best` reduz para a melhor de cada receita depois de calcular — a comparação existe, só
-   * não ocupa mil linhas.
+   * Onde se **vende**. Em `best` o engine avalia todas as cidades e reduz para a melhor de
+   * cada receita depois de calcular — a comparação existe, e mora no painel expandido.
    */
   const cidadesDeVenda = useMemo(
-    () => (sellIn === 'best' || sellIn === 'all' ? cidades.map((c) => c.id) : [sellIn]),
+    () => (sellIn === 'best' ? cidades.map((c) => c.id) : [sellIn]),
     [sellIn, cidades],
   )
 
@@ -197,21 +195,6 @@ export function ScannerPage({
     return sellIn === 'best' ? bestPerRecipe(todas) : todas
   }, [noWorker, doWorker.rows, naThreadPrincipal, sellIn])
 
-  /**
-   * O filtro de cidade só vale no modo de comparação. Fora dele a cidade já foi decidida pelo
-   * seletor, e um `?location=` que sobrou de um link antigo apagaria linhas em silêncio — com
-   * o controle escondido, sem nada na tela explicando por quê.
-   */
-  const filtrosEfetivos = useMemo(
-    () => (sellIn === 'all' ? filters : { ...filters, locations: [] }),
-    [filters, sellIn],
-  )
-
-  const visiveis = useMemo(
-    () => sortRows(applyFilters(linhas, filtrosEfetivos, itemsByName), sort),
-    [linhas, filtrosEfetivos, itemsByName, sort],
-  )
-
   // Nome legível de qualquer item do catálogo — a coluna de ingrediente precisa dele, e o
   // ingrediente não é a saída da receita (não vem no `item` da linha).
   const nomeItem = useMemo(() => {
@@ -221,6 +204,12 @@ export function ScannerPage({
         unique,
       )
   }, [itemsByName])
+
+  const visiveis = useMemo(
+    // O nome desempata a ordem por tier: é o nome que o jogador lê que define "alfabética".
+    () => sortRows(applyFilters(linhas, filters, itemsByName), sort, nomeItem),
+    [linhas, filters, itemsByName, sort, nomeItem],
+  )
 
   const columns = useMemo(
     () =>
@@ -385,27 +374,15 @@ export function ScannerPage({
           />
 
           <FilterGroup legend="Mercado">
+            {/* Uma linha por receita nos dois modos (task 19). A comparação entre cidades mora no
+                painel expandido, onde não multiplica a tabela por oito. */}
             <FilterSelectField
               label="Vender em"
               value={sellIn === 'best' ? '' : sellIn}
               onChange={(v) => setParam('sell_in', v)}
-              options={[
-                { value: 'all', label: 'Todas (comparar lado a lado)' },
-                ...cidades.map((c) => ({ value: c.id, label: c.name })),
-              ]}
+              options={cidades.map((c) => ({ value: c.id, label: c.name }))}
               allLabel="Melhor cidade"
             />
-            {/* Os chips só fazem sentido quando há uma linha por cidade; nos outros modos a
-                cidade já está decidida e um controle inerte confundiria. */}
-            {sellIn === 'all' && (
-              <FilterChips
-                label="Cidade"
-                options={cidades.map((c) => c.id)}
-                selected={filters.locations}
-                onToggle={(id) => toggleText('location', id)}
-                formatOption={locationName}
-              />
-            )}
           </FilterGroup>
 
           <FilterGroup legend="Preço dos ingredientes">

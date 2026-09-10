@@ -133,6 +133,10 @@ export interface ScannerRow {
   outputItem: string
   locationId: string
   productionKind: string
+  /** tier da saída — a ordem estrutural da tabela (task 4/19); nulo em item sem tier no dump */
+  tier: number | null
+  /** encantamento da saída, da coluna da receita (a mesma fonte de `outputEnchantment`) */
+  enchantmentLevel: number
   state: ScannerState
 
   // Preenchidos só quando `state === 'priced'`.
@@ -296,6 +300,7 @@ function prepararReceita(
     // Derivar do nome seria uma segunda fonte de verdade, livre para divergir.
     outputEnchantment: recipe.enchantment_level,
     outputWeight: saida?.weight ?? null,
+    outputTier: saida?.tier ?? null,
   }
 }
 
@@ -458,6 +463,7 @@ interface EvaluateInput {
   salesTaxRate: Decimal
   returnRate: string
   outputEnchantment: number
+  outputTier: number | null
   outputWeight: string | null
   cacheDaMedia: Map<string, ResolvedPrice>
   coletor?: Coletor
@@ -471,6 +477,8 @@ function emptyRow(
     outputItem: input.recipe.output_item,
     locationId: input.locationId,
     productionKind: input.recipe.production_kind,
+    tier: input.outputTier,
+    enchantmentLevel: input.outputEnchantment,
     state,
     acquisitionMode: null,
     saleMode: null,
@@ -704,6 +712,8 @@ function evaluate(input: EvaluateInput): ScannerRow {
         outputItem: recipe.output_item,
         locationId,
         productionKind: recipe.production_kind,
+        tier: input.outputTier,
+        enchantmentLevel: input.outputEnchantment,
         state: 'priced',
         acquisitionMode,
         saleMode,

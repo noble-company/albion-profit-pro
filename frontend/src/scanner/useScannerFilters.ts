@@ -59,8 +59,9 @@ function quantidadeSegura(raw: string | null): number {
 }
 
 /**
- * Onde o item é vendido (task 11.3). `best` = a cidade de maior lucro, uma linha por receita;
- * `all` = uma linha por cidade, para comparar lado a lado; um `location_id` = só aquela.
+ * Onde o item é vendido (task 11.3). `best` = a cidade de maior lucro; um `location_id` = só
+ * aquela. Os dois dão **uma linha por receita**. O antigo `all` (uma linha por cidade) saiu na
+ * task 19 — a comparação entre cidades mora no painel expandido.
  */
 export type SellIn = string
 
@@ -106,7 +107,6 @@ export function useScannerFilters() {
       tiers: numbers(params.get('tier')),
       enchantments: numbers(params.get('ench')),
       category: params.get('category'),
-      locations: params.getAll('location'),
       minProfit: params.get('min_profit'),
       minRoi: params.get('min_roi'),
       maxAgeHours: params.get('max_age') ? Number(params.get('max_age')) : null,
@@ -170,7 +170,10 @@ export function useScannerFilters() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
   }, [chaveDosPrecos])
 
-  const sellIn: SellIn = params.get('sell_in') || 'best'
+  // Link antigo com `sell_in=all` cai no padrão em vez de abrir numa tela sem controle
+  // correspondente (task 19).
+  const sellInCru = params.get('sell_in')
+  const sellIn: SellIn = sellInCru && sellInCru !== 'all' ? sellInCru : 'best'
 
   /**
    * Como o jogador compra e vende. Ausente = `best`, o cenário mais lucrativo — que **supõe as
@@ -239,22 +242,6 @@ export function useScannerFilters() {
     [params, setParam],
   )
 
-  /**
-   * Alterna um valor numa multi-seleção de **texto**, que viaja como parâmetro repetido
-   * (`?location=1002&location=4002`) — é o formato que `filters.locations` lê. Cidade não cabe
-   * em `toggleNumber`: o identificador não é número e a lista não é separada por vírgula.
-   */
-  const toggleText = useCallback(
-    (key: string, value: string) => {
-      const atual = params.getAll(key)
-      setList(
-        key,
-        atual.includes(value) ? atual.filter((v) => v !== value) : [...atual, value],
-      )
-    },
-    [params, setList],
-  )
-
   const reset = useCallback(
     () => setParams(new URLSearchParams(), { replace: true }),
     [setParams],
@@ -271,7 +258,6 @@ export function useScannerFilters() {
     setParam,
     setList,
     toggleNumber,
-    toggleText,
     reset,
   }
 }

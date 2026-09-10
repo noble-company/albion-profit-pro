@@ -57,11 +57,6 @@ describe('leitura da URL', () => {
     expect(result.current.filters.enchantments).toEqual([1, 3])
   })
 
-  test('cidades viajam como parâmetro repetido', () => {
-    const { result } = render('/refino?location=1002&location=4002')
-    expect(result.current.filters.locations).toEqual(['1002', '4002'])
-  })
-
   test('a base do preço de ingrediente é a MÉDIA por padrão (task 11.3)', () => {
     // "no fim do dia, a maioria dos players que refinam usam preço médio" — então é o padrão,
     // não uma opção escondida.
@@ -84,8 +79,13 @@ describe('leitura da URL', () => {
 
   test('vender em: melhor cidade por padrão', () => {
     expect(render().result.current.sellIn).toBe('best')
-    expect(render('/refino?sell_in=all').result.current.sellIn).toBe('all')
     expect(render('/refino?sell_in=3005').result.current.sellIn).toBe('3005')
+  })
+
+  test('link antigo com `sell_in=all` abre em melhor cidade (task 19)', () => {
+    // O modo "todas as cidades lado a lado" saiu: a comparação mora no painel. Link salvo com
+    // ele não pode abrir numa tela sem controle correspondente — cai no padrão.
+    expect(render('/refino?sell_in=all').result.current.sellIn).toBe('best')
   })
 
   test('só `unpriced=false` esconde — qualquer outra coisa mostra', () => {
@@ -118,21 +118,6 @@ describe('escrita na URL', () => {
     // Lista vazia sai da URL em vez de virar `tier=` — link limpo.
     expect(result.current.filters.tiers).toEqual([])
     expect(result.current.params.has('tier')).toBe(false)
-  })
-
-  test('alternar cidade adiciona e remove o parâmetro repetido', () => {
-    // Cidade não cabe em `toggleNumber`: o identificador é texto ('1002') e viaja repetido,
-    // não separado por vírgula. Sem isto a tela lê `location` da URL e não tem como escrever.
-    const { result } = render('/refino?location=1002')
-
-    act(() => result.current.toggleText('location', '4002'))
-    expect(result.current.filters.locations).toEqual(['1002', '4002'])
-
-    act(() => result.current.toggleText('location', '1002'))
-    expect(result.current.filters.locations).toEqual(['4002'])
-
-    act(() => result.current.toggleText('location', '4002'))
-    expect(result.current.params.has('location')).toBe(false)
   })
 
   test('valor vazio remove o parâmetro em vez de gravar string vazia', () => {

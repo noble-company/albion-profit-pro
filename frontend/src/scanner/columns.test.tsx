@@ -22,6 +22,8 @@ function row(overrides: Partial<ScannerRow> = {}): ScannerRow {
     outputItem: 'T4_CLOTH',
     locationId: '1002',
     productionKind: 'refining',
+    tier: 4,
+    enchantmentLevel: 0,
     state: 'priced',
     acquisitionMode: 'immediate',
     saleMode: 'immediate',

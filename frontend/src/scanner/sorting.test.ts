@@ -7,8 +7,12 @@ import { DEFAULT_SORT, sortRows } from './sorting'
 
 /**
  * Task 4/10. A regra que carrega peso aqui é: **linha sem preço vai sempre para o fim, nas duas
- * direções**. Ausência não é "o pior resultado" — ordená-la junto com número inventaria uma
- * posição que o dado não sustenta.
+ * direções** — quando o campo ordenado é um número calculado. Ausência não é "o pior resultado";
+ * ordená-la junto com número inventaria uma posição que o dado não sustenta.
+ *
+ * Task 4/19. A exceção é a ordem **estrutural** (tier, encantamento, nome): ali a posição não
+ * depende de preço, e mandar `Couro T4.2` sem cotação para depois do T8 quebraria justamente a
+ * leitura "como o mercado do jogo" que a ordem existe para dar.
  */
 
 function row(nome: string, profit: string | null, extra: Partial<ScannerRow> = {}) {
@@ -24,13 +28,71 @@ function row(nome: string, profit: string | null, extra: Partial<ScannerRow> = {
     totalCost: null,
     oldestObservedAt: profit === null ? null : 1_757_000_000,
     ingredients: [],
+    tier: null,
+    enchantmentLevel: 0,
     ...extra,
   } as ScannerRow
 }
 
 describe('sortRows', () => {
-  test('padrão é lucro decrescente', () => {
-    expect(DEFAULT_SORT).toEqual({ field: 'profit', direction: 'desc' })
+  test('padrão é tier crescente — a lista se lê como o mercado do jogo', () => {
+    expect(DEFAULT_SORT).toEqual({ field: 'tier', direction: 'asc' })
+  })
+
+  test('tier ordena por tier, depois encantamento', () => {
+    // Os códigos estão escolhidos para a ordem ALFABÉTICA contradizer a de encantamento
+    // (`T4_A@2` < `T4_M@1` < `T4_Z`). A primeira versão deste teste usava `T4_CLOTH`,
+    // `T4_CLOTH_LEVEL1@1`… e passava contra o código antigo: o desempate por código coincidia
+    // com o encantamento, e o teste não distinguia nada.
+    const linhas = [
+      row('T5_B', '1', { tier: 5, enchantmentLevel: 0 }),
+      row('T4_A@2', '1', { tier: 4, enchantmentLevel: 2 }),
+      row('T2_Y', '1', { tier: 2, enchantmentLevel: 0 }),
+      row('T4_Z', '1', { tier: 4, enchantmentLevel: 0 }),
+      row('T4_M@1', '1', { tier: 4, enchantmentLevel: 1 }),
+      row('T3_X', '1', { tier: 3, enchantmentLevel: 0 }),
+    ]
+    expect(
+      sortRows(linhas, { field: 'tier', direction: 'asc' }).map((r) => r.outputItem),
+    ).toEqual(['T2_Y', 'T3_X', 'T4_Z', 'T4_M@1', 'T4_A@2', 'T5_B'])
+  })
+
+  test('no mesmo tier.encanto, desempata pelo NOME EXIBIDO, não pelo código', () => {
+    // Pelo código, `T4_A` viria antes de `T4_B`. Pelo nome que o jogador lê, é o contrário —
+    // e é o nome que ele lê que define "ordem alfabética".
+    const nomes: Record<string, string> = { T4_A: 'Tábua T4', T4_B: 'Couro T4' }
+    const linhas = [
+      row('T4_A', '1', { tier: 4, enchantmentLevel: 0 }),
+      row('T4_B', '1', { tier: 4, enchantmentLevel: 0 }),
+    ]
+    expect(
+      sortRows(linhas, { field: 'tier', direction: 'asc' }, (u) => nomes[u] ?? u).map(
+        (r) => r.outputItem,
+      ),
+    ).toEqual(['T4_B', 'T4_A'])
+  })
+
+  test('em ordem de tier, linha sem preço fica na posição do tier dela', () => {
+    const linhas = [
+      row('T5', '10', { tier: 5 }),
+      row('T4_SEM_PRECO', null, { tier: 4 }),
+      row('T3', '10', { tier: 3 }),
+    ]
+    expect(
+      sortRows(linhas, { field: 'tier', direction: 'asc' }).map((r) => r.outputItem),
+    ).toEqual(['T3', 'T4_SEM_PRECO', 'T5'])
+  })
+
+  test('em ordem de lucro, a mesma linha sem preço continua indo para o fim', () => {
+    // O par do teste acima: a exceção é da ordem estrutural, não uma regra nova para tudo.
+    const linhas = [
+      row('T5', '10', { tier: 5 }),
+      row('T4_SEM_PRECO', null, { tier: 4 }),
+      row('T3', '900', { tier: 3 }),
+    ]
+    expect(
+      sortRows(linhas, { field: 'profit', direction: 'desc' }).map((r) => r.outputItem),
+    ).toEqual(['T3', 'T5', 'T4_SEM_PRECO'])
   })
 
   test('ordena por lucro, decrescente', () => {

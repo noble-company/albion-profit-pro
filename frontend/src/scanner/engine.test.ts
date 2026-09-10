@@ -756,3 +756,30 @@ describe('lista de compras (task 4/11.2)', () => {
     expect(rodar(snap, { quantity: 1000, useFocus: false })[0]!.focusConsumed).toBe(0)
   })
 })
+
+describe('ordem estrutural (task 4/19)', () => {
+  // Os testes de `sortRows` montam as linhas à mão, já com `tier`. Sem estes, a ordenação
+  // passaria mesmo com o engine nunca preenchendo o campo — e a tabela ordenaria tudo como
+  // "sem tier", em silêncio.
+  test('a linha carrega o tier e o encantamento da saída', () => {
+    const linha = rodar(
+      snapshot([
+        { item: 'T4_FIBER', location: '1002', sell: '100' },
+        { item: 'T3_CLOTH', location: '1002', sell: '200' },
+        { item: 'T4_CLOTH', location: '1002', buy: '1000' },
+      ]),
+      { quantity: 1 },
+    )[0]!
+
+    expect(linha.state).toBe('priced')
+    expect(linha.tier).toBe(4)
+    expect(linha.enchantmentLevel).toBe(0)
+  })
+
+  test('linha SEM preço também carrega — é justamente ela que mantém a posição do tier', () => {
+    const linha = rodar(snapshot([]), { quantity: 1 })[0]!
+
+    expect(linha.state).not.toBe('priced')
+    expect(linha.tier).toBe(4)
+  })
+})

@@ -22,7 +22,6 @@ export interface ScannerFilters {
   tiers: number[]
   enchantments: number[]
   category: string | null
-  locations: string[]
   /** string decimal (`F09`), nunca `number` */
   minProfit: string | null
   minRoi: string | null
@@ -41,7 +40,6 @@ export const DEFAULT_FILTERS: ScannerFilters = {
   tiers: [],
   enchantments: [],
   category: null,
-  locations: [],
   minProfit: null,
   minRoi: null,
   maxAgeHours: null,
@@ -89,9 +87,6 @@ export function applyFilters(
       return false
     }
     if (filters.category && item?.shop_category !== filters.category) return false
-    if (filters.locations.length > 0 && !filters.locations.includes(row.locationId)) {
-      return false
-    }
 
     // --- filtros financeiros: só se aplicam a linha COM preço ---
     // Linha sem preço não é "lucro zero" nem "ROI negativo" — é ausência. Excluí-la aqui

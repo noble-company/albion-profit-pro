@@ -155,7 +155,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [ ] 14 — Calculadora sobre o engine
 - [x] 17 — Painel do Destino (eficiência de foco)
 - [x] 18 — Taxa da estação por nutrição consumida
-- [ ] 19 — Uma linha por receita, em ordem de tier
+- [x] 19 — Uma linha por receita, em ordem de tier
 - [ ] 20 — Colunas enxutas e painel completo
 - [ ] 21 — Abrir vazio e escolher a categoria
 - [ ] 22 — Snapshot só da categoria (opcional)

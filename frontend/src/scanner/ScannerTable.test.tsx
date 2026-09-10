@@ -22,6 +22,8 @@ function row(nome: string, profit: string | null): ScannerRow {
     outputItem: nome,
     locationId: '1002',
     productionKind: 'refining',
+    tier: 4,
+    enchantmentLevel: 0,
     state: profit === null ? 'missing_output_price' : 'priced',
     acquisitionMode: null,
     saleMode: null,
