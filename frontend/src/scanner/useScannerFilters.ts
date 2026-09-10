@@ -5,7 +5,14 @@ import { money, percentageToRate } from '@/lib/money'
 
 import { DEFAULT_FILTERS, type ScannerFilters } from './filters'
 import { DEFAULT_STRATEGY, type ScannerStrategy } from './engine'
-import { ORIGEM_MEDIA, type Origem, type PriceBasis, type PricingPolicy } from './pricing'
+import {
+  ORIGEM_MEDIA,
+  ORIGEM_MELHOR,
+  ORIGEM_MENOR,
+  type Origem,
+  type PriceBasis,
+  type PricingPolicy,
+} from './pricing'
 
 /**
  * Filtros do scanner sincronizados com a URL (task 4/09).
@@ -93,6 +100,22 @@ function chaveDe(params: URLSearchParams, chaves: string[]): string {
   return chaves.map((chave) => `${chave}=${params.getAll(chave).join(',')}`).join('&')
 }
 
+/** O valor de `pc`/`sc` para uma origem; `null` = o item não tem escolha nesse degrau. */
+function valorDaEscolha(origem: Origem): string | null {
+  switch (origem.tipo) {
+    case 'cidade':
+      return origem.locationId
+    case 'media':
+      return ORIGEM_MEDIA
+    case 'menor':
+      return ORIGEM_MENOR
+    case 'melhor':
+      return ORIGEM_MELHOR
+    default:
+      return null
+  }
+}
+
 function numbers(raw: string | null): number[] {
   if (!raw) return []
   return raw
@@ -149,23 +172,29 @@ export function useScannerFilters() {
   )
 
   /**
-   * De onde vem o preço de cada ingrediente. **Média das cidades é o padrão** — "no fim do dia,
-   * a maioria dos players que refinam usa preço médio". `sale` reproduz o comportamento antigo
-   * (cotar na cidade da venda), e um `location_id` fixa uma cidade.
+   * De onde vem cada preço. Na compra, **média das cidades é o padrão** — "no fim do dia, a
+   * maioria dos players que refinam usa preço médio" —, e `ing_price=min` pede a cidade mais
+   * barata (task 25). `sale` e um `location_id` são links antigos da 11.3: continuam abrindo.
+   *
+   * Na venda, `sale_price=avg` vende tudo pela média das cidades de Vender em; ausente é a melhor
+   * cidade, o comportamento de antes da barra ter a escolha (task 25).
    */
-  const chaveDosPrecos = chaveDe(params, ['ing_price', 'px', 'pc', 'sx', 'sc'])
+  const chaveDosPrecos = chaveDe(params, ['ing_price', 'sale_price', 'px', 'pc', 'sx', 'sc'])
 
   const pricing = useMemo<PricingPolicy>(() => {
     const bruto = params.get('ing_price')
     const base: PriceBasis =
       bruto === null || bruto === '' || bruto === 'avg'
         ? { kind: 'average' }
-        : bruto === 'sale'
-          ? { kind: 'sale_city' }
-          : { kind: 'city', locationId: bruto }
+        : bruto === 'min'
+          ? { kind: 'cheapest' }
+          : bruto === 'sale'
+            ? { kind: 'sale_city' }
+            : { kind: 'city', locationId: bruto }
 
     return {
       base,
+      saleBase: params.get('sale_price') === 'avg' ? 'average' : 'best',
       manual: pares(params.getAll('px')),
       byItemCity: pares(params.getAll('pc')),
       manualSale: pares(params.getAll('sx')),
@@ -274,14 +303,20 @@ export function useScannerFilters() {
       }
 
       reescrever(chaveDoFixo, origem.tipo === 'fixo' ? origem.valor : null)
-      reescrever(
-        chaveDaEscolha,
-        origem.tipo === 'cidade'
-          ? origem.locationId
-          : origem.tipo === 'media'
-            ? ORIGEM_MEDIA
-            : null,
-      )
+      reescrever(chaveDaEscolha, valorDaEscolha(origem))
+      setParams(next, { replace: true })
+    },
+    [params, setParams],
+  )
+
+  /**
+   * Devolve à barra todos os itens de um lado (task 25): apaga preço fixo e origem escolhida numa
+   * escrita só, pelo mesmo motivo do `definirOrigem`. O outro lado não muda.
+   */
+  const limparEscolhas = useCallback(
+    (lado: 'compra' | 'venda') => {
+      const next = new URLSearchParams(params)
+      for (const chave of lado === 'compra' ? ['px', 'pc'] : ['sx', 'sc']) next.delete(chave)
       setParams(next, { replace: true })
     },
     [params, setParams],
@@ -330,6 +365,7 @@ export function useScannerFilters() {
     strategy,
     setExcecao,
     definirOrigem,
+    limparEscolhas,
     setParam,
     setList,
     toggleNumber,

@@ -95,6 +95,7 @@ export function RowDetails({
   precoPorCidade,
   cidades,
   origemDe,
+  padraoDe,
   onOrigem,
   analise,
   agora = new Date(),
@@ -108,6 +109,8 @@ export function RowDetails({
   cidades: Cidade[]
   /** a escolha atual de um item, num lado */
   origemDe: (lado: Lado, item: string) => Origem
+  /** o padrão da barra naquele lado (task 25) — o que o seletor mostra num item sem escolha */
+  padraoDe: (lado: Lado) => Origem
   onOrigem: (lado: Lado, item: string, origem: Origem) => void
   /** a ponte para o número exato; ausente = o painel só mostra a estimativa */
   analise?: ReactNode
@@ -219,6 +222,9 @@ export function RowDetails({
                   </div>
                   <div className="flex items-baseline justify-between gap-2 text-[0.6875rem] text-foreground-subtle">
                     <span className="min-w-0 truncate">
+                      {/* A cidade, quando o preço veio de uma só: o menor preço sem dizer onde
+                          não serve para ir buscar (task 25). */}
+                      {ingrediente.locationId && `${locationName(ingrediente.locationId)} · `}
                       {ingrediente.source ?? 'sem cotação'} ·{' '}
                       {idade(ingrediente.observedAt, agora)}
                     </span>
@@ -229,10 +235,11 @@ export function RowDetails({
                   <OrigemDoPreco
                     // A chave pela escolha: quando a URL muda a origem, o seletor recomeça do
                     // estado novo em vez de carregar o rascunho da escolha anterior.
-                    key={`${ingrediente.item}:${JSON.stringify(origem)}`}
+                    key={`${ingrediente.item}:${JSON.stringify(origem)}:${JSON.stringify(padraoDe('compra'))}`}
                     lado="compra"
                     rotulo={`de ${nomeItem(ingrediente.item)}`}
                     origem={origem}
+                    padrao={padraoDe('compra')}
                     cidades={cidades}
                     onOrigem={(escolha) => onOrigem('compra', ingrediente.item, escolha)}
                   />
@@ -259,10 +266,11 @@ export function RowDetails({
           {/* Junto da venda, onde o olho está — e fora do bloco que só aparece com cotação:
               escolher a origem de um item SEM mercado é quando o jogador mais precisa dela. */}
           <OrigemDoPreco
-            key={`${row.outputItem}:${JSON.stringify(origemDaVenda)}`}
+            key={`${row.outputItem}:${JSON.stringify(origemDaVenda)}:${JSON.stringify(padraoDe('venda'))}`}
             lado="venda"
             rotulo={`de venda de ${nomeItem(row.outputItem)}`}
             origem={origemDaVenda}
+            padrao={padraoDe('venda')}
             cidades={cidades}
             onOrigem={(escolha) => onOrigem('venda', row.outputItem, escolha)}
           />
@@ -351,9 +359,31 @@ export function RowDetails({
   )
 }
 
+/** O `value` de uma origem no `<select>`. */
+function valorDaOrigem(origem: Origem): string {
+  switch (origem.tipo) {
+    case 'cidade':
+      return `cidade:${origem.locationId}`
+    default:
+      return origem.tipo
+  }
+}
+
+function origemDoValor(valor: string): Origem {
+  if (valor.startsWith('cidade:')) {
+    return { tipo: 'cidade', locationId: valor.slice('cidade:'.length) }
+  }
+  if (valor === 'media' || valor === 'menor' || valor === 'melhor') return { tipo: valor }
+  return { tipo: 'padrao' }
+}
+
 /**
- * De onde vem o preço de um item, num lado (task 24): o padrão, a média das cidades filtradas,
+ * De onde vem o preço de um item, num lado (task 24): a média, o menor preço ou a melhor cidade,
  * uma cidade específica, ou um preço fixo.
+ *
+ * **A opção igual à da barra é o padrão** (task 25): item sem escolha mostra ela, e escolher ela
+ * não grava nada. Gravar contaria um "item com preço próprio" idêntico à barra — que deixaria de
+ * acompanhar a barra quando ela mudasse.
  *
  * "Fixar preço…" abre o campo; aplicar vazio volta ao padrão — apagar o número é "volta a usar o
  * mercado", nunca "vale zero". Preço já fixado aparece aberto: fechado, esconderia justamente o
@@ -363,6 +393,7 @@ function OrigemDoPreco({
   lado,
   rotulo,
   origem,
+  padrao,
   cidades,
   onOrigem,
 }: {
@@ -370,6 +401,8 @@ function OrigemDoPreco({
   /** complemento dos rótulos acessíveis: "de T4_FIBER", "de venda de T4_CLOTH" */
   rotulo: string
   origem: Origem
+  /** o padrão da barra, na mesma língua de `origem` */
+  padrao: Origem
   cidades: Cidade[]
   onOrigem: (origem: Origem) => void
 }) {
@@ -377,14 +410,9 @@ function OrigemDoPreco({
   const [rascunho, setRascunho] = useState<string | null>(null)
   const atual = rascunho ?? (origem.tipo === 'fixo' ? origem.valor : '')
 
-  // Na compra, o padrão JÁ É a média das cidades de compra — as duas escolhas são a mesma.
   const valorAtual = fixando
     ? 'fixo'
-    : origem.tipo === 'cidade'
-      ? `cidade:${origem.locationId}`
-      : origem.tipo === 'media' && lado === 'venda'
-        ? 'media'
-        : 'padrao'
+    : valorDaOrigem(origem.tipo === 'padrao' ? padrao : origem)
 
   const escolher = (valor: string) => {
     if (valor === 'fixo') {
@@ -393,10 +421,8 @@ function OrigemDoPreco({
     }
     setFixando(false)
     setRascunho(null)
-    if (valor === 'media') onOrigem({ tipo: 'media' })
-    else if (valor.startsWith('cidade:')) {
-      onOrigem({ tipo: 'cidade', locationId: valor.slice('cidade:'.length) })
-    } else onOrigem({ tipo: 'padrao' })
+    const escolhida = origemDoValor(valor)
+    onOrigem(valorDaOrigem(escolhida) === valorDaOrigem(padrao) ? { tipo: 'padrao' } : escolhida)
   }
 
   const aplicar = () => {
@@ -420,11 +446,14 @@ function OrigemDoPreco({
       >
         {lado === 'venda' ? (
           <>
-            <option value="padrao">Melhor cidade</option>
+            <option value="melhor">Melhor cidade</option>
             <option value="media">Média das cidades de venda</option>
           </>
         ) : (
-          <option value="padrao">Média das cidades de compra</option>
+          <>
+            <option value="media">Média das cidades de compra</option>
+            <option value="menor">Menor preço das cidades de compra</option>
+          </>
         )}
         {cidades.map((cidade) => (
           <option key={cidade.id} value={`cidade:${cidade.id}`}>

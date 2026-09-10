@@ -263,3 +263,52 @@ describe('comprar em e origem por item (task 24)', () => {
     expect(result.current.scenario).toBe(cenario)
   })
 })
+
+describe('preço de compra e de venda na barra (task 25)', () => {
+  test('o padrão de cada lado viaja na URL e sobrevive ao F5', () => {
+    expect(render('/refino?ing_price=min').result.current.pricing.base).toEqual({
+      kind: 'cheapest',
+    })
+    expect(render('/refino?sale_price=avg').result.current.pricing.saleBase).toBe('average')
+    // Ausente = melhor cidade, o comportamento de antes da task.
+    expect(render().result.current.pricing.saleBase).toBe('best')
+  })
+
+  test('mudar o preço de venda da barra troca a política — e não o cenário', () => {
+    // Se `sale_price` não entrasse na chave de conteúdo da política, ela ficaria velha e o
+    // engine não recalcularia (task 12).
+    const { result } = render('/refino')
+    const precos = result.current.pricing
+    const cenario = result.current.scenario
+
+    act(() => result.current.setParam('sale_price', 'avg'))
+
+    expect(result.current.pricing).not.toBe(precos)
+    expect(result.current.pricing.saleBase).toBe('average')
+    expect(result.current.scenario).toBe(cenario)
+  })
+
+  test('limpar um lado apaga fixo e origem só daquele lado, numa escrita só', () => {
+    const { result } = render(
+      '/refino?px=T4_FIBER:250&pc=T3_CLOTH:1002&sx=T4_CLOTH:1200&sc=T5_CLOTH:3005&q=tecido',
+    )
+
+    act(() => result.current.limparEscolhas('compra'))
+
+    expect(result.current.pricing.manual.size).toBe(0)
+    expect(result.current.pricing.byItemCity.size).toBe(0)
+    expect(result.current.pricing.manualSale.get('T4_CLOTH')).toBe('1200')
+    expect(result.current.pricing.saleByItem.get('T5_CLOTH')).toBe('3005')
+    expect(result.current.filters.search).toBe('tecido')
+  })
+
+  test('menor e melhor escolhidos no item viajam na URL', () => {
+    const { result } = render('/refino')
+
+    act(() => result.current.definirOrigem('compra', 'T4_FIBER', { tipo: 'menor' }))
+    expect(result.current.pricing.byItemCity.get('T4_FIBER')).toBe('menor')
+
+    act(() => result.current.definirOrigem('venda', 'T4_CLOTH', { tipo: 'melhor' }))
+    expect(result.current.pricing.saleByItem.get('T4_CLOTH')).toBe('melhor')
+  })
+})

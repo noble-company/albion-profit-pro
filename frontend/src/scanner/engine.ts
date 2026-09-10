@@ -21,7 +21,9 @@ import {
 } from './focus-efficiency'
 import type { PriceIndex } from './prices'
 import {
+  escolhaDoItem,
   ORIGEM_MEDIA,
+  ORIGEM_MELHOR,
   resolveIngredientPrice,
   resolveOutputPrice,
   type PricingPolicy,
@@ -207,6 +209,8 @@ export interface ScannerBreakdown {
 export interface ScannerIngredientDetail extends ScannerIngredient {
   source: string | null
   observedAt: number | null
+  /** a cidade da cotação usada; nula na média, no preço na mão e sem preço (task 25) */
+  locationId: string | null
   /** os dois lados cotados, para comparar os cenários */
   immediatePrice: Money | null
   orderPrice: Money | null
@@ -233,12 +237,19 @@ interface Quote {
   /** `null` = preço digitado pelo jogador; não tem idade e não entra no frescor da linha */
   observedAt: number | null
   source: string
+  /** a cidade da cotação, quando veio de uma só — o painel diz onde buscar (task 25) */
+  locationId: string | null
 }
 
 function quoteResolvido(side: ResolvedSide | null): Quote | null {
   return side === null
     ? null
-    : { price: money(side.price), observedAt: side.observedAt, source: side.source }
+    : {
+        price: money(side.price),
+        observedAt: side.observedAt,
+        source: side.source,
+        locationId: side.locationId,
+      }
 }
 
 /**
@@ -479,23 +490,33 @@ interface EvaluateInput {
   coletor?: Coletor
 }
 
-/** Como o preço de venda da linha foi decidido (task 24) — a mesma precedência de `pricing.ts`. */
+/**
+ * Como o preço de venda da linha foi decidido (task 24) — a mesma precedência de `pricing.ts`,
+ * com a barra como último degrau (task 25).
+ */
 function baseDaVenda(pricing: PricingPolicy, item: string): ScannerRow['saleBasis'] {
   const fixado = pricing.manualSale.get(item)
   if (fixado !== undefined && fixado !== '') return 'manual'
-  return pricing.saleByItem.get(item) === ORIGEM_MEDIA ? 'average' : 'city'
+  const escolha = escolhaDoItem(pricing, 'venda', item)
+  if (escolha === ORIGEM_MEDIA) return 'average'
+  // Uma cidade escolhida, ou a melhor delas: nos dois casos a venda é num mercado.
+  if (escolha) return 'city'
+  return pricing.saleBase === 'average' ? 'average' : 'city'
 }
 
 /**
  * Em que cidades uma receita é avaliada (task 24).
  *
  * Com uma cidade escolhida no painel para aquele item, **só nela** — mesmo desmarcada em Vender
- * em: é a escolha mais explícita da tela. Sem escolha, com média ou com preço fixo, todas as de
- * Vender em, e `bestPerRecipe` escolhe; nos dois últimos a venda empata e a linha diz a base.
+ * em: é a escolha mais explícita da tela. Sem escolha, com média, com a melhor cidade ou com preço
+ * fixo, todas as de Vender em, e `bestPerRecipe` escolhe; na média e no fixo a venda empata e a
+ * linha diz a base. "Melhor cidade" não é uma cidade (task 25).
  */
 function cidadesDeAvaliacao(item: string, params: ScannerParams): string[] {
-  const escolha = params.pricing.saleByItem.get(item)
-  return escolha && escolha !== ORIGEM_MEDIA ? [escolha] : params.locations
+  const escolha = escolhaDoItem(params.pricing, 'venda', item)
+  return escolha && escolha !== ORIGEM_MEDIA && escolha !== ORIGEM_MELHOR
+    ? [escolha]
+    : params.locations
 }
 
 function emptyRow(
@@ -560,7 +581,7 @@ function evaluate(input: EvaluateInput): ScannerRow {
       enchantmentLevel: input.outputEnchantment,
       locationId,
     },
-    // A média da venda, quando é a escolha do item, varre as cidades de Vender em (task 24).
+    // A média da venda, escolhida no item ou na barra, varre as cidades de Vender em (24, 25).
     params.locations,
     input.cacheDaMedia,
   )
@@ -655,6 +676,7 @@ function evaluate(input: EvaluateInput): ScannerRow {
       subtotal: null,
       source: null,
       observedAt: null,
+      locationId: null,
       immediatePrice: d.immediate?.price ?? null,
       orderPrice: d.order?.price ?? null,
     }))
@@ -849,6 +871,7 @@ function evaluate(input: EvaluateInput): ScannerRow {
         subtotal: vencedor.ingredients[indice]?.subtotal ?? null,
         source: cotacao?.source ?? null,
         observedAt: cotacao?.observedAt ?? null,
+        locationId: cotacao?.locationId ?? null,
       }
     })
   }

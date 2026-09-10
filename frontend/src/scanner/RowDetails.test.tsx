@@ -88,8 +88,15 @@ const CIDADES = [
   { id: '3005', name: 'Caerleon', ids: ['3005'] },
 ] as Cidade[]
 
-/** `origens` por `lado:item` — o que a URL diria para cada item. */
-function montar(onOrigem = vi.fn(), origens: Record<string, Origem> = {}) {
+/**
+ * `origens` por `lado:item` — o que a URL diria para cada item. `padroes` é a barra (task 25);
+ * ausente, os padrões do produto: média na compra, melhor cidade na venda.
+ */
+function montar(
+  onOrigem = vi.fn(),
+  origens: Record<string, Origem> = {},
+  padroes: { compra?: Origem; venda?: Origem } = {},
+) {
   const index = buildPriceIndex(SNAPSHOT)
   const detail = explainRow(CATALOGO, index, PARAMS, {
     outputItem: 'T4_CLOTH',
@@ -107,6 +114,9 @@ function montar(onOrigem = vi.fn(), origens: Record<string, Origem> = {}) {
       ]}
       cidades={CIDADES}
       origemDe={(lado, item) => origens[`${lado}:${item}`] ?? { tipo: 'padrao' }}
+      padraoDe={(lado) =>
+        padroes[lado] ?? (lado === 'compra' ? { tipo: 'media' } : { tipo: 'melhor' })
+      }
       onOrigem={onOrigem}
       agora={new Date(T * 1000)}
     />,
@@ -299,10 +309,11 @@ describe('origem do preço por item (task 24)', () => {
     ])
   })
 
-  test('cada ingrediente oferece a média de compra, cada cidade e fixar', () => {
+  test('cada ingrediente oferece a média, o menor preço, cada cidade e fixar', () => {
     montar()
     expect(opcoes('Origem do preço de T4_FIBER')).toEqual([
       'Média das cidades de compra',
+      'Menor preço das cidades de compra',
       'Lymhurst',
       'Caerleon',
       'Fixar preço…',
@@ -336,5 +347,48 @@ describe('origem do preço por item (task 24)', () => {
   test('o seletor mostra a escolha que já está na URL', () => {
     montar(vi.fn(), { 'compra:T3_CLOTH': { tipo: 'cidade', locationId: '3005' } })
     expect(screen.getByLabelText('Origem do preço de T3_CLOTH')).toHaveValue('cidade:3005')
+  })
+})
+
+describe('padrão da barra no painel (task 25)', () => {
+  test('item sem escolha mostra o que a barra diz, não o padrão do produto', () => {
+    montar(vi.fn(), {}, { compra: { tipo: 'menor' }, venda: { tipo: 'media' } })
+
+    expect(screen.getByLabelText('Origem do preço de T4_FIBER')).toHaveValue('menor')
+    expect(screen.getByLabelText('Origem do preço de venda de T4_CLOTH')).toHaveValue('media')
+  })
+
+  test('escolher a opção igual à da barra volta ao padrão, sem gravar escolha própria', async () => {
+    const user = userEvent.setup()
+    const { onOrigem } = montar(
+      vi.fn(),
+      { 'venda:T4_CLOTH': { tipo: 'cidade', locationId: '3005' } },
+      { venda: { tipo: 'media' } },
+    )
+
+    await user.selectOptions(
+      screen.getByLabelText('Origem do preço de venda de T4_CLOTH'),
+      'Média das cidades de venda',
+    )
+
+    expect(onOrigem).toHaveBeenCalledWith('venda', 'T4_CLOTH', { tipo: 'padrao' })
+  })
+
+  test('com a barra na média, "Melhor cidade" no item vira escolha própria', async () => {
+    const user = userEvent.setup()
+    const { onOrigem } = montar(vi.fn(), {}, { venda: { tipo: 'media' } })
+
+    await user.selectOptions(
+      screen.getByLabelText('Origem do preço de venda de T4_CLOTH'),
+      'Melhor cidade',
+    )
+
+    expect(onOrigem).toHaveBeenCalledWith('venda', 'T4_CLOTH', { tipo: 'melhor' })
+  })
+
+  test('o ingrediente cotado numa cidade diz qual', () => {
+    // O menor preço sem dizer onde não serve para ir buscar.
+    montar()
+    expect(secao('Compra').getAllByText(/Lymhurst · client · agora/)).toHaveLength(2)
   })
 })

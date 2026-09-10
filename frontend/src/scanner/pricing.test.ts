@@ -3,8 +3,12 @@ import { describe, expect, test } from 'vitest'
 import { priceKey, type PriceIndex } from './prices'
 import {
   DEFAULT_PRICING,
+  itensComEscolhaPropria,
   ORIGEM_MEDIA,
+  ORIGEM_MELHOR,
+  ORIGEM_MENOR,
   origemDoItem,
+  origemPadrao,
   resolveIngredientPrice,
   resolveOutputPrice,
   type PricingPolicy,
@@ -274,5 +278,155 @@ describe('origem escolhida por item (task 24)', () => {
       locationId: '3005',
     })
     expect(origemDoItem(policy, 'venda', 'T5_CLOTH')).toEqual({ tipo: 'padrao' })
+  })
+})
+
+describe('padrão da barra (task 25)', () => {
+  const FIBRA = { item: 'T4_FIBER', enchantmentLevel: 0, saleLocationId: '1002' }
+
+  test('menor preço cota cada lado na cidade mais barata de Comprar em, e diz a cidade', () => {
+    const index = indice([
+      { item: 'T4_FIBER', local: '1002', sell: '300', buy: '120' },
+      { item: 'T4_FIBER', local: '3005', sell: '100', buy: '200' },
+      { item: 'T4_FIBER', local: '4002', sell: '50', buy: '10' },
+    ])
+
+    // Comprar em = 1002 e 3005: Fort Sterling, a mais barata de todas, fica fora.
+    const preco = resolveIngredientPrice(
+      index,
+      { ...DEFAULT_PRICING, base: { kind: 'cheapest' } },
+      ['1002', '3005'],
+      FIBRA,
+    )
+
+    expect(preco.sell?.price).toBe('100')
+    expect(preco.sell?.locationId).toBe('3005')
+    // Oferta imediata e ordem de compra são compras diferentes: cada lado acha a sua cidade.
+    expect(preco.buy?.price).toBe('120')
+    expect(preco.buy?.locationId).toBe('1002')
+  })
+
+  test('menor preço ignora cidade sem cotação, em vez de tratar ausência como zero', () => {
+    const index = indice([{ item: 'T4_FIBER', local: '3005', sell: '100' }])
+    const preco = resolveIngredientPrice(
+      index,
+      { ...DEFAULT_PRICING, base: { kind: 'cheapest' } },
+      CIDADES,
+      FIBRA,
+    )
+
+    expect(preco.sell?.price).toBe('100')
+    expect(preco.buy).toBeNull()
+  })
+
+  test('a média escolhida no item vence o menor preço da barra', () => {
+    const index = indice([
+      { item: 'T4_FIBER', local: '1002', sell: '100' },
+      { item: 'T4_FIBER', local: '3005', sell: '300' },
+    ])
+    const barra: PricingPolicy = { ...DEFAULT_PRICING, base: { kind: 'cheapest' } }
+    const preco = resolveIngredientPrice(
+      index,
+      { ...barra, byItemCity: new Map([['T4_FIBER', ORIGEM_MEDIA]]) },
+      ['1002', '3005'],
+      FIBRA,
+    )
+
+    // Contraste: sem a escolha do item, a barra dá o menor. Sem ele o teste passaria contra um
+    // código que nem conhece o menor preço — a média escolhida já vencia qualquer base.
+    expect(
+      resolveIngredientPrice(index, barra, ['1002', '3005'], FIBRA).sell?.price,
+    ).toBe('100')
+    expect(preco.sell?.price).toBe('200')
+  })
+
+  test('o menor preço escolhido no item vence a média da barra', () => {
+    const index = indice([
+      { item: 'T4_FIBER', local: '1002', sell: '100' },
+      { item: 'T4_FIBER', local: '3005', sell: '300' },
+    ])
+    const preco = resolveIngredientPrice(
+      index,
+      { ...DEFAULT_PRICING, byItemCity: new Map([['T4_FIBER', ORIGEM_MENOR]]) },
+      ['1002', '3005'],
+      FIBRA,
+    )
+
+    expect(preco.sell?.price).toBe('100')
+  })
+
+  test('venda pela média da barra vale para o item sem escolha', () => {
+    const index = indice([
+      { item: 'T4_CLOTH', local: '1002', sell: '1100' },
+      { item: 'T4_CLOTH', local: '3005', sell: '1900' },
+    ])
+    const preco = resolveOutputPrice(
+      index,
+      { ...DEFAULT_PRICING, saleBase: 'average' },
+      { item: 'T4_CLOTH', quality: 1, enchantmentLevel: 0, locationId: '1002' },
+      ['1002', '3005'],
+    )
+
+    expect(preco.sell?.price).toBe('1500')
+    expect(preco.sell?.source).toContain('média')
+  })
+
+  test('"melhor cidade" escolhida no item vence a média da barra', () => {
+    const index = indice([
+      { item: 'T4_CLOTH', local: '1002', sell: '1100' },
+      { item: 'T4_CLOTH', local: '3005', sell: '1900' },
+    ])
+    const barra: PricingPolicy = { ...DEFAULT_PRICING, saleBase: 'average' }
+    const saida = { item: 'T4_CLOTH', quality: 1, enchantmentLevel: 0, locationId: '1002' }
+    const preco = resolveOutputPrice(
+      index,
+      { ...barra, saleByItem: new Map([['T4_CLOTH', ORIGEM_MELHOR]]) },
+      saida,
+      ['1002', '3005'],
+    )
+
+    // Contraste: sem a escolha do item, a barra dá a média. Sem ele, um código que ignora a
+    // barra devolveria a cidade da linha e o teste passaria por acaso.
+    expect(resolveOutputPrice(index, barra, saida, ['1002', '3005']).sell?.price).toBe('1500')
+    // A cidade da linha — quem escolhe a melhor entre elas é `bestPerRecipe`.
+    expect(preco.sell?.price).toBe('1100')
+  })
+
+  test('origemDoItem lê menor e melhor', () => {
+    const policy: PricingPolicy = {
+      ...DEFAULT_PRICING,
+      byItemCity: new Map([['T4_FIBER', ORIGEM_MENOR]]),
+      saleByItem: new Map([['T4_CLOTH', ORIGEM_MELHOR]]),
+    }
+
+    expect(origemDoItem(policy, 'compra', 'T4_FIBER')).toEqual({ tipo: 'menor' })
+    expect(origemDoItem(policy, 'venda', 'T4_CLOTH')).toEqual({ tipo: 'melhor' })
+  })
+
+  test('origemPadrao traduz a barra na língua do seletor do item', () => {
+    expect(origemPadrao(DEFAULT_PRICING, 'compra')).toEqual({ tipo: 'media' })
+    expect(
+      origemPadrao({ ...DEFAULT_PRICING, base: { kind: 'cheapest' } }, 'compra'),
+    ).toEqual({ tipo: 'menor' })
+    expect(origemPadrao(DEFAULT_PRICING, 'venda')).toEqual({ tipo: 'melhor' })
+    expect(origemPadrao({ ...DEFAULT_PRICING, saleBase: 'average' }, 'venda')).toEqual({
+      tipo: 'media',
+    })
+  })
+
+  test('itens com preço próprio contam fixo e origem, uma vez por item, por lado', () => {
+    const policy: PricingPolicy = {
+      ...DEFAULT_PRICING,
+      // T4_FIBER tem as duas coisas: conta uma vez.
+      manual: new Map([['T4_FIBER', '250']]),
+      byItemCity: new Map([
+        ['T4_FIBER', '4002'],
+        ['T3_CLOTH', ORIGEM_MEDIA],
+      ]),
+      saleByItem: new Map([['T4_CLOTH', '3005']]),
+    }
+
+    expect(itensComEscolhaPropria(policy, 'compra')).toBe(2)
+    expect(itensComEscolhaPropria(policy, 'venda')).toBe(1)
   })
 })

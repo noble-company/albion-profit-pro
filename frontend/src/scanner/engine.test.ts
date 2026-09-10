@@ -11,7 +11,7 @@ import {
   type ScannerParams,
 } from './engine'
 import { buildPriceIndex, type PriceSnapshotOut } from './prices'
-import { ORIGEM_MEDIA } from './pricing'
+import { ORIGEM_MEDIA, ORIGEM_MELHOR } from './pricing'
 
 /**
  * Task 4/05. Os valores esperados são **conferidos à mão** nos comentários, não extraídos da
@@ -880,5 +880,69 @@ describe('origem da venda escolhida por item (task 24)', () => {
   test('sem escolha, a base é a cidade da linha', () => {
     const linha = rodar(DUAS_CIDADES(), venda(new Map()))[0]!
     expect(linha.saleBasis).toBe('city')
+  })
+})
+
+describe('preço de compra e de venda na barra (task 25)', () => {
+  // O tecido paga 1000 em 1002 e 1800 em 3005 (venda imediata). Ingredientes: a fibra é mais
+  // barata em 1002 e o tecido T3 em 3005 — o menor preço busca cada um numa cidade.
+  const MERCADO = () =>
+    snapshot([
+      { item: 'T4_FIBER', location: '1002', sell: '100' },
+      { item: 'T3_CLOTH', location: '1002', sell: '200' },
+      { item: 'T4_CLOTH', location: '1002', buy: '1000' },
+      { item: 'T4_FIBER', location: '3005', sell: '300' },
+      { item: 'T3_CLOTH', location: '3005', sell: '50' },
+      { item: 'T4_CLOTH', location: '3005', buy: '1800' },
+    ])
+
+  const barra = (
+    pricing: Partial<ScannerParams['pricing']>,
+    extra: Partial<ScannerParams> = {},
+  ): Partial<ScannerParams> => ({
+    locations: ['1002', '3005'],
+    priceLocations: ['1002', '3005'],
+    pricing: { ...PADRAO.pricing, base: { kind: 'average' }, ...pricing },
+    ...extra,
+  })
+
+  test('venda pela média na barra: a linha sem escolha diz que a base é média', () => {
+    const linha = bestPerRecipe(rodar(MERCADO(), barra({ saleBase: 'average' })))[0]!
+
+    // (1000 + 1800) / 2
+    expect(linha.saleUnitPrice?.toString()).toBe('1400')
+    expect(linha.saleBasis).toBe('average')
+  })
+
+  test('"melhor cidade" no item volta a escolher a cidade, com a barra na média', () => {
+    const linhas = rodar(
+      MERCADO(),
+      barra({ saleBase: 'average', saleByItem: new Map([['T4_CLOTH', ORIGEM_MELHOR]]) }),
+    )
+
+    // Contraste: a mesma barra, sem a escolha do item, vende pela média.
+    expect(
+      bestPerRecipe(rodar(MERCADO(), barra({ saleBase: 'average' })))[0]!.saleBasis,
+    ).toBe('average')
+    // Melhor cidade não restringe a avaliação: todas as de Vender em entram, e a melhor vence.
+    expect(linhas.map((l) => l.locationId)).toEqual(['1002', '3005'])
+    const melhor = bestPerRecipe(linhas)[0]!
+    expect(melhor.locationId).toBe('3005')
+    expect(melhor.saleUnitPrice?.toString()).toBe('1800')
+    expect(melhor.saleBasis).toBe('city')
+  })
+
+  test('menor preço na barra cota cada ingrediente na cidade mais barata, e o painel diz qual', () => {
+    const params = barra({ base: { kind: 'cheapest' } }, { locations: ['1002'] })
+    const linha = rodar(MERCADO(), params)[0]!
+
+    // Na média seriam 200 e 125.
+    expect(linha.ingredients.map((i) => i.unitPrice?.toString())).toEqual(['100', '50'])
+
+    const detalhe = explainRow(CATALOGO, buildPriceIndex(MERCADO()), { ...PADRAO, ...params }, {
+      outputItem: 'T4_CLOTH',
+      locationId: '1002',
+    })!
+    expect(detalhe.ingredients.map((i) => i.locationId)).toEqual(['1002', '3005'])
   })
 })

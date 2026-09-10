@@ -24,7 +24,7 @@ import { buildColumns, motivoSemPreco } from './columns'
 import { bestPerRecipe, computeScanner, explainRow, type ScannerRow } from './engine'
 import { applyFilters } from './filters'
 import { buildPriceIndex, priceKey } from './prices'
-import { origemDoItem } from './pricing'
+import { itensComEscolhaPropria, origemDoItem, origemPadrao } from './pricing'
 import { ExactAnalysis } from './ExactAnalysis'
 import { RowDetails } from './RowDetails'
 import { ScannerTable } from './ScannerTable'
@@ -70,6 +70,7 @@ export function ScannerPage({
     buyIn,
     strategy,
     definirOrigem,
+    limparEscolhas,
     setParam,
     toggleNumber,
     toggleText,
@@ -263,6 +264,7 @@ export function ScannerPage({
           })}
           cidades={cidades}
           origemDe={(lado, item) => origemDoItem(pricing, lado, item)}
+          padraoDe={(lado) => origemPadrao(pricing, lado)}
           onOrigem={definirOrigem}
           analise={
             realm && detail.row.profit && podeAnalisar(detail.row) ? (
@@ -347,6 +349,24 @@ export function ScannerPage({
   })
   const erro = catalogo.error ?? precos.error
 
+  const valorDaCompra =
+    pricing.base.kind === 'cheapest'
+      ? 'min'
+      : pricing.base.kind === 'city'
+        ? pricing.base.locationId
+        : pricing.base.kind === 'sale_city'
+          ? 'sale'
+          : ''
+  const opcoesDeCompra = [
+    { value: 'min', label: 'Menor preço das cidades' },
+    // Links antigos da 11.3 continuam abrindo com a base deles. A opção só aparece para o seletor
+    // não mostrar "Média" enquanto a conta usa outra coisa.
+    ...(pricing.base.kind === 'city'
+      ? [{ value: pricing.base.locationId, label: locationName(pricing.base.locationId) }]
+      : []),
+    ...(pricing.base.kind === 'sale_city' ? [{ value: 'sale', label: 'Cidade da venda' }] : []),
+  ]
+
   return (
     <div className="flex h-full flex-col gap-3">
       <SidebarSection title="Filtros">
@@ -368,6 +388,19 @@ export function ScannerPage({
               formatOption={locationName}
               emptyHint="todas"
             />
+            {/* De onde vem o preço de venda de TODOS os itens (task 25). Sem cidade específica:
+                marcar só uma em Vender em já é isso, e as duas juntas permitiriam contradição. */}
+            <FilterSelectField
+              label="Preço de venda"
+              value={pricing.saleBase === 'average' ? 'avg' : ''}
+              onChange={(v) => setParam('sale_price', v)}
+              options={[{ value: 'avg', label: 'Média das cidades' }]}
+              allLabel="Melhor cidade"
+            />
+            <PrecoProprio
+              quantidade={itensComEscolhaPropria(pricing, 'venda')}
+              onLimpar={() => limparEscolhas('venda')}
+            />
             {/* O mesmo motivo vale para comprar (task 24): ninguém busca fibra onde não vai
                 vender tecido. A média de cada ingrediente varre só estas. */}
             <FilterChips
@@ -377,6 +410,17 @@ export function ScannerPage({
               onToggle={(id) => toggleText('buy_in', id)}
               formatOption={locationName}
               emptyHint="todas"
+            />
+            <FilterSelectField
+              label="Preço de compra"
+              value={valorDaCompra}
+              onChange={(v) => setParam('ing_price', v)}
+              options={opcoesDeCompra}
+              allLabel="Média das cidades"
+            />
+            <PrecoProprio
+              quantidade={itensComEscolhaPropria(pricing, 'compra')}
+              onLimpar={() => limparEscolhas('compra')}
             />
             <p className="text-xs text-foreground-subtle">
               Para um item específico, escolha de onde vem o preço no painel da linha.
@@ -593,6 +637,30 @@ export function RefiningScannerPage() {
       title="O que vale a pena refinar"
       description="Todas as receitas de refino, em todas as cidades — inclusive as que ainda não têm preço."
     />
+  )
+}
+
+/**
+ * Quantos itens não seguem a barra num lado, e o atalho para que voltem a seguir (task 25).
+ *
+ * Mudar a barra não apaga escolha de item — ela é a mais específica. Sem esta linha, uma receita
+ * que ignora a barra não teria explicação na tela.
+ */
+function PrecoProprio({ quantidade, onLimpar }: { quantidade: number; onLimpar: () => void }) {
+  if (quantidade === 0) return null
+  return (
+    <p className="flex items-baseline justify-between gap-2 text-xs text-foreground-subtle">
+      <span>
+        {quantidade === 1 ? '1 item com preço próprio' : `${quantidade} itens com preço próprio`}
+      </span>
+      <button
+        type="button"
+        onClick={onLimpar}
+        className="font-medium text-primary underline-offset-2 hover:underline"
+      >
+        limpar
+      </button>
+    </p>
   )
 }
 
