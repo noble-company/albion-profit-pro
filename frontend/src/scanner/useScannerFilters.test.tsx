@@ -77,15 +77,23 @@ describe('leitura da URL', () => {
     expect(result.current.pricing.byItemCity.get('T4_CLOTH')).toBe('4002')
   })
 
-  test('vender em: melhor cidade por padrão', () => {
-    expect(render().result.current.sellIn).toBe('best')
-    expect(render('/refino?sell_in=3005').result.current.sellIn).toBe('3005')
+  test('vender em: nenhuma cidade marcada = todas entram na conta', () => {
+    expect(render().result.current.sellIn).toEqual([])
   })
 
-  test('link antigo com `sell_in=all` abre em melhor cidade (task 19)', () => {
-    // O modo "todas as cidades lado a lado" saiu: a comparação mora no painel. Link salvo com
-    // ele não pode abrir numa tela sem controle correspondente — cai no padrão.
-    expect(render('/refino?sell_in=all').result.current.sellIn).toBe('best')
+  test('vender em: várias cidades viajam como parâmetro repetido', () => {
+    // O jogador tira Brecilien e Caerleon da conta: vendem caro, mas o caminho é zona de PvP
+    // e morrer lá perde o inventário. A melhor cidade é escolhida só entre as marcadas.
+    expect(render('/refino?sell_in=1002&sell_in=4002').result.current.sellIn).toEqual([
+      '1002',
+      '4002',
+    ])
+  })
+
+  test('links antigos continuam abrindo (task 19)', () => {
+    // Uma cidade só era o formato anterior; `all` era o modo de uma linha por cidade.
+    expect(render('/refino?sell_in=3005').result.current.sellIn).toEqual(['3005'])
+    expect(render('/refino?sell_in=all').result.current.sellIn).toEqual([])
   })
 
   test('só `unpriced=false` esconde — qualquer outra coisa mostra', () => {
@@ -118,6 +126,20 @@ describe('escrita na URL', () => {
     // Lista vazia sai da URL em vez de virar `tier=` — link limpo.
     expect(result.current.filters.tiers).toEqual([])
     expect(result.current.params.has('tier')).toBe(false)
+  })
+
+  test('marcar cidade de venda adiciona e remove o parâmetro repetido', () => {
+    const { result } = render('/refino?sell_in=1002')
+
+    act(() => result.current.toggleText('sell_in', '4002'))
+    expect(result.current.sellIn).toEqual(['1002', '4002'])
+
+    act(() => result.current.toggleText('sell_in', '1002'))
+    expect(result.current.sellIn).toEqual(['4002'])
+
+    act(() => result.current.toggleText('sell_in', '4002'))
+    // Desmarcar a última volta a "todas" e some da URL — link limpo.
+    expect(result.current.params.has('sell_in')).toBe(false)
   })
 
   test('valor vazio remove o parâmetro em vez de gravar string vazia', () => {

@@ -106,6 +106,42 @@ preenchesse o campo — e a tabela ordenaria tudo como "sem tier", em silêncio.
 manter a posição. Verificados vermelhos cortando `tier: input.outputTier` nos dois pontos onde a
 linha é montada.
 
+### Correção: as cidades de venda voltaram, como seleção (2026-09-10)
+
+Reportado logo depois da entrega: "eu não queria que tu tirasse a opção de selecionar várias
+cidades pra ver a venda".
+
+A spec mandava tirar o modo "todas as cidades lado a lado", e os chips de cidade saíram junto
+porque só existiam dentro dele. Mas eram duas coisas: **uma linha por cidade** (que o usuário
+queria fora) e **quais cidades entram na conta** (que ele usa). O motivo é de jogo, não de tela:
+
+> Brecilien e Caerleon normalmente pagam caro, o que dá muito lucro, mas dificilmente se leva lá
+> para vender — as zonas ao redor são PvP, e morrer perde tudo no inventário.
+
+Um "melhor lucro" calculado com essas cidades mostra uma oportunidade que o jogador não vai
+buscar.
+
+**Agora:** "Vender em" é uma seleção múltipla de cidades. **Nenhuma marcada = todas.** A tabela
+continua com **uma linha por receita**, e a melhor cidade é escolhida **só entre as marcadas**.
+
+- `sell_in` virou lista em parâmetro repetido (`?sell_in=1002&sell_in=4002`). Link antigo de uma
+  cidade só (`?sell_in=3005`) continua funcionando; `?sell_in=all` abre com todas.
+- Cidade da URL que não existe mais é ignorada; se nenhuma marcada sobreviver, vale todas —
+  melhor que uma tabela vazia sem explicação. É `cidadesDeVendaPara`, em `scanner/tela.ts`.
+- **`tela.ts` existe por causa do lint.** Exportar essa função de dentro de `ScannerPage.tsx` subiu
+  os avisos de 8 para 9: arquivo de componente que também exporta função perde o *fast refresh*
+  do Vite (`react-refresh/only-export-components`). O `estadoDaTela` da task 12 tinha o mesmo
+  problema e já contava entre os 8. As duas funções puras foram para `tela.ts`, e os avisos
+  ficaram em 7 — menos do que antes desta correção.
+- A lista é memoizada pela chave de conteúdo, pelo mesmo motivo da correção de desempenho da
+  task 12: identidade nova a cada render recalcularia o catálogo inteiro.
+- `toggleText` voltou — tinha saído junto com os chips, e é exatamente o que a seleção precisa.
+- A **média de preço dos ingredientes continua varrendo todas as cidades.** A seleção é de onde se
+  **vende**; de onde se **compra** é a política de preço por ingrediente (task 11.3), que já
+  permite fixar cidade.
+
+Oito guards novos, vermelhos antes do código.
+
 ### Pendente pra você testar
 
 1. Abrir `/refino` sem parâmetros e conferir a família de couro na ordem acima.

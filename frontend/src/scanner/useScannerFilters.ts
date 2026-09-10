@@ -59,11 +59,14 @@ function quantidadeSegura(raw: string | null): number {
 }
 
 /**
- * Onde o item é vendido (task 11.3). `best` = a cidade de maior lucro; um `location_id` = só
- * aquela. Os dois dão **uma linha por receita**. O antigo `all` (uma linha por cidade) saiu na
- * task 19 — a comparação entre cidades mora no painel expandido.
+ * As cidades onde o jogador **aceita vender** (task 11.3, revista na 19). Vazio = todas. A tela
+ * mostra uma linha por receita, com a melhor cidade escolhida só entre estas.
+ *
+ * Preço alto não é o único critério: Brecilien e Caerleon costumam pagar mais, mas o caminho é
+ * zona de PvP, e morrer lá perde o inventário. Tirar essas cidades da conta é tirar da tela um
+ * lucro que o jogador não vai buscar.
  */
-export type SellIn = string
+export type SellIn = string[]
 
 /** `?px=T5_FIBER:250` → `Map { 'T5_FIBER' => '250' }`. Par malformado é ignorado, não quebra. */
 function pares(raw: string[]): Map<string, string> {
@@ -170,10 +173,15 @@ export function useScannerFilters() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
   }, [chaveDosPrecos])
 
-  // Link antigo com `sell_in=all` cai no padrão em vez de abrir numa tela sem controle
-  // correspondente (task 19).
-  const sellInCru = params.get('sell_in')
-  const sellIn: SellIn = sellInCru && sellInCru !== 'all' ? sellInCru : 'best'
+  // Lista em parâmetro repetido. `all` era o antigo modo de uma linha por cidade: link salvo com
+  // ele abre com todas (task 19). Memo pela chave, para a lista não ganhar identidade nova a cada
+  // render e recalcular o catálogo à toa (task 12).
+  const chaveDeVenda = params.getAll('sell_in').join(',')
+  const sellIn = useMemo<SellIn>(
+    () => params.getAll('sell_in').filter((id) => id !== '' && id !== 'all'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
+    [chaveDeVenda],
+  )
 
   /**
    * Como o jogador compra e vende. Ausente = `best`, o cenário mais lucrativo — que **supõe as
@@ -242,6 +250,22 @@ export function useScannerFilters() {
     [params, setParam],
   )
 
+  /**
+   * Alterna um valor numa multi-seleção de **texto**, que viaja como parâmetro repetido
+   * (`?sell_in=1002&sell_in=4002`). Cidade não cabe em `toggleNumber`: o identificador não é
+   * número e a lista não é separada por vírgula.
+   */
+  const toggleText = useCallback(
+    (key: string, value: string) => {
+      const atual = params.getAll(key)
+      setList(
+        key,
+        atual.includes(value) ? atual.filter((v) => v !== value) : [...atual, value],
+      )
+    },
+    [params, setList],
+  )
+
   const reset = useCallback(
     () => setParams(new URLSearchParams(), { replace: true }),
     [setParams],
@@ -258,6 +282,7 @@ export function useScannerFilters() {
     setParam,
     setList,
     toggleNumber,
+    toggleText,
     reset,
   }
 }

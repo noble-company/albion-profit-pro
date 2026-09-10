@@ -27,6 +27,7 @@ import { buildPriceIndex, priceKey } from './prices'
 import { ExactAnalysis } from './ExactAnalysis'
 import { RowDetails } from './RowDetails'
 import { ScannerTable } from './ScannerTable'
+import { cidadesDeVendaPara, estadoDaTela } from './tela'
 import { DEFAULT_SORT, sortRows, type SortState } from './sorting'
 import { usePriceSnapshot } from './usePriceSnapshot'
 import { useScannerWorker } from './useScannerWorker'
@@ -44,28 +45,6 @@ import { DEFAULT_QUANTITY, useScannerFilters } from './useScannerFilters'
  * Mudar um filtro, um tier, o retorno de recurso ou a ordenação refaz a cadeia num `useMemo`.
  * Não há chave de query envolvida, então nada disso dispara rede.
  */
-
-/**
- * **Recalcular não é carregar.** Trocar a tabela pelo estado de carregando a cada recálculo
- * perde a rolagem, fecha a linha aberta e — com 2,7 s de cálculo no craft — lê como travamento.
- * Só a primeira carga esconde a tabela; depois dela, as linhas do cenário anterior continuam
- * sendo a melhor informação que existe até a conta nova chegar.
- */
-export function estadoDaTela({
-  dadosCarregando,
-  calculando,
-  temLinhas,
-}: {
-  dadosCarregando: boolean
-  calculando: boolean
-  temLinhas: boolean
-}): 'carregando' | 'recalculando' | 'pronto' {
-  if (dadosCarregando) return 'carregando'
-  // Sem nenhuma linha ainda, mostrar a tabela escreveria "0 linhas" — uma afirmação sobre o
-  // mercado que a conta inacabada não autoriza.
-  if (calculando) return temLinhas ? 'recalculando' : 'carregando'
-  return 'pronto'
-}
 
 const TIERS = [2, 3, 4, 5, 6, 7, 8]
 const ENCANTAMENTOS = [0, 1, 2, 3, 4]
@@ -92,6 +71,7 @@ export function ScannerPage({
     setExcecao,
     setParam,
     toggleNumber,
+    toggleText,
     reset,
   } = useScannerFilters()
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT)
@@ -114,11 +94,11 @@ export function ScannerPage({
   const precos = usePriceSnapshot(realm, mercadosPedidos)
 
   /**
-   * Onde se **vende**. Em `best` o engine avalia todas as cidades e reduz para a melhor de
-   * cada receita depois de calcular — a comparação existe, e mora no painel expandido.
+   * Onde se **vende**: as cidades marcadas, ou todas. O engine avalia cada uma e `bestPerRecipe`
+   * reduz para a melhor — a comparação completa mora no painel expandido.
    */
   const cidadesDeVenda = useMemo(
-    () => (sellIn === 'best' ? cidades.map((c) => c.id) : [sellIn]),
+    () => cidadesDeVendaPara(sellIn, cidades),
     [sellIn, cidades],
   )
 
@@ -192,8 +172,9 @@ export function ScannerPage({
 
   const linhas = useMemo(() => {
     const todas = noWorker ? doWorker.rows : naThreadPrincipal
-    return sellIn === 'best' ? bestPerRecipe(todas) : todas
-  }, [noWorker, doWorker.rows, naThreadPrincipal, sellIn])
+    // Uma linha por receita sempre. Com uma cidade só marcada, a redução não muda nada.
+    return bestPerRecipe(todas)
+  }, [noWorker, doWorker.rows, naThreadPrincipal])
 
   // Nome legível de qualquer item do catálogo — a coluna de ingrediente precisa dele, e o
   // ingrediente não é a saída da receita (não vem no `item` da linha).
@@ -374,14 +355,15 @@ export function ScannerPage({
           />
 
           <FilterGroup legend="Mercado">
-            {/* Uma linha por receita nos dois modos (task 19). A comparação entre cidades mora no
-                painel expandido, onde não multiplica a tabela por oito. */}
-            <FilterSelectField
+            {/* Uma linha por receita, com a melhor cidade escolhida só entre as marcadas. Tirar
+                Brecilien e Caerleon da conta é o caso típico: pagam mais, mas o caminho é PvP. */}
+            <FilterChips
               label="Vender em"
-              value={sellIn === 'best' ? '' : sellIn}
-              onChange={(v) => setParam('sell_in', v)}
-              options={cidades.map((c) => ({ value: c.id, label: c.name }))}
-              allLabel="Melhor cidade"
+              options={cidades.map((c) => c.id)}
+              selected={sellIn}
+              onToggle={(id) => toggleText('sell_in', id)}
+              formatOption={locationName}
+              emptyHint="todas"
             />
           </FilterGroup>
 
