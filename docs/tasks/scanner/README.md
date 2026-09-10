@@ -74,6 +74,13 @@ BLOCO 3 — o resto do produto
 14 Calculadora sobre o engine              ── depende de 05
 17 Painel do Destino (eficiencia de foco)  ── depende de 11
 18 Taxa da estacao por nutricao            ── depende de 01, 05
+
+BLOCO 4 — a tela que o jogador pediu (achados do uso real, 2026-09-10)
+19 Uma linha por receita, ordem de tier     ── depende de 11
+20 Colunas enxutas e painel completo        ── depende de 19
+21 Abrir vazio e escolher a categoria       ── depende de 19, 20
+22 Snapshot so da categoria (opcional)      ── depende de 21
+23 Historico da API publica (volume/dia)    ── depende de 04, 20
 15 Aposentar o ranking materializado       ── depende de 11, 12
 16 Documentos reconciliados                ── depende de 15
 ```
@@ -110,6 +117,11 @@ estado real e recebe confirmação explícita antes de alterar código.
 | 14 | Calculadora sobre o engine | — | Instantânea ao digitar |
 | [17](17-painel-do-destino.md) | Painel do Destino | — | Custo de foco real: `Lucro/foco` deixa de errar por ate 16x |
 | [18](18-taxa-da-estacao-por-nutricao.md) | Taxa da estação por nutrição | `W5` | A estação cobra por nutrição consumida; prata fixa errava por 56x pra mais e 44x pra menos |
+| [19](19-uma-linha-por-receita-em-ordem-de-tier.md) | Uma linha por receita, ordem de tier | — | A lista se lê como o mercado do jogo; o modo "todas as cidades" sai |
+| [20](20-colunas-enxutas-e-painel-completo.md) | Colunas enxutas e painel completo | — | 8 colunas sem rolagem lateral; o resto no painel |
+| [21](21-abrir-vazio-e-escolher-a-categoria.md) | Abrir vazio e escolher a categoria | — | Calcula só a categoria escolhida — substitui a paginação descartada |
+| [22](22-snapshot-so-da-categoria.md) | Snapshot só da categoria (opcional) | — | Polling de 30 s com o payload da categoria, não do realm |
+| [23](23-historico-da-api-publica.md) | Histórico da API pública | — | Unidades por dia ao lado do preço de venda, com 30 dias desde o primeiro dia |
 | [15](15-aposentar-o-ranking-materializado.md) | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
 | 16 | Documentos reconciliados | — | Specs param de descrever a arquitetura revogada |
 
@@ -143,6 +155,11 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [ ] 14 — Calculadora sobre o engine
 - [x] 17 — Painel do Destino (eficiência de foco)
 - [x] 18 — Taxa da estação por nutrição consumida
+- [ ] 19 — Uma linha por receita, em ordem de tier
+- [ ] 20 — Colunas enxutas e painel completo
+- [ ] 21 — Abrir vazio e escolher a categoria
+- [ ] 22 — Snapshot só da categoria (opcional)
+- [ ] 23 — Histórico da API pública
 - [x] 15 — Aposentar o ranking materializado
 - [ ] 16 — Documentos reconciliados
 
