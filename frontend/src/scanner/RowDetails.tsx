@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { filterControl } from '@/components/filters'
 import { Button } from '@/components/ui/button'
 import { formatarIdade } from '@/lib/formatters'
-import { formatSilver, type Money } from '@/lib/money'
+import { formatQuantity, formatSilver, type Money } from '@/lib/money'
 
 import type { ScannerDetail, ScannerScenarioResult } from './engine'
 
@@ -143,6 +143,32 @@ export function RowDetails({
         </p>
 
         {analise && <div className="pt-2">{analise}</div>}
+      </Secao>
+
+      {/* O que saiu da tabela na task 20 — oito colunas não comportam tudo, e nada disto
+          some: mora aqui, onde o jogador abre quando quer entender o número. */}
+      <Secao titulo="Resultado">
+        <Linha
+          rotulo="Custo por item"
+          valor={row.averageUnitCost ? formatSilver(row.averageUnitCost) : TRACO}
+        />
+        <Linha
+          rotulo="Lucro por kg"
+          valor={row.profitPerWeight ? formatQuantity(row.profitPerWeight, 0) : TRACO}
+        />
+        <Linha
+          rotulo="Lucro por foco"
+          valor={row.profitPerFocus ? formatQuantity(row.profitPerFocus, 1) : TRACO}
+        />
+        <Linha rotulo="Fonte" valor={row.sources.length ? row.sources.join(', ') : TRACO} />
+        <Linha
+          rotulo="Dado mais velho"
+          valor={
+            row.oldestObservedAt === null || !Number.isFinite(row.oldestObservedAt)
+              ? TRACO
+              : idade(row.oldestObservedAt, agora)
+          }
+        />
       </Secao>
 
       <Secao titulo="Ingredientes">

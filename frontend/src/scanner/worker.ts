@@ -97,6 +97,7 @@ export function serializeRow(row: ScannerRow): SerializedScannerRow {
     roi: texto(row.roi),
     profitPerWeight: texto(row.profitPerWeight),
     profitPerFocus: texto(row.profitPerFocus),
+    saleUnitPrice: texto(row.saleUnitPrice),
     ingredients: row.ingredients.map((ingrediente) => ({
       ...ingrediente,
       unitPrice: texto(ingrediente.unitPrice),
@@ -118,6 +119,7 @@ export function reviveRow(raw: SerializedScannerRow): ScannerRow {
     roi: numero(raw.roi),
     profitPerWeight: numero(raw.profitPerWeight),
     profitPerFocus: numero(raw.profitPerFocus),
+    saleUnitPrice: numero(raw.saleUnitPrice),
     ingredients: raw.ingredients.map((ingrediente) => ({
       ...ingrediente,
       unitPrice: numero(ingrediente.unitPrice),

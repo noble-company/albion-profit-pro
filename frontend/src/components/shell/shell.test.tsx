@@ -29,6 +29,7 @@ function renderNoShell(tela: ReactNode) {
 
 beforeEach(() => {
   localStorage.removeItem('albion-profit-pro:nav-collapsed')
+  localStorage.removeItem('albion-profit-pro:filters-collapsed')
   localStorage.setItem('albion-profit-pro:realm', 'west')
 })
 
@@ -190,5 +191,53 @@ describe('ErrorBoundary', () => {
     ).not.toBeInTheDocument()
 
     consoleError.mockRestore()
+  })
+})
+
+describe('painel de filtros recolhível (task 4/20)', () => {
+  // Os 320 px dos filtros são a diferença entre as 8 colunas caberem ou não: numa tela de
+  // 1440 px, com navegação e filtros recolhidos (56 px cada), sobram 1.296 px — cabe até o craft
+  // com 4 ingredientes, que pede 1.264.
+  function TelaComFiltros() {
+    return (
+      <>
+        <SidebarSection title="Filtros">
+          <label>
+            Campo
+            <input />
+          </label>
+        </SidebarSection>
+        <p>tabela</p>
+      </>
+    )
+  }
+
+  test('recolher o painel devolve a largura para a tabela', async () => {
+    const user = userEvent.setup()
+    renderNoShell(<TelaComFiltros />)
+
+    await user.click(await screen.findByRole('button', { name: 'Recolher filtros' }))
+
+    const filtros = screen.getByRole('complementary', { name: 'Filtros' })
+    expect(filtros.className).not.toMatch(/\bw-80\b/)
+    expect(screen.getByRole('button', { name: 'Expandir filtros' })).toBeInTheDocument()
+  })
+
+  test('recolhido sobrevive a uma remontagem', async () => {
+    const user = userEvent.setup()
+    const primeira = renderNoShell(<TelaComFiltros />)
+
+    await user.click(await screen.findByRole('button', { name: 'Recolher filtros' }))
+    primeira.unmount()
+
+    renderNoShell(<TelaComFiltros />)
+    expect(
+      await screen.findByRole('button', { name: 'Expandir filtros' }),
+    ).toBeInTheDocument()
+  })
+
+  test('tela sem filtros não mostra botão de recolher', () => {
+    renderNoShell(<p>Tela sem filtros</p>)
+    expect(screen.queryByRole('button', { name: 'Recolher filtros' })).not.toBeInTheDocument()
   })
 })

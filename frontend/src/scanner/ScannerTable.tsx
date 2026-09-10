@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, ChevronRight, Inbox } from 'lucide-react'
-import { useCallback, useMemo, useRef, type ReactNode } from 'react'
+import { Fragment, useCallback, useMemo, useRef, type ReactNode } from 'react'
 
 import type { components } from '@/api/schema'
 import { EstadoVazio } from '@/components/ui/states'
@@ -26,6 +26,11 @@ export interface ScannerColumn {
   header: string
   /** ordena por este campo quando o cabeçalho é clicado; ausente = coluna não ordenável */
   sortField?: SortField
+  /**
+   * Vários alvos no mesmo cabeçalho (task 4/20) — "Lucro" e "%" dividem a coluna. Quando
+   * presente, substitui `sortField`: cada rótulo vira um botão que ordena pelo seu campo.
+   */
+  sortTargets?: ReadonlyArray<{ field: SortField; label: string }>
   numeric?: boolean
   width: string
   weight?: 'primary' | 'tertiary'
@@ -151,7 +156,10 @@ export function ScannerTable({
             style={{ gridTemplateColumns: gridTemplate, height: ROW_HEIGHT }}
           >
             {columns.map((column, index) => {
-              const active = sort.field === column.sortField
+              const alvos =
+                column.sortTargets ??
+                (column.sortField ? [{ field: column.sortField, label: column.header }] : [])
+              const active = alvos.some((alvo) => alvo.field === sort.field)
               const Icon = sort.direction === 'desc' ? ArrowDown : ArrowUp
               return (
                 <div
@@ -168,17 +176,29 @@ export function ScannerTable({
                     index === 0 ? `${CELULA_FIXA} bg-surface-raised` : ''
                   }`}
                 >
-                  {column.sortField ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(column.sortField!)}
-                      className={`inline-flex items-center gap-1 transition hover:text-foreground ${
-                        active ? 'text-primary' : ''
-                      }`}
-                    >
-                      {column.header}
-                      {active && <Icon className="size-3" aria-hidden="true" />}
-                    </button>
+                  {alvos.length > 0 ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      {alvos.map((alvo, i) => {
+                        const ativo = alvo.field === sort.field
+                        return (
+                          <Fragment key={alvo.field}>
+                            {i > 0 && (
+                              <span aria-hidden="true" className="h-3 w-px bg-border-strong" />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(alvo.field)}
+                              className={`inline-flex items-center gap-1 transition hover:text-foreground ${
+                                ativo ? 'text-primary' : ''
+                              }`}
+                            >
+                              {alvo.label}
+                              {ativo && <Icon className="size-3" aria-hidden="true" />}
+                            </button>
+                          </Fragment>
+                        )
+                      })}
+                    </span>
                   ) : (
                     column.header
                   )}

@@ -783,3 +783,41 @@ describe('ordem estrutural (task 4/19)', () => {
     expect(linha.tier).toBe(4)
   })
 })
+
+describe('o que a tabela enxuta precisa (task 4/20)', () => {
+  const COM_PRECO = () =>
+    snapshot([
+      { item: 'T4_FIBER', location: '1002', sell: '100' },
+      { item: 'T3_CLOTH', location: '1002', sell: '200' },
+      { item: 'T4_CLOTH', location: '1002', buy: '1000' },
+    ])
+
+  test('a linha diz por quanto se vende, de quando e de onde é esse preço', () => {
+    // Com a cidade virando parte da célula de Venda, a linha precisa carregar o preço unitário
+    // e a procedência dele — até aqui isso só existia no painel (`explainRow`).
+    const linha = rodar(COM_PRECO(), { quantity: 1 })[0]!
+
+    expect(linha.saleUnitPrice?.toString()).toBe('1000')
+    expect(linha.saleObservedAt).not.toBeNull()
+    expect(linha.saleSource).not.toBeNull()
+  })
+
+  test('cada ingrediente carrega a idade do preço usado', () => {
+    const linha = rodar(COM_PRECO(), { quantity: 1 })[0]!
+
+    expect(linha.ingredients.length).toBeGreaterThan(0)
+    // `typeof`, não `!== null`: sem o campo, `undefined !== null` é verdadeiro e o teste
+    // passava contra o código antigo — foi o que aconteceu na primeira versão dele.
+    expect(linha.ingredients.map((i) => typeof i.observedAt)).toEqual(
+      linha.ingredients.map(() => 'number'),
+    )
+  })
+
+  test('linha sem preço: venda ausente, nunca zero', () => {
+    const linha = rodar(snapshot([]), { quantity: 1 })[0]!
+
+    expect(linha.saleUnitPrice).toBeNull()
+    expect(linha.saleObservedAt).toBeNull()
+    expect(linha.ingredients.every((i) => i.observedAt === null)).toBe(true)
+  })
+})

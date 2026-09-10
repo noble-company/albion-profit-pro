@@ -7,6 +7,8 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Recycle,
   Search,
   Sparkles,
@@ -73,6 +75,8 @@ const THEME_LABEL: Record<Theme, string> = {
 }
 
 const COLLAPSE_KEY = 'albion-profit-pro:nav-collapsed'
+/** Filtros recolhidos devolvem 320 px à tabela (task 4/20) — e quem recolhe quer amanhã também. */
+const FILTERS_COLLAPSE_KEY = 'albion-profit-pro:filters-collapsed'
 
 function NavItems({
   collapsed,
@@ -206,6 +210,14 @@ export function AppShell() {
     localStorage.setItem(COLLAPSE_KEY, String(collapsed))
   }, [collapsed])
 
+  const [filtersCollapsed, setFiltersCollapsed] = useState(
+    () => localStorage.getItem(FILTERS_COLLAPSE_KEY) === 'true',
+  )
+
+  useEffect(() => {
+    localStorage.setItem(FILTERS_COLLAPSE_KEY, String(filtersCollapsed))
+  }, [filtersCollapsed])
+
   const signOut = () => {
     void logout()
     void navigate('/login')
@@ -306,10 +318,32 @@ export function AppShell() {
         <aside
           aria-label="Filtros"
           className={`hidden h-full shrink-0 overflow-y-auto border-l border-border bg-surface md:block ${
-            hasFilters ? 'w-80' : 'w-0 border-l-0'
+            !hasFilters ? 'w-0 border-l-0' : filtersCollapsed ? 'w-14' : 'w-80'
           }`}
         >
-          <div ref={setSlot} />
+          {hasFilters && (
+            <div
+              className={`flex px-2 pt-3 ${filtersCollapsed ? 'justify-center' : 'justify-start'}`}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 shrink-0"
+                aria-label={filtersCollapsed ? 'Expandir filtros' : 'Recolher filtros'}
+                aria-expanded={!filtersCollapsed}
+                onClick={() => setFiltersCollapsed((value) => !value)}
+              >
+                {filtersCollapsed ? (
+                  <PanelRightOpen className="size-4" aria-hidden="true" />
+                ) : (
+                  <PanelRightClose className="size-4" aria-hidden="true" />
+                )}
+              </Button>
+            </div>
+          )}
+          {/* Recolhido, o nó do portal continua montado — a tela injeta os filtros nele e
+              perderia o estado dos campos se ele sumisse. Só fica escondido. */}
+          <div ref={setSlot} hidden={hasFilters && filtersCollapsed} />
         </aside>
       </div>
     </SidebarSlotProvider>

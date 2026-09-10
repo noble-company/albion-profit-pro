@@ -192,13 +192,19 @@ export function ScannerPage({
     [linhas, filters, itemsByName, sort, nomeItem],
   )
 
-  const columns = useMemo(
+  /** A largura da coluna Compra acompanha a receita com mais ingredientes do catálogo aberto. */
+  const maxIngredientes = useMemo(
     () =>
-      buildColumns(locationName, nomeItem, {
-        mostrarEstrategia: strategy.acquisition === 'best' || strategy.sale === 'best',
-        modo: kind === 'crafting' ? 'craft' : 'refino',
-      }),
-    [locationName, nomeItem, strategy, kind],
+      (catalogo.catalog?.recipes ?? []).reduce(
+        (maior, receita) => Math.max(maior, receita.ingredients.length),
+        1,
+      ),
+    [catalogo.catalog],
+  )
+
+  const columns = useMemo(
+    () => buildColumns(locationName, nomeItem, { maxIngredientes }),
+    [locationName, nomeItem, maxIngredientes],
   )
 
   /**

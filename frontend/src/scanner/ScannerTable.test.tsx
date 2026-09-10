@@ -37,6 +37,9 @@ function row(nome: string, profit: string | null): ScannerRow {
     roi: null,
     profitPerWeight: null,
     profitPerFocus: null,
+    saleUnitPrice: null,
+    saleObservedAt: null,
+    saleSource: null,
     executions: 1,
     producedQuantity: 1,
     focusConsumed: 0,
@@ -167,5 +170,54 @@ describe('estado vazio', () => {
       screen.getByText('Nenhuma receita corresponde aos filtros'),
     ).toBeInTheDocument()
     expect(screen.getByText(/é o filtro, não o mercado/)).toBeInTheDocument()
+  })
+})
+
+describe('cabeçalho com dois alvos de ordenação (task 4/20)', () => {
+  // "Lucro" e "%" moram na mesma coluna: a célula mostra prata e ROI juntos, e o jogador tem
+  // que conseguir ordenar por qualquer um dos dois.
+  const comDoisAlvos: ScannerColumn[] = [
+    { key: 'item', header: 'Item', width: '12rem', cell: (r) => r.outputItem },
+    {
+      key: 'lucro',
+      header: 'Lucro',
+      numeric: true,
+      width: '7rem',
+      sortTargets: [
+        { field: 'profit', label: 'Lucro' },
+        { field: 'roi', label: '%' },
+      ],
+      cell: (r) => r.profit?.toString() ?? '—',
+    },
+  ]
+
+  function montar(sort: SortState = DEFAULT_SORT, onSortChange = vi.fn()) {
+    render(
+      <div style={{ height: 400 }}>
+        <ScannerTable
+          rows={[row('a', '10')]}
+          columns={comDoisAlvos}
+          items={items}
+          sort={sort}
+          onSortChange={onSortChange}
+        />
+      </div>,
+    )
+    return onSortChange
+  }
+
+  test('cada alvo ordena pelo seu próprio campo', async () => {
+    const onSortChange = montar()
+
+    await userEvent.click(screen.getByRole('button', { name: '%' }))
+    expect(onSortChange).toHaveBeenLastCalledWith({ field: 'roi', direction: 'desc' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lucro' }))
+    expect(onSortChange).toHaveBeenLastCalledWith({ field: 'profit', direction: 'desc' })
+  })
+
+  test('a coluna anuncia a direção quando QUALQUER alvo dela está ativo', () => {
+    montar({ field: 'roi', direction: 'asc' })
+    expect(screen.getAllByRole('columnheader')[1]).toHaveAttribute('aria-sort', 'ascending')
   })
 })

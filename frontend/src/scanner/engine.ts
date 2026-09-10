@@ -127,6 +127,8 @@ export interface ScannerIngredient {
   unitPrice: Money | null
   /** `purchaseQuantity × unitPrice` */
   subtotal: Money | null
+  /** epoch em segundos da cotação usada; nulo sem preço ou com preço fixado na mão (task 4/20) */
+  observedAt: number | null
 }
 
 export interface ScannerRow {
@@ -156,6 +158,11 @@ export interface ScannerRow {
   profitPerWeight: Money | null
   /** lucro por ponto de foco gasto */
   profitPerFocus: Money | null
+  /** preço unitário de venda do cenário vencedor — a célula de Venda (task 4/20) */
+  saleUnitPrice: Money | null
+  /** epoch em segundos da cotação de venda; nulo sem preço ou com preço fixado na mão */
+  saleObservedAt: number | null
+  saleSource: string | null
 
   executions: number
   producedQuantity: number
@@ -492,6 +499,9 @@ function emptyRow(
     roi: null,
     profitPerWeight: null,
     profitPerFocus: null,
+    saleUnitPrice: null,
+    saleObservedAt: null,
+    saleSource: null,
     executions: input.production.executions,
     producedQuantity: input.production.producedQuantity,
     focusConsumed: input.focusConsumed,
@@ -509,6 +519,7 @@ function emptyRow(
       ).purchaseQuantity,
       unitPrice: null,
       subtotal: null,
+      observedAt: null,
     })),
   }
 }
@@ -738,6 +749,11 @@ function evaluate(input: EvaluateInput): ScannerRow {
             : null,
         profitPerFocus:
           input.focusConsumed > 0 ? divide(profit, input.focusConsumed) : null,
+        // A célula de Venda precisa do preço e da procedência dele. Preço digitado chega com
+        // `observedAt` nulo, e a tela diz "preço fixo" em vez de inventar uma idade.
+        saleUnitPrice: quote.price,
+        saleObservedAt: quote.observedAt,
+        saleSource: quote.source,
         executions: input.production.executions,
         producedQuantity: input.production.producedQuantity,
         focusConsumed: input.focusConsumed,
@@ -751,6 +767,7 @@ function evaluate(input: EvaluateInput): ScannerRow {
             subtotal: cotacao
               ? multiplyByQuantity(cotacao.price, d.purchaseQuantity)
               : null,
+            observedAt: cotacao?.observedAt ?? null,
           }
         }),
         // Só entra aqui o que foi **observado**. Preço digitado não tem idade, e contá-lo

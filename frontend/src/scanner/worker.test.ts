@@ -193,3 +193,17 @@ describe('a taxa da estação atravessa o Worker (task 4/18)', () => {
     ).toBe('7.02')
   })
 })
+
+describe('o preço unitário de venda atravessa o Worker (task 4/20)', () => {
+  test('vai como string decimal e volta como Decimal, sem perder o valor', () => {
+    // O spread de `serializeRow` levaria o `Decimal` como objeto, e o `structuredClone` do
+    // `postMessage` perderia o protótipo: do outro lado chegaria algo sem `.plus()`.
+    const antes = original()
+    const serializada = serializeRow(antes)
+
+    expect(typeof serializada.saleUnitPrice).toBe('string')
+    const depois = reviveRow(serializada)
+    expect(depois.saleUnitPrice?.toString()).toBe(antes.saleUnitPrice?.toString())
+    expect(typeof depois.saleUnitPrice?.plus).toBe('function')
+  })
+})

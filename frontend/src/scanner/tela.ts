@@ -1,3 +1,4 @@
+import { formatarIdade } from '@/lib/formatters'
 import type { Cidade } from '@/lib/locations'
 
 /**
@@ -42,4 +43,21 @@ export function cidadesDeVendaPara(
 ): string[] {
   const validas = cidades.filter((c) => marcadas.includes(c.id)).map((c) => c.id)
   return validas.length > 0 ? validas : cidades.map((c) => c.id)
+}
+
+/** Traço, nunca zero. Ausência de preço não é preço zero — é a microcópia da §5 virada em código. */
+export const TRACO = '—'
+
+/**
+ * Idade de uma cotação para caber numa célula (task 4/20).
+ *
+ * `null` = preço digitado pelo jogador, que não tem idade — quem chama decide dizer "preço fixo".
+ * Data impossível vira traço: foi um `new Date(Infinity).toISOString()` no meio do render que
+ * derrubou a tela inteira no ErrorBoundary (task 11). Formatar é apresentação, e apresentação não
+ * pode derrubar produto.
+ */
+export function idadeDaCotacao(observedAt: number | null, agora: Date): string | null {
+  if (observedAt === null) return null
+  if (!Number.isFinite(observedAt)) return TRACO
+  return formatarIdade(new Date(observedAt * 1000).toISOString(), agora)
 }

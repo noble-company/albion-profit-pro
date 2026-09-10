@@ -2,17 +2,26 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 
 import type { components } from '@/api/schema'
-import { money } from '@/lib/money'
+import { formatarIdade } from '@/lib/formatters'
+import { formatPercent, formatSilver, money } from '@/lib/money'
 
 import { buildColumns, motivoSemPreco } from './columns'
-import type { ScannerRow } from './engine'
+import type { ScannerIngredient, ScannerRow } from './engine'
 
 /**
- * Task 4/11. É **aqui** que o conteúdo da tabela é verificado: cada `cell` é pura, então não
- * depende do virtualizador — que não funciona em jsdom (`W4`).
+ * Task 4/11, revista na 4/20. É **aqui** que o conteúdo da tabela é verificado: cada `cell` é
+ * pura, então não depende do virtualizador — que não funciona em jsdom (`W4`).
+ *
+ * A 20 corta a tabela para 8 colunas. O que saiu dela não sumiu: está no painel expandido e é
+ * testado em `RowDetails.test.tsx`.
  */
 
 type CatalogItem = components['schemas']['CatalogItemOut']
+
+const T = 1_757_000_000
+/** Duas horas depois de toda observação dos fixtures. */
+const AGORA = new Date((T + 7200) * 1000)
+const IDADE = formatarIdade(new Date(T * 1000).toISOString(), AGORA)
 
 const locationName = (id: string) => ({ '1002': 'Lymhurst' })[id] ?? id
 const nomeItem = (unique: string) => unique
@@ -37,204 +46,223 @@ function row(overrides: Partial<ScannerRow> = {}): ScannerRow {
     roi: money('140'),
     profitPerWeight: money('1098.04'),
     profitPerFocus: null,
+    saleUnitPrice: money('1000'),
+    saleObservedAt: T,
+    saleSource: 'client',
     executions: 1,
     producedQuantity: 1,
     focusConsumed: 0,
-    oldestObservedAt: 1_757_000_000,
+    oldestObservedAt: T,
     sources: ['client'],
     ingredients: [],
     ...overrides,
   }
 }
 
-const item = { unique_name: 'T4_CLOTH', name_pt: 'Tecido Fino', tier: 4 } as CatalogItem
-
-function renderCell(key: string, r: ScannerRow, i: CatalogItem | undefined = item) {
-  const column = buildColumns(locationName, nomeItem).find((c) => c.key === key)!
-  render(<>{column.cell(r, i)}</>)
-}
-
-describe('linha sem preço', () => {
-  test('a coluna de lucro diz o MOTIVO, não um zero', () => {
-    // Zero seria uma afirmação sobre o mercado. O motivo é a verdade: não sabemos.
-    renderCell('lucro', row({ state: 'missing_ingredient_price', profit: null }))
-    expect(screen.getByText('sem preço de ingrediente')).toBeInTheDocument()
-  })
-
-  test('cada estado tem seu motivo', () => {
-    expect(motivoSemPreco(row({ state: 'missing_output_price' }))).toBe(
-      'sem preço de venda',
-    )
-    expect(motivoSemPreco(row({ state: 'missing_ingredient_price' }))).toBe(
-      'sem preço de ingrediente',
-    )
-    expect(motivoSemPreco(row())).toBeNull()
-  })
-
-  test('as colunas numéricas viram traço, nunca zero', () => {
-    for (const key of [
-      'custo',
-      'custoMedio',
-      'receita',
-      'roi',
-      'lucroPorPeso',
-      'lucroPorFoco',
-    ]) {
-      const { unmount } = render(
-        <>
-          {buildColumns(locationName, nomeItem)
-            .find((c) => c.key === key)!
-            .cell(
-              row({
-                state: 'no_price',
-                totalCost: null,
-                averageUnitCost: null,
-                grossRevenue: null,
-                roi: null,
-                profitPerWeight: null,
-                profitPerFocus: null,
-              }),
-              item,
-            )}
-        </>,
-      )
-      expect(screen.getByText('—'), `coluna ${key}`).toBeInTheDocument()
-      unmount()
-    }
-  })
-})
-
-describe('sinal do número', () => {
-  test('prejuízo é vermelho, lucro é verde', () => {
-    // Revisão da §2 de `13-linguagem-visual.md` na task 4/11: o scanner mostra receita que NÃO
-    // dá lucro por padrão, e pintar prejuízo de verde induziria a erro.
-    const { container, unmount } = render(
-      <>{buildColumns(locationName, nomeItem).find((c) => c.key === 'lucro')!.cell(row(), item)}</>,
-    )
-    expect(container.querySelector('.text-profit')).not.toBeNull()
-    unmount()
-
-    render(
-      <>
-        {buildColumns(locationName, nomeItem)
-          .find((c) => c.key === 'lucro')!
-          .cell(row({ profit: money('-500') }), item)}
-      </>,
-    )
-    expect(document.querySelector('.text-danger')).not.toBeNull()
-  })
-})
-
-describe('lista de compras', () => {
-  const ingrediente = {
-    item: 'T5_WOOD',
+function ingrediente(
+  item: string,
+  overrides: Partial<ScannerIngredient> = {},
+): ScannerIngredient {
+  return {
+    item,
     enchantmentLevel: 0,
     purchaseQuantity: 3000,
-    unitPrice: money('120'),
-    subtotal: money('360000'),
+    unitPrice: money('100'),
+    subtotal: money('300000'),
+    observedAt: T,
+    ...overrides,
   }
+}
 
-  test('o nome do ingrediente corta; a quantidade, não', () => {
-    // Truncar nome e quantidade juntos apaga justamente o número que manda comprar: na coluna
-    // estreita sobra "Troncos de Cedro Rar…" e nenhuma quantidade — foi o que apareceu na tela.
-    renderCell('ing0', row({ ingredients: [ingrediente] }))
+const SEM_PRECO: Partial<ScannerRow> = {
+  state: 'missing_output_price',
+  totalCost: null,
+  averageUnitCost: null,
+  grossRevenue: null,
+  netRevenue: null,
+  profit: null,
+  roi: null,
+  saleUnitPrice: null,
+  saleObservedAt: null,
+  saleSource: null,
+}
 
-    expect(screen.getByText('×3.000').closest('.truncate')).toBeNull()
-    expect(screen.getByText('T5_WOOD').className).toMatch(/\btruncate\b/)
+const item = { unique_name: 'T4_CLOTH', name_pt: 'Tecido Fino', tier: 4 } as CatalogItem
+
+function colunas(maxIngredientes = 2) {
+  return buildColumns(locationName, nomeItem, { agora: AGORA, maxIngredientes })
+}
+
+function coluna(key: string, maxIngredientes = 2) {
+  return colunas(maxIngredientes).find((c) => c.key === key)!
+}
+
+function renderCell(key: string, r: ScannerRow, i: CatalogItem | undefined = item) {
+  render(<>{coluna(key).cell(r, i)}</>)
+}
+
+describe('as 8 colunas (task 20)', () => {
+  test('na ordem em que o jogador decide', () => {
+    expect(colunas().map((c) => c.key)).toEqual([
+      'item',
+      'investimento',
+      'vendaBruta',
+      'lucro',
+      'venda',
+      'compra',
+      'foco',
+      'rendimento',
+    ])
+  })
+
+  test('são as mesmas no refino e no craft — só a largura da Compra acompanha', () => {
+    // O refino tem 2 ingredientes, o craft até 4. Antes a tela trocava de colunas conforme a
+    // aba; agora os cards de Compra absorvem a diferença.
+    expect(colunas(4).map((c) => c.key)).toEqual(colunas(2).map((c) => c.key))
+    expect(coluna('compra', 4).width).not.toBe(coluna('compra', 2).width)
+  })
+
+  test('nada do que saiu voltou como coluna', () => {
+    // Cada uma destas mora no painel expandido agora.
+    const chaves = colunas().map((c) => c.key)
+    for (const saiu of [
+      'cidade',
+      'custoMedio',
+      'lucroPorPeso',
+      'lucroPorFoco',
+      'estrategia',
+      'idade',
+      'fonte',
+      'ingredientes',
+      'ing0',
+      'sub0',
+    ]) {
+      expect(chaves).not.toContain(saiu)
+    }
+  })
+
+  test('a coluna Item ordena por tier (task 19)', () => {
+    expect(coluna('item').sortField).toBe('tier')
   })
 })
 
-describe('colunas do craft (task 12)', () => {
-  const quatro = [
-    { item: 'T4_PLANKS', enchantmentLevel: 0, purchaseQuantity: 80, unitPrice: money('10'), subtotal: money('800') },
-    { item: 'T4_METALBAR', enchantmentLevel: 0, purchaseQuantity: 48, unitPrice: money('20'), subtotal: money('960') },
-    { item: 'T4_LEATHER', enchantmentLevel: 0, purchaseQuantity: 12, unitPrice: money('30'), subtotal: money('360') },
-    { item: 'T4_ARTEFACT', enchantmentLevel: 0, purchaseQuantity: 1, unitPrice: money('5000'), subtotal: money('5000') },
-  ]
+describe('lucro', () => {
+  test('prata e percentual na mesma célula', () => {
+    renderCell('lucro', row())
 
-  const colunaCraft = (key: string) =>
-    buildColumns(locationName, nomeItem, { modo: 'craft' }).find((c) => c.key === key)!
-
-  test('resume TODOS os ingredientes numa coluna — o craft tem de 1 a 4', () => {
-    // As colunas fixas do refino cobrem 105 das 110 receitas porque lá são sempre 2. Aqui um
-    // par de colunas por ingrediente daria oito colunas para mostrar quatro números.
-    render(<>{colunaCraft('ingredientes').cell(row({ ingredients: quatro }), item)}</>)
-
-    expect(screen.getByText(/T4_PLANKS ×80/)).toBeInTheDocument()
-    expect(screen.getByText(/T4_ARTEFACT ×1/)).toBeInTheDocument()
+    expect(screen.getByText(formatSilver(money('560')))).toBeInTheDocument()
+    expect(screen.getByText(formatPercent(money('140')))).toBeInTheDocument()
   })
 
-  test('o investimento é a soma dos ingredientes, não o de um deles', () => {
-    render(<>{colunaCraft('investimento').cell(row({ ingredients: quatro }), item)}</>)
-
-    // 800 + 960 + 360 + 5.000 = 7.120
-    expect(screen.getByText('7.120 silver')).toBeInTheDocument()
+  test('ordena por lucro OU por ROI, pelo mesmo cabeçalho', () => {
+    expect(coluna('lucro').sortTargets?.map((alvo) => alvo.field)).toEqual(['profit', 'roi'])
   })
 
-  test('ingrediente sem preço não vira zero na soma', () => {
-    const semUm = [...quatro.slice(0, 3), { ...quatro[3]!, unitPrice: null, subtotal: null }]
-    render(<>{colunaCraft('investimento').cell(row({ ingredients: semUm }), item)}</>)
-
-    // Some o que dá para somar e **avisa** que falta — 2.120 com a marca de incompleto.
-    expect(screen.getByText(/2\.120 silver/)).toBeInTheDocument()
-    expect(screen.getByTitle(/sem preço/i)).toBeInTheDocument()
+  test('prejuízo é vermelho, lucro é verde', () => {
+    renderCell('lucro', row({ profit: money('-5'), roi: money('-2') }))
+    expect(screen.getByText(formatSilver(money('-5')))).toHaveClass('text-danger')
   })
 
-  test('no refino as colunas por ingrediente continuam como estavam', () => {
-    expect(buildColumns(locationName, nomeItem).some((c) => c.key === 'ing0')).toBe(true)
-    expect(buildColumns(locationName, nomeItem).some((c) => c.key === 'ingredientes')).toBe(false)
+  test('sem preço, diz o MOTIVO — não um zero', () => {
+    const r = row(SEM_PRECO)
+    renderCell('lucro', r)
+    expect(screen.getByText(motivoSemPreco(r)!)).toBeInTheDocument()
+  })
+})
+
+describe('venda', () => {
+  test('diz a cidade, o preço unitário e de quando é o preço', () => {
+    // Com a cidade fora da linha (task 19), "Venda bruta" sozinha não diria ONDE nem por
+    // QUANTO se vende.
+    renderCell('venda', row())
+
+    expect(screen.getByText('Lymhurst')).toBeInTheDocument()
+    expect(screen.getByText('1.000')).toBeInTheDocument()
+    expect(screen.getByText(IDADE)).toBeInTheDocument()
+  })
+
+  test('preço fixado na mão diz que é fixo, sem inventar idade', () => {
+    renderCell('venda', row({ saleObservedAt: null }))
+    expect(screen.getByText('preço fixo')).toBeInTheDocument()
+  })
+
+  test('sem preço de venda, traço', () => {
+    renderCell('venda', row(SEM_PRECO))
+    expect(screen.getByText('—')).toBeInTheDocument()
+  })
+
+  test('idade impossível não derruba a tela', () => {
+    // Foi um `new Date(Infinity).toISOString()` no meio do render que levou a tela inteira ao
+    // ErrorBoundary na task 11. Formatar é apresentação e não pode derrubar produto.
+    expect(() =>
+      renderCell('venda', row({ saleObservedAt: Number.POSITIVE_INFINITY })),
+    ).not.toThrow()
+  })
+})
+
+describe('compra', () => {
+  const QUATRO = ['T4_FIBER', 'T4_HIDE', 'T4_ORE', 'T4_WOOD'].map((nome) => ingrediente(nome))
+
+  test('um card por ingrediente, de 1 a 4', () => {
+    renderCell('compra', row({ ingredients: QUATRO }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+  })
+
+  test('a quantidade aparece inteira em cada card', () => {
+    renderCell('compra', row({ ingredients: [ingrediente('T4_FIBER')] }))
+    expect(screen.getByText('×3.000')).toBeInTheDocument()
+  })
+
+  test('o nome completo fica no título do card, para o hover', () => {
+    renderCell('compra', row({ ingredients: [ingrediente('T4_FIBER')] }))
+    expect(screen.getByRole('listitem')).toHaveAttribute(
+      'title',
+      expect.stringContaining('T4_FIBER'),
+    )
+  })
+
+  test('cada card diz de quando é o preço', () => {
+    renderCell('compra', row({ ingredients: QUATRO }))
+    expect(screen.getAllByText(IDADE)).toHaveLength(4)
+  })
+
+  test('ingrediente sem preço mostra traço, não zero', () => {
+    renderCell(
+      'compra',
+      row({
+        ingredients: [
+          ingrediente('T4_FIBER', { unitPrice: null, subtotal: null, observedAt: null }),
+        ],
+      }),
+    )
+    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
+  })
+})
+
+describe('traço, nunca zero', () => {
+  test('investimento e venda bruta sem preço', () => {
+    const r = row(SEM_PRECO)
+    // Cada célula no seu elemento, como na tabela. Lado a lado no mesmo pai, os dois traços
+    // viravam um texto só ("——") e o teste falhava sem haver defeito nenhum na coluna.
+    render(
+      <>
+        <span>{coluna('investimento').cell(r, item)}</span>
+        <span>{coluna('vendaBruta').cell(r, item)}</span>
+      </>,
+    )
+    expect(screen.getAllByText('—')).toHaveLength(2)
+  })
+
+  test('foco zero não é "0 de foco" — é não usar foco', () => {
+    renderCell('foco', row({ focusConsumed: 0 }))
+    expect(screen.getByText('—')).toBeInTheDocument()
   })
 })
 
 describe('rendimento da sessão (task 11.6)', () => {
   test('mostra quantos itens saem no fim, não quantas receitas foram compradas', () => {
-    // É o número que responde "vou terminar com quanto?". Com 1000 receitas e 15,2% de
-    // retorno são 1179 execuções — e 1179 itens, não os 1000 comprados.
-    renderCell('rendimento', row({ executions: 1179, producedQuantity: 1179 }))
+    renderCell('rendimento', row({ producedQuantity: 1179, executions: 1179 }))
     expect(screen.getByText('1.179')).toBeInTheDocument()
-  })
-})
-
-describe('estratégia na linha (task 11.5)', () => {
-  test('a coluna diz em que cenário o número foi feito', () => {
-    // Sem isso, "lucro 658" some com a premissa: ele supõe a ordem de compra E a de venda
-    // sendo aceitas. É a expectativa falsa que a leitura por cima cria.
-    const column = buildColumns(locationName, nomeItem, { mostrarEstrategia: true }).find(
-      (c) => c.key === 'estrategia',
-    )!
-    render(<>{column.cell(row({ acquisitionMode: 'buy_order', saleMode: 'sell_order' }), item)}</>)
-
-    expect(screen.getByText('ordem → ordem')).toBeInTheDocument()
-  })
-
-  test('sem a coluna pedida, ela não existe — a barra já respondeu', () => {
-    expect(
-      buildColumns(locationName, nomeItem).some((c) => c.key === 'estrategia'),
-    ).toBe(false)
-  })
-})
-
-describe('procedência e contexto', () => {
-  test('idade impossível vira traço, não derruba a tela', () => {
-    // Defesa em profundidade: o engine já não produz `Infinity`, mas uma data inválida chegando
-    // aqui não pode virar `RangeError` no meio do render — foi assim que a tela inteira caiu no
-    // boundary. Formatar é apresentação; apresentação não derruba produto.
-    renderCell('idade', row({ oldestObservedAt: Number.POSITIVE_INFINITY }))
-    expect(screen.getByText('—')).toBeInTheDocument()
-  })
-
-  test('a fonte de cada linha é exibida', () => {
-    renderCell('fonte', row({ sources: ['client', 'aodp'] }))
-    expect(screen.getByText('client, aodp')).toBeInTheDocument()
-  })
-
-  test('a cidade é traduzida pelo catálogo de localizações', () => {
-    renderCell('cidade', row())
-    expect(screen.getByText('Lymhurst')).toBeInTheDocument()
-  })
-
-  test('lucro por peso aparece quando o item tem peso', () => {
-    renderCell('lucroPorPeso', row())
-    expect(screen.getByText('1.098')).toBeInTheDocument()
   })
 })

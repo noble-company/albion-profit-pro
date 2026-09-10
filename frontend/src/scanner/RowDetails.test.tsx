@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 
-import { money } from '@/lib/money'
+import { formatSilver, money } from '@/lib/money'
 
 import { computeScanner, explainRow, type ScannerCatalog, type ScannerParams } from './engine'
 import { buildPriceIndex, type PriceSnapshotOut } from './prices'
@@ -175,5 +175,30 @@ describe('comparação entre cidades', () => {
 
     expect(screen.getByText('Caerleon')).toBeInTheDocument()
     expect(screen.getByText('1.500 silver')).toBeInTheDocument()
+  })
+})
+
+describe('o que saiu da tabela (task 4/20)', () => {
+  function secao(titulo: string) {
+    return within(screen.getByRole('heading', { name: titulo }).closest('section')!)
+  }
+
+  test('custo por item, lucro por kg e lucro por foco ficam no painel', () => {
+    const { detail } = montar()
+    const resultado = secao('Resultado')
+
+    expect(resultado.getByText('Custo por item')).toBeInTheDocument()
+    expect(resultado.getByText(formatSilver(detail.row.averageUnitCost))).toBeInTheDocument()
+    expect(resultado.getByText('Lucro por kg')).toBeInTheDocument()
+    expect(resultado.getByText('Lucro por foco')).toBeInTheDocument()
+  })
+
+  test('de onde e de quando é o dado da linha', () => {
+    montar()
+    const resultado = secao('Resultado')
+
+    expect(resultado.getByText('Fonte')).toBeInTheDocument()
+    expect(resultado.getByText('client')).toBeInTheDocument()
+    expect(resultado.getByText('Dado mais velho')).toBeInTheDocument()
   })
 })
