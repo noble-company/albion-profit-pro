@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest'
 
 import type { Cidade } from '@/lib/locations'
 
-import { cidadesDeVendaPara, estadoDaTela } from './tela'
+import type { PricingPolicy } from './pricing'
+import { cidadesDeVendaPara, estadoDaTela, precosNaMaoPara } from './tela'
 
 /**
  * Task 4/12, segunda correção de desempenho.
@@ -62,5 +63,33 @@ describe('cidadesDeVendaPara', () => {
 
   test('se nenhuma marcada for válida, vale todas — e não uma tabela vazia sem explicação', () => {
     expect(cidadesDeVendaPara(['9999'], CIDADES)).toEqual(['1002', '3003', '4002', '5003'])
+  })
+})
+
+describe('precosNaMaoPara', () => {
+  // O "Analisar com o livro real" levava só os ingredientes fixados. A venda fixada ficava de
+  // fora, e a análise exata respondia com o livro de venda de verdade — uma pergunta diferente da
+  // estimativa da linha, que usou o preço declarado.
+  const POLITICA = {
+    base: { kind: 'average' },
+    manual: new Map([['T4_FIBER', '250']]),
+    byItemCity: new Map(),
+    manualSale: new Map([
+      ['T4_CLOTH', '1500'],
+      ['T5_CLOTH', '9999'],
+    ]),
+  } as PricingPolicy
+
+  test('leva os ingredientes fixados E a venda fixada do item analisado', () => {
+    expect(precosNaMaoPara(POLITICA, 'T4_CLOTH')).toEqual({
+      T4_FIBER: { offer: '250', request: '250' },
+      T4_CLOTH: { offer: '1500', request: '1500' },
+    })
+  })
+
+  test('a venda fixada de OUTRO item não vai junto', () => {
+    expect(precosNaMaoPara(POLITICA, 'T6_CLOTH')).toEqual({
+      T4_FIBER: { offer: '250', request: '250' },
+    })
   })
 })

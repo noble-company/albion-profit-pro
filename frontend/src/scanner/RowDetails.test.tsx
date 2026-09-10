@@ -252,3 +252,15 @@ describe('organização do painel (task 20, revista no uso)', () => {
     expect(screen.getByLabelText('Fixar preço de venda de T4_CLOTH')).toHaveValue('1200')
   })
 })
+
+describe('fixar a venda fica à vista (task 20, revista no uso)', () => {
+  test('o campo da venda vem junto da melhor venda, antes da tabela de cidades', () => {
+    // No fim da seção, embaixo de nove cidades e fechado atrás de um link, parecia ter sumido.
+    montar()
+    const venda = secao('Venda')
+    const botao = venda.getByRole('button', { name: 'Fixar preço de venda de T4_CLOTH' })
+    const tabela = venda.getByRole('table')
+
+    expect(botao.compareDocumentPosition(tabela) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})

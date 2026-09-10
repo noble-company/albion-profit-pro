@@ -229,6 +229,15 @@ export function RowDetails({
             </div>
           )}
 
+          {/* Junto da melhor venda, onde o olho está. No fim da seção, embaixo de nove
+              cidades, parecia ter sumido. E fica fora do `saleUnitPrice &&`: fixar o preço
+              de um item SEM cotação é justamente quando o jogador mais precisa. */}
+          <PrecoEditavel
+            rotulo={`Fixar preço de venda de ${nomeItem(row.outputItem)}`}
+            valor={precoDeVendaFixado}
+            onAplicar={(valor) => onExcecao('sx', row.outputItem, valor)}
+          />
+
           <table className="w-full whitespace-nowrap text-xs">
             <thead className="text-[0.6875rem] uppercase tracking-wide text-foreground-subtle">
               <tr>
@@ -253,11 +262,6 @@ export function RowDetails({
             </tbody>
           </table>
 
-          <PrecoEditavel
-            rotulo={`Fixar preço de venda de ${nomeItem(row.outputItem)}`}
-            valor={precoDeVendaFixado}
-            onAplicar={(valor) => onExcecao('sx', row.outputItem, valor)}
-          />
         </Secao>
 
         <Secao titulo="Cenários">

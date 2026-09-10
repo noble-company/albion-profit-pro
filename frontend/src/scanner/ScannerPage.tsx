@@ -27,7 +27,7 @@ import { buildPriceIndex, priceKey } from './prices'
 import { ExactAnalysis } from './ExactAnalysis'
 import { RowDetails } from './RowDetails'
 import { ScannerTable } from './ScannerTable'
-import { cidadesDeVendaPara, estadoDaTela } from './tela'
+import { cidadesDeVendaPara, estadoDaTela, precosNaMaoPara } from './tela'
 import { DEFAULT_SORT, sortRows, type SortState } from './sorting'
 import { usePriceSnapshot } from './usePriceSnapshot'
 import { useScannerWorker } from './useScannerWorker'
@@ -272,12 +272,7 @@ export function ScannerPage({
                   premium: scenario.premium,
                   // As exceções de preço da barra viajam junto: sem elas o "exato" ignoraria
                   // o preço que o jogador declarou pagar e as duas contas não se comparariam.
-                  manual_prices: Object.fromEntries(
-                    [...pricing.manual].map(([item, preco]) => [
-                      item,
-                      { offer: preco, request: preco },
-                    ]),
-                  ),
+                  manual_prices: precosNaMaoPara(pricing, row.outputItem),
                 }}
                 estimativa={detail.row.profit}
                 acquisitionMode={detail.row.acquisitionMode ?? 'immediate'}

@@ -1,6 +1,8 @@
 import { formatarIdade } from '@/lib/formatters'
 import type { Cidade } from '@/lib/locations'
 
+import type { PricingPolicy } from './pricing'
+
 /**
  * Decisões puras da tela do scanner, fora do componente.
  *
@@ -60,4 +62,25 @@ export function idadeDaCotacao(observedAt: number | null, agora: Date): string |
   if (observedAt === null) return null
   if (!Number.isFinite(observedAt)) return TRACO
   return formatarIdade(new Date(observedAt * 1000).toISOString(), agora)
+}
+
+/**
+ * Os preços na mão que vão para o "Analisar com o livro real" (task 20, revista no uso).
+ *
+ * Levava só os ingredientes fixados. A venda fixada ficava de fora, e a análise exata respondia
+ * com o livro de venda de verdade — outra pergunta que a da estimativa da linha, que usou o preço
+ * declarado. Só a venda **do item analisado** vai: a dos outros itens não é assunto dela.
+ */
+export function precosNaMaoPara(
+  pricing: PricingPolicy,
+  outputItem: string,
+): Record<string, { offer: string; request: string }> {
+  const precos: Record<string, { offer: string; request: string }> = Object.fromEntries(
+    [...pricing.manual].map(([item, preco]) => [item, { offer: preco, request: preco }]),
+  )
+  const venda = pricing.manualSale.get(outputItem)
+  if (venda !== undefined && venda !== '') {
+    precos[outputItem] = { offer: venda, request: venda }
+  }
+  return precos
 }

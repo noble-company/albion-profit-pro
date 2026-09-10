@@ -50,9 +50,15 @@ const OVERSCAN = 8
  */
 export const CELULA_FIXA = 'sticky left-0 z-10 -ml-3 pl-3'
 
-/** Identidade da linha na tabela — a mesma chave do React e do estado de expansão. */
+/**
+ * Identidade da linha na tabela — a mesma chave do React e do estado de expansão.
+ *
+ * **Só o item.** Desde a task 19 a tabela tem uma linha por receita, e a cidade é um atributo
+ * que muda: fixar o preço de venda empata todas as cidades e a "melhor" vira outra. Com a
+ * cidade na chave, o painel aberto fechava na cara de quem acabou de clicar em Fixar.
+ */
 export function rowKey(row: ScannerRow): string {
-  return `${row.outputItem}|${row.locationId}`
+  return row.outputItem
 }
 
 export function ScannerTable({

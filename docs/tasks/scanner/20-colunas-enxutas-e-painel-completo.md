@@ -172,3 +172,38 @@ começam fechados", que ficou vermelho. `npm run test` **417/417** · `lint` 0 e
 `typecheck` limpo.
 
 A organização visual em si não é testável em jsdom; a conferência é na tela.
+
+## Correção: fixar a venda não funcionava (2026-09-10)
+
+Reportado logo depois da reorganização: "não dá pra fixar venda né, isso aí é paia".
+
+### Três defeitos no mesmo recurso
+
+1. **O painel fechava ao clicar em Fixar.** O preço de venda fixado vale igual em todas as
+   cidades (`resolveOutputPrice`). Com a venda empatada, `bestPerRecipe` mantém a primeira cidade
+   avaliada, então a "melhor cidade" da linha trocava. A chave da linha era `item|cidade`: chave
+   nova, painel aberto que não casava mais. Existia desde a task 11.4, e ficou mais provável com a
+   seleção de várias cidades virando o uso normal.
+2. **O campo tinha ido para o fim da seção**, embaixo de nove cidades e fechado atrás de um link —
+   a reorganização anterior fez parecer que ele sumiu.
+3. **O "Analisar com o livro real" ignorava a venda fixada.** Levava só os preços fixados dos
+   ingredientes, e a análise exata respondia com o livro de venda de verdade — outra pergunta que a
+   da estimativa da linha.
+
+### Correção
+
+- `rowKey` passou a ser **só o item**. Desde a task 19 a tabela tem uma linha por receita; a cidade
+  é atributo, e muda.
+- O campo da venda voltou para **junto da "Melhor venda"**, antes da tabela de cidades — e fora do
+  bloco que só aparece com cotação: fixar o preço de um item sem mercado é justamente quando o
+  jogador mais precisa dele.
+- `precosNaMaoPara` (em `tela.ts`) monta os preços da análise exata com os ingredientes **e** a
+  venda fixada do item analisado; a de outros itens não vai.
+
+### Testes
+
+Quatro vermelhos antes do código. O de identidade monta o cenário de verdade — duas cidades, a
+venda mais cara em uma delas — e verifica que a melhor cidade **muda** ao fixar o preço (senão ele
+passaria sem provar nada) e que a chave da linha **não muda**. `npm run test` **421/421** · `lint`
+0 erros · `typecheck` limpo.
+
