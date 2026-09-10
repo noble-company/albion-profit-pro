@@ -3,8 +3,8 @@ import Decimal from 'decimal.js'
 /**
  * Taxas do jogo — espelho de `backend/src/craft/constants.py`.
  *
- * Estavam privadas em `ranking-projection.ts:22-24`; o engine do scanner (task 4/05) precisa
- * das mesmas, e uma terceira cópia acabaria divergindo em silêncio no dia em que o jogo mudar
+ * Estavam privadas na camada de projeção do ranking (apagada na task 4/15); o engine do
+ * scanner precisa das mesmas, e uma terceira cópia divergiria em silêncio no dia em que o jogo
  * uma alíquota. Os vetores dourados travam os dois lados contra o Python.
  */
 

@@ -49,8 +49,6 @@ export function parseSortParam(raw: string | null): {
   }
 }
 
-export type ProductionKind = 'refining' | 'crafting'
-
 export async function getFlipOpportunities(
   server: components['schemas']['AlbionServer'],
   query: OpportunityQuery,
@@ -99,40 +97,3 @@ export async function getCategories(signal: AbortSignal) {
   return response.data ?? []
 }
 
-export async function getProductionOpportunities(
-  kind: ProductionKind,
-  server: components['schemas']['AlbionServer'],
-  query: OpportunityQuery,
-  signal: AbortSignal,
-) {
-  // premium / return_rate / station_cost / use_focus NÃO vão ao servidor: são a camada
-  // "e se" do cliente (task 23), aplicada em `applyProjection` sobre a página carregada. O
-  // servidor devolve os componentes neutros e a projeção default; o cliente recalcula.
-  const params = {
-    server,
-    location_id: query.locations?.length ? query.locations : undefined,
-    tier: query.tier,
-    enchantment_level: query.enchantment,
-    quality_level: query.quality,
-    max_age_hours: query.maxAgeHours,
-    require_complete: query.requireComplete,
-    limit: query.limit,
-    offset: query.offset,
-    min_profit: query.profitOnly ? query.minProfit || '0' : query.minProfit,
-    min_roi: query.minRoi,
-    sort: query.sort,
-    direction: query.direction,
-  }
-  const response = await safeApiCall(() =>
-    kind === 'refining'
-      ? apiClient.GET('/opportunities/refining', {
-          params: { query: params },
-          signal,
-        })
-      : apiClient.GET('/opportunities/crafting', {
-          params: { query: params },
-          signal,
-        }),
-  )
-  return response.data
-}

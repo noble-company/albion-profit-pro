@@ -1,8 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 
-import { money } from '@/lib/money'
-import { percentageToRate } from '@/opportunities/production-params'
+import { money, percentageToRate } from '@/lib/money'
 
 import { DEFAULT_FILTERS, type ScannerFilters } from './filters'
 import { DEFAULT_STRATEGY, type ScannerStrategy } from './engine'

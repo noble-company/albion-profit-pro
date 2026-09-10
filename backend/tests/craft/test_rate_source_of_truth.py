@@ -8,7 +8,6 @@ from decimal import Decimal
 
 from src.craft import constants
 from src.items.models import Item, Location
-from src.opportunities.ranking_service import rebuild_ranking
 from src.prices.models import MarketOrder
 from src.prices.policy import MarketBookPolicy
 from src.recipes.models import Recipe, RecipeIngredient
@@ -81,9 +80,6 @@ async def _seed(db_session, *, seen=None):
         ]
     )
     await db_session.commit()
-    # The recipe ranking is materialized; refino/craft read it. Neutral rebuild — independent
-    # of the tax constant under test, which the read projection applies afterwards.
-    await rebuild_ranking(db_session, "west")
     return output
 
 
@@ -102,13 +98,6 @@ async def _profit_snapshot(client, token, output):
     flip = (
         await client.get("/opportunities/flips", params={"server": "west"}, headers=headers)
     ).json()
-    refining = (
-        await client.get(
-            "/opportunities/refining",
-            params={"server": "west", "location_id": "1002"},
-            headers=headers,
-        )
-    ).json()
     simulate = (
         await client.post(
             "/craft/simulate",
@@ -123,23 +112,30 @@ async def _profit_snapshot(client, token, output):
         )
     ).json()
     flip_profit = Decimal(flip["opportunities"][0]["profit"])
-    refining_profit = Decimal(refining["opportunities"][0]["profit"])
     sim_profit = max(Decimal(s["profit"]) for s in simulate["scenarios"] if s["profit"] is not None)
-    return flip_profit, refining_profit, sim_profit
+    return flip_profit, sim_profit
 
 
 async def test_sales_tax_rate_is_single_source_across_surfaces(client, db_session, monkeypatch):
+    """Duas superfícies, não três (task 4/15).
+
+    Este teste comparava flip, refino (ranking materializado) e simulate. O refino saiu com a
+    tabela; a cobertura **encolheu de verdade** e não adianta fingir o contrário.
+
+    A superfície que substituiu o refino é o scanner, que calcula no cliente — não há endpoint
+    para consultar aqui. A alíquota dele é travada por outro mecanismo: `craft-constants.ts`
+    espelha `craft/constants.py` e os vetores dourados quebram os dois juntos se divergirem.
+    """
     _, token = await registrar_e_logar(client)
     output = await _seed(db_session)
 
-    base_flip, base_refining, base_sim = await _profit_snapshot(client, token, output)
+    base_flip, base_sim = await _profit_snapshot(client, token, output)
 
     monkeypatch.setattr(constants, "DEFAULT_PREMIUM_SALES_TAX_RATE", Decimal("0.5"))
 
-    hi_flip, hi_refining, hi_sim = await _profit_snapshot(client, token, output)
+    hi_flip, hi_sim = await _profit_snapshot(client, token, output)
 
     assert hi_flip < base_flip
-    assert hi_refining < base_refining
     assert hi_sim < base_sim
 
 

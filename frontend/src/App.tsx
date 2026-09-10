@@ -7,7 +7,7 @@ import { AppShell } from '@/components/AppShell'
 import { Carregando } from '@/components/ui/states'
 
 // Code splitting de verdade (task 3.5/25, F11): cada rota de tela vira um chunk próprio,
-// carregado sob demanda. `/refino` e `/craft` compartilham o chunk de `production-pages`.
+// carregado sob demanda.
 const MarketFlipPage = lazy(() =>
   import('@/opportunities/pages').then((m) => ({ default: m.MarketFlipPage })),
 )
@@ -20,8 +20,6 @@ const ItemPricesPage = lazy(() =>
 const CalculadoraPage = lazy(() =>
   import('@/craft/pages').then((m) => ({ default: m.CalculadoraPage })),
 )
-// Task 4/11: `/refino` passou para o scanner. A tela antiga (`production-pages`) segue
-// servindo `/craft` até a task 4/12, e some com o ranking materializado na 4/15.
 const RefiningScannerPage = lazy(() =>
   import('@/scanner/ScannerPage').then((m) => ({
     default: m.RefiningScannerPage,

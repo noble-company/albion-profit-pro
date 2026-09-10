@@ -11,7 +11,8 @@ import type { Opportunity } from '@/opportunities/service'
 import { DetailDrawer } from './DetailDrawer'
 
 const row: Opportunity = {
-  kind: 'refining',
+  // `flip` é o único `kind` que sobrou: os de produção saíram com o ranking (task 4/15).
+  kind: 'flip',
   item: 'T4_CLOTH',
   item_name: 'Pano',
   quality_level: 1,

@@ -531,40 +531,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/opportunities/refining": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Refining */
-        get: operations["refining_opportunities_refining_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/opportunities/crafting": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Crafting */
-        get: operations["crafting_opportunities_crafting_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/health": {
         parameters: {
             query?: never;
@@ -1424,26 +1390,13 @@ export interface components {
             /** Orders */
             Orders: components["schemas"]["MarketOrderIn"][];
         };
-        /** OpportunityIngredientOut */
-        OpportunityIngredientOut: {
-            /** Item */
-            item: string;
-            /** Item Name */
-            item_name?: string | null;
-            /** Gross Quantity */
-            gross_quantity: number;
-            /** Expected Return Quantity */
-            expected_return_quantity: string;
-            /** Purchase Quantity */
-            purchase_quantity: number;
-        };
         /** OpportunityOut */
         OpportunityOut: {
             /**
              * Kind
-             * @enum {string}
+             * @constant
              */
-            kind: "flip" | "refining" | "crafting";
+            kind: "flip";
             /** Item */
             item: string;
             /** Item Name */
@@ -1486,27 +1439,20 @@ export interface components {
             /** Sale Mode */
             sale_mode?: ("immediate" | "sell_order") | null;
             /** Price Model */
-            price_model?: ("top_of_book" | "neutral_ranking") | null;
-            /** Ingredients */
-            ingredients?: components["schemas"]["OpportunityIngredientOut"][];
-            /** Station Cost */
-            station_cost?: string | null;
-            /** Focus Consumed */
-            focus_consumed?: number | null;
+            price_model?: "top_of_book" | null;
             /** Oldest Observed At */
             oldest_observed_at?: string | null;
             /** Warnings */
             warnings?: string[];
-            components?: components["schemas"]["RankingComponentsOut"] | null;
         };
         /** OpportunityPage */
         OpportunityPage: {
             server: components["schemas"]["AlbionServer"];
             /**
              * Kind
-             * @enum {string}
+             * @constant
              */
-            kind: "flip" | "refining" | "crafting";
+            kind: "flip";
             /** Opportunities */
             opportunities: components["schemas"]["OpportunityOut"][];
             /** Total */
@@ -1515,7 +1461,6 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
-            coverage?: components["schemas"]["RankingCoverage"] | null;
         };
         /** OutputSaleQuotesOut */
         OutputSaleQuotesOut: {
@@ -1594,56 +1539,6 @@ export interface components {
             subtotal: string;
             /** Observed At */
             observed_at?: string | null;
-        };
-        /**
-         * RankingComponentsOut
-         * @description Componentes neutros de uma linha do ranking materializado (task 3.5/23).
-         *
-         *     Premium, imposto, taxa de retorno, custo de estação e foco são transformações baratas
-         *     sobre estes números — o cliente as aplica na hora (`src/lib/ranking-projection.ts`), sem
-         *     round-trip. O que o servidor faz é a varredura (avaliar milhares de receitas contra o
-         *     livro); o que ele não precisa fazer é multiplicar por 0,96 a cada tecla.
-         */
-        RankingComponentsOut: {
-            /** Recipe Silver Cost */
-            recipe_silver_cost: number;
-            /** Crafting Focus */
-            crafting_focus: number;
-            /** Executions */
-            executions: number;
-            /** Produced Quantity */
-            produced_quantity: number;
-            /** Ingredient Cost Immediate */
-            ingredient_cost_immediate?: string | null;
-            /** Ingredient Cost Order */
-            ingredient_cost_order?: string | null;
-            /** Output Gross Immediate */
-            output_gross_immediate?: string | null;
-            /** Output Gross Order */
-            output_gross_order?: string | null;
-            /** Ingredients Oldest Observed At */
-            ingredients_oldest_observed_at?: string | null;
-            /** Output Immediate Observed At */
-            output_immediate_observed_at?: string | null;
-            /** Output Order Observed At */
-            output_order_observed_at?: string | null;
-        };
-        /**
-         * RankingCoverage
-         * @description Cobertura da última reconstrução do ranking materializado, para a UI nunca esconder
-         *     truncamento (``B02``).
-         */
-        RankingCoverage: {
-            /** Evaluated Recipes */
-            evaluated_recipes: number;
-            /** Priced Recipes */
-            priced_recipes: number;
-            /** Total Recipes */
-            total_recipes: number;
-            /** Computed At */
-            computed_at?: string | null;
-            /** Stale */
-            stale: boolean;
         };
         /** RecipeIngredientOut */
         RecipeIngredientOut: {
@@ -2934,102 +2829,6 @@ export interface operations {
                 premium?: boolean;
                 buy_order?: boolean;
                 sell_order?: boolean;
-                sort?: "profit" | "roi" | "freshness";
-                direction?: "asc" | "desc";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OpportunityPage"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    refining_opportunities_refining_get: {
-        parameters: {
-            query: {
-                server: components["schemas"]["AlbionServer"];
-                item_id?: string | null;
-                location_id?: string[] | null;
-                tier?: number | null;
-                enchantment_level?: number | null;
-                quality_level?: number | null;
-                max_age_hours?: number | null;
-                require_complete?: boolean;
-                limit?: number;
-                offset?: number;
-                min_profit?: number | string | null;
-                min_roi?: number | string | null;
-                return_rate?: number | string;
-                station_cost_per_execution?: number | string;
-                use_focus?: boolean;
-                premium?: boolean;
-                sort?: "profit" | "roi" | "freshness";
-                direction?: "asc" | "desc";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OpportunityPage"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    crafting_opportunities_crafting_get: {
-        parameters: {
-            query: {
-                server: components["schemas"]["AlbionServer"];
-                item_id?: string | null;
-                location_id?: string[] | null;
-                tier?: number | null;
-                enchantment_level?: number | null;
-                quality_level?: number | null;
-                max_age_hours?: number | null;
-                require_complete?: boolean;
-                limit?: number;
-                offset?: number;
-                min_profit?: number | string | null;
-                min_roi?: number | string | null;
-                return_rate?: number | string;
-                station_cost_per_execution?: number | string;
-                use_focus?: boolean;
-                premium?: boolean;
                 sort?: "profit" | "roi" | "freshness";
                 direction?: "asc" | "desc";
             };

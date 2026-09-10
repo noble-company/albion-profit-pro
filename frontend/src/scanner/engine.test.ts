@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
-import { percentageToRate } from '@/opportunities/production-params'
 
-import { money } from '@/lib/money'
+import { money, percentageToRate } from '@/lib/money'
 
 import {
   bestPerRecipe,

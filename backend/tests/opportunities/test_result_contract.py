@@ -1,17 +1,25 @@
-"""B04/B05: the money fields mean the same thing in /flips, /refining, /crafting and
-/craft/simulate, and require_complete drops the same kind of row everywhere.
+"""B04/B05: the money fields mean the same thing across the read surfaces, and
+require_complete drops the same kind of row.
+
+**Narrowed by task 4/15.** This file used to compare /flips, /refining and /crafting side by
+side — the point being that three engines agreed on what "profit" means. The two ranking
+endpoints were retired with the materialized table, so only /flips is left here, and the
+cross-surface comparison it provided is genuinely gone.
+
+What replaced it is not equivalent, and is worth naming: the scanner computes on the client,
+so its agreement with the server is locked by the golden vectors
+(`frontend/src/scanner/engine.golden.test.ts` against `tests/craft/test_scanner_vectors.py`)
+rather than by asking two endpoints the same question.
 """
 
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-import pytest
 from sqlalchemy import select
 
 from src.cache.redis_client import get_redis
 from src.items.models import Item, Location
-from src.opportunities.ranking_service import rebuild_ranking
 from src.prices.models import MarketOrder
 from src.recipes.models import Recipe, RecipeIngredient
 from tests.conftest import registrar_e_logar
@@ -122,7 +130,6 @@ async def _seed_all_kinds(db_session) -> dict:
         ]
     )
     await db_session.commit()
-    await rebuild_ranking(db_session, "west")
     await _flush()
     return {"flip": flip_item, "refine": refine_out, "craft": craft_out}
 
@@ -137,8 +144,8 @@ async def _rows(client, token, endpoint, **params):
     return resp.json()["opportunities"]
 
 
-@pytest.mark.parametrize("endpoint", ["flips", "refining", "crafting"])
-async def test_revenue_identity_holds(client, db_session, endpoint):
+async def test_revenue_identity_holds(client, db_session):
+    endpoint = "flips"
     _, token = await registrar_e_logar(client)
     await _seed_all_kinds(db_session)
 
@@ -158,8 +165,8 @@ async def test_revenue_identity_holds(client, db_session, endpoint):
         assert gross >= net
 
 
-@pytest.mark.parametrize("endpoint", ["flips", "refining", "crafting"])
-async def test_money_fields_are_decimal_strings_not_numbers(client, db_session, endpoint):
+async def test_money_fields_are_decimal_strings_not_numbers(client, db_session):
+    endpoint = "flips"
     _, token = await registrar_e_logar(client)
     await _seed_all_kinds(db_session)
     rows = await _rows(client, token, endpoint)
@@ -170,24 +177,21 @@ async def test_money_fields_are_decimal_strings_not_numbers(client, db_session, 
             assert value is None or isinstance(value, str), f"{endpoint}.{field} = {value!r}"
 
 
-async def test_require_complete_drops_the_same_kind_of_row_everywhere(client, db_session):
+async def test_require_complete_drops_stale_rows(client, db_session):
     _, token = await registrar_e_logar(client)
     kinds = await _seed_all_kinds(db_session)
 
-    # Age every order past the 6h policy, then rebuild so the ranking loses its prices and the
-    # flip rows go stale — the "incomplete" state in all three engines.
+    # Age every order past the 6h policy so the flip rows go stale — the "incomplete" state.
     stale_at = datetime.now(timezone.utc) - timedelta(hours=10)
     for order in await db_session.scalars(select(MarketOrder)):
         order.last_seen_at = stale_at
     await db_session.commit()
-    await rebuild_ranking(db_session, "west")
     await _flush()
 
-    for endpoint in ("flips", "refining", "crafting"):
-        lax = await _rows(client, token, endpoint)
-        await _flush()
-        strict = await _rows(client, token, endpoint, require_complete="true")
-        assert len(lax) >= 1, endpoint
-        assert strict == [], endpoint  # every row had a warning / no fresh price
+    lax = await _rows(client, token, "flips")
+    await _flush()
+    strict = await _rows(client, token, "flips", require_complete="true")
+    assert len(lax) >= 1
+    assert strict == []  # every row had a warning / no fresh price
 
     _ = kinds

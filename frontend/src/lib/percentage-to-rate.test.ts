@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { percentageToRate } from './production-params'
+import { percentageToRate } from './money'
 
 // Task 3.6/01 (E01): o percentual de retorno digitado tem que virar taxa com divisão decimal,
 // não `Number(v) / 100`. `36.7 / 100 === 0.36700000000000005` em ponto flutuante e esse lixo

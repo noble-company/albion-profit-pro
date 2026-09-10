@@ -4,6 +4,10 @@ import { expect, test } from 'vitest'
 // byte a byte em `opportunities/pages.tsx` e `production-pages.tsx` (1.561 linhas fazendo o
 // mesmo). Extraídos para `src/components/opportunities/` + `useOpportunityParams`. Este teste
 // impede a volta da cópia.
+//
+// Task 4/15: `production-pages.tsx` foi apagada com o ranking materializado. O guard **fica** —
+// ele varre o repositório inteiro procurando redeclaração, não só aquelas duas telas; só a
+// última asserção citava a tela por nome.
 
 const sources: Record<string, string> = import.meta.glob('/src/**/*.{ts,tsx}', {
   query: '?raw',
@@ -76,12 +80,9 @@ test('nenhum `updateParam` local sobrou nas telas de oportunidade', () => {
   expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
 })
 
-test('as telas antigas não redeclaram `Kpi` / `Toggle` / `Select` locais', () => {
+test('a tela de Market Flip não redeclara `Kpi` / `Toggle` / `Select` locais', () => {
   const offenders: string[] = []
-  for (const path of [
-    '/src/opportunities/pages.tsx',
-    '/src/opportunities/production-pages.tsx',
-  ]) {
+  for (const path of ['/src/opportunities/pages.tsx']) {
     const code = stripComments(sources[path] ?? '')
     for (const name of ['Kpi', 'Toggle', 'Select']) {
       if (new RegExp(`\\bfunction\\s+${name}\\s*\\(`).test(code)) {

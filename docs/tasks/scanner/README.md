@@ -110,7 +110,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | 14 | Calculadora sobre o engine | — | Instantânea ao digitar |
 | [17](17-painel-do-destino.md) | Painel do Destino | — | Custo de foco real: `Lucro/foco` deixa de errar por ate 16x |
 | [18](18-taxa-da-estacao-por-nutricao.md) | Taxa da estação por nutrição | `W5` | A estação cobra por nutrição consumida; prata fixa errava por 56x pra mais e 44x pra menos |
-| 15 | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
+| [15](15-aposentar-o-ranking-materializado.md) | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
 | 16 | Documentos reconciliados | — | Specs param de descrever a arquitetura revogada |
 
 > As specs de 05-16 são escritas ao chegar no bloco, para não congelar decisão de UI antes da
@@ -143,7 +143,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [ ] 14 — Calculadora sobre o engine
 - [x] 17 — Painel do Destino (eficiência de foco)
 - [x] 18 — Taxa da estação por nutrição consumida
-- [ ] 15 — Aposentar o ranking materializado
+- [x] 15 — Aposentar o ranking materializado
 - [ ] 16 — Documentos reconciliados
 
 ## Herança da Fase 3.6

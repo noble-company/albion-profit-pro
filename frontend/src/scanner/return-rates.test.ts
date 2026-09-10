@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { percentageToRate } from '@/opportunities/production-params'
+import { percentageToRate } from '@/lib/money'
 
 import { RETORNOS_PADRAO, rendimentoPorCemRecursos } from './return-rates'
 

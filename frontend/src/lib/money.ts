@@ -60,6 +60,27 @@ export function divide(a: MoneyInput, b: MoneyInput): Money {
 }
 
 /** Multiplica por uma quantidade inteira não-negativa (unidades produzidas/compradas). */
+/**
+ * Converte o percentual que o usuário digita (ex.: `36,7`) na taxa em [0,1] que o engine
+ * consome.
+ *
+ * Divisão decimal e não `Number(v) / 100` (task 3.6/01, `E01`): `36.7 / 100` dá
+ * `0.367000000000005` em ponto flutuante, e o lixo se propagava até `profit`/`roi`, quebrando
+ * o contrato que `F09` e os vetores dourados existem para garantir.
+ *
+ * Morava em `opportunities/production-params.ts`, que saiu com o ranking materializado
+ * (task 4/15). O scanner é quem usa, e a conta é de dinheiro — o lugar dela é aqui.
+ */
+export function percentageToRate(value: string): string {
+  if (!value) return '0'
+  const normalized = value.replace(',', '.')
+  try {
+    return divide(normalized, 100).toString()
+  } catch {
+    return '0'
+  }
+}
+
 export function multiplyByQuantity(value: MoneyInput, quantity: number): Money {
   if (!Number.isInteger(quantity) || quantity < 0) {
     throw new RangeError('quantity deve ser inteiro não-negativo')
