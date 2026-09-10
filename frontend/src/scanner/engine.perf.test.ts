@@ -90,6 +90,7 @@ test('calcula o catálogo de craft inteiro numa cidade sem estourar a ordem de g
       manual: new Map(),
       byItemCity: new Map(),
       manualSale: new Map(),
+      saleByItem: new Map(),
     },
     stationFeePer100Nutrition: '0', useFocus: true, outputQuality: 1, quantity: 1,
   })

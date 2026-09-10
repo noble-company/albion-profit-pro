@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest'
 
 import type { Cidade } from '@/lib/locations'
+import { money } from '@/lib/money'
 
 import type { PricingPolicy } from './pricing'
-import { cidadesDeVendaPara, estadoDaTela, precosNaMaoPara } from './tela'
+import { cidadesFiltradas, estadoDaTela, podeAnalisar, precosNaMaoPara } from './tela'
 
 /**
  * Task 4/12, segunda correção de desempenho.
@@ -40,7 +41,7 @@ describe('estadoDaTela', () => {
   })
 })
 
-describe('cidadesDeVendaPara', () => {
+describe('cidadesFiltradas', () => {
   const CIDADES = [
     { id: '1002', name: 'Lymhurst', ids: ['1002', '1301'] },
     { id: '3003', name: 'Caerleon', ids: ['3003'] },
@@ -49,20 +50,20 @@ describe('cidadesDeVendaPara', () => {
   ] as Cidade[]
 
   test('nenhuma marcada: todas entram na conta', () => {
-    expect(cidadesDeVendaPara([], CIDADES)).toEqual(['1002', '3003', '4002', '5003'])
+    expect(cidadesFiltradas([], CIDADES)).toEqual(['1002', '3003', '4002', '5003'])
   })
 
   test('marcadas: só elas disputam a melhor cidade', () => {
     // Sem Caerleon e Brecilien, a linha não pode mostrar o lucro de vender lá.
-    expect(cidadesDeVendaPara(['1002', '4002'], CIDADES)).toEqual(['1002', '4002'])
+    expect(cidadesFiltradas(['1002', '4002'], CIDADES)).toEqual(['1002', '4002'])
   })
 
   test('cidade que não existe mais na URL é ignorada', () => {
-    expect(cidadesDeVendaPara(['9999', '4002'], CIDADES)).toEqual(['4002'])
+    expect(cidadesFiltradas(['9999', '4002'], CIDADES)).toEqual(['4002'])
   })
 
   test('se nenhuma marcada for válida, vale todas — e não uma tabela vazia sem explicação', () => {
-    expect(cidadesDeVendaPara(['9999'], CIDADES)).toEqual(['1002', '3003', '4002', '5003'])
+    expect(cidadesFiltradas(['9999'], CIDADES)).toEqual(['1002', '3003', '4002', '5003'])
   })
 })
 
@@ -91,5 +92,22 @@ describe('precosNaMaoPara', () => {
     expect(precosNaMaoPara(POLITICA, 'T6_CLOTH')).toEqual({
       T4_FIBER: { offer: '250', request: '250' },
     })
+  })
+})
+
+describe('podeAnalisar', () => {
+  // "Analisar com o livro real" anda o livro de ordens, que é por mercado. A média não é um
+  // mercado: o botão analisaria uma cidade qualquer e o número exato responderia outra pergunta.
+  test('venda numa cidade, ou com preço fixo, pode ir para a análise exata', () => {
+    expect(podeAnalisar({ profit: money('10'), saleBasis: 'city' })).toBe(true)
+    expect(podeAnalisar({ profit: money('10'), saleBasis: 'manual' })).toBe(true)
+  })
+
+  test('venda pela média, não', () => {
+    expect(podeAnalisar({ profit: money('10'), saleBasis: 'average' })).toBe(false)
+  })
+
+  test('sem lucro calculado não há o que comparar', () => {
+    expect(podeAnalisar({ profit: null, saleBasis: 'city' })).toBe(false)
   })
 })

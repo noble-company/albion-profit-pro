@@ -21,6 +21,7 @@ import {
 } from './focus-efficiency'
 import type { PriceIndex } from './prices'
 import {
+  ORIGEM_MEDIA,
   resolveIngredientPrice,
   resolveOutputPrice,
   type PricingPolicy,
@@ -163,6 +164,8 @@ export interface ScannerRow {
   /** epoch em segundos da cotação de venda; nulo sem preço ou com preço fixado na mão */
   saleObservedAt: number | null
   saleSource: string | null
+  /** como o preço de venda foi decidido — a célula de Venda não mostra cidade que não houve (task 24) */
+  saleBasis: 'city' | 'average' | 'manual'
 
   executions: number
   producedQuantity: number
@@ -355,7 +358,7 @@ export function computeScanner(
 
   for (const recipe of catalog.recipes) {
     const base = prepararReceita(recipe, params, itemsByName)
-    for (const locationId of params.locations) {
+    for (const locationId of cidadesDeAvaliacao(recipe.output_item, params)) {
       rows.push(evaluate({ ...base, recipe, locationId, prices, params, cacheDaMedia }))
     }
   }
@@ -476,6 +479,25 @@ interface EvaluateInput {
   coletor?: Coletor
 }
 
+/** Como o preço de venda da linha foi decidido (task 24) — a mesma precedência de `pricing.ts`. */
+function baseDaVenda(pricing: PricingPolicy, item: string): ScannerRow['saleBasis'] {
+  const fixado = pricing.manualSale.get(item)
+  if (fixado !== undefined && fixado !== '') return 'manual'
+  return pricing.saleByItem.get(item) === ORIGEM_MEDIA ? 'average' : 'city'
+}
+
+/**
+ * Em que cidades uma receita é avaliada (task 24).
+ *
+ * Com uma cidade escolhida no painel para aquele item, **só nela** — mesmo desmarcada em Vender
+ * em: é a escolha mais explícita da tela. Sem escolha, com média ou com preço fixo, todas as de
+ * Vender em, e `bestPerRecipe` escolhe; nos dois últimos a venda empata e a linha diz a base.
+ */
+function cidadesDeAvaliacao(item: string, params: ScannerParams): string[] {
+  const escolha = params.pricing.saleByItem.get(item)
+  return escolha && escolha !== ORIGEM_MEDIA ? [escolha] : params.locations
+}
+
 function emptyRow(
   input: EvaluateInput,
   state: ScannerState,
@@ -502,6 +524,7 @@ function emptyRow(
     saleUnitPrice: null,
     saleObservedAt: null,
     saleSource: null,
+    saleBasis: baseDaVenda(input.params.pricing, input.recipe.output_item),
     executions: input.production.executions,
     producedQuantity: input.production.producedQuantity,
     focusConsumed: input.focusConsumed,
@@ -528,12 +551,19 @@ function evaluate(input: EvaluateInput): ScannerRow {
   const { recipe, locationId, prices, params } = input
 
   // --- Saída: os dois modos de venda ---
-  const outputPrice = resolveOutputPrice(prices, params.pricing, {
-    item: recipe.output_item,
-    quality: params.outputQuality,
-    enchantmentLevel: input.outputEnchantment,
-    locationId,
-  })
+  const outputPrice = resolveOutputPrice(
+    prices,
+    params.pricing,
+    {
+      item: recipe.output_item,
+      quality: params.outputQuality,
+      enchantmentLevel: input.outputEnchantment,
+      locationId,
+    },
+    // A média da venda, quando é a escolha do item, varre as cidades de Vender em (task 24).
+    params.locations,
+    input.cacheDaMedia,
+  )
   // Vender imediato = entregar para a maior ordem de compra (`buy`).
   // Ordem de venda   = anunciar junto da oferta mais barata (`sell`).
   // A estratégia recorta os modos ANTES da escolha. Sem isso, travar em "venda imediata" e
@@ -754,6 +784,7 @@ function evaluate(input: EvaluateInput): ScannerRow {
         saleUnitPrice: quote.price,
         saleObservedAt: quote.observedAt,
         saleSource: quote.source,
+        saleBasis: baseDaVenda(params.pricing, recipe.output_item),
         executions: input.production.executions,
         producedQuantity: input.production.producedQuantity,
         focusConsumed: input.focusConsumed,

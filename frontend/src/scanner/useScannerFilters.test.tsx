@@ -201,3 +201,65 @@ describe('o que dispara recálculo (task 12)', () => {
     expect(result.current.scenario).toBe(cenario)
   })
 })
+
+describe('comprar em e origem por item (task 24)', () => {
+  test('comprar em: nenhuma marcada = todas; várias viajam repetidas', () => {
+    expect(render().result.current.buyIn).toEqual([])
+    expect(render('/refino?buy_in=1002&buy_in=4002').result.current.buyIn).toEqual([
+      '1002',
+      '4002',
+    ])
+  })
+
+  test('a origem da venda por item viaja na URL e sobrevive ao F5', () => {
+    const { result } = render('/refino?sc=T4_CLOTH:media&sc=T5_CLOTH:3005')
+
+    expect(result.current.pricing.saleByItem.get('T4_CLOTH')).toBe('media')
+    expect(result.current.pricing.saleByItem.get('T5_CLOTH')).toBe('3005')
+  })
+
+  test('escolher uma cidade apaga o preço fixo do mesmo item, numa escrita só', () => {
+    // Duas chamadas de `setExcecao` seguidas leriam o mesmo `params` antigo, e a segunda
+    // desfaria a primeira: a cidade entraria e o preço fixo continuaria lá, vencendo ela.
+    const { result } = render('/refino?px=T4_FIBER:250')
+
+    act(() =>
+      result.current.definirOrigem('compra', 'T4_FIBER', { tipo: 'cidade', locationId: '4002' }),
+    )
+
+    expect(result.current.pricing.manual.has('T4_FIBER')).toBe(false)
+    expect(result.current.pricing.byItemCity.get('T4_FIBER')).toBe('4002')
+  })
+
+  test('fixar o preço apaga a cidade escolhida do mesmo item', () => {
+    const { result } = render('/refino?sc=T4_CLOTH:3005')
+
+    act(() =>
+      result.current.definirOrigem('venda', 'T4_CLOTH', { tipo: 'fixo', valor: '1200' }),
+    )
+
+    expect(result.current.pricing.saleByItem.has('T4_CLOTH')).toBe(false)
+    expect(result.current.pricing.manualSale.get('T4_CLOTH')).toBe('1200')
+  })
+
+  test('voltar ao padrão apaga as duas escolhas — e só daquele item', () => {
+    const { result } = render('/refino?px=T4_FIBER:250&pc=T3_CLOTH:1002')
+
+    act(() => result.current.definirOrigem('compra', 'T4_FIBER', { tipo: 'padrao' }))
+
+    expect(result.current.pricing.manual.size).toBe(0)
+    expect(result.current.pricing.byItemCity.get('T3_CLOTH')).toBe('1002')
+  })
+
+  test('mudar a origem da venda troca a política — e não o cenário', () => {
+    // Se `sc` não entrasse na chave de conteúdo da política, ela ficaria velha e o engine não
+    // recalcularia (task 12).
+    const { result } = render('/refino')
+    const cenario = result.current.scenario
+
+    act(() => result.current.definirOrigem('venda', 'T4_CLOTH', { tipo: 'media' }))
+
+    expect(result.current.pricing.saleByItem.get('T4_CLOTH')).toBe('media')
+    expect(result.current.scenario).toBe(cenario)
+  })
+})

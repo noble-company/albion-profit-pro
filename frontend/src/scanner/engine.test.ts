@@ -11,6 +11,7 @@ import {
   type ScannerParams,
 } from './engine'
 import { buildPriceIndex, type PriceSnapshotOut } from './prices'
+import { ORIGEM_MEDIA } from './pricing'
 
 /**
  * Task 4/05. Os valores esperados são **conferidos à mão** nos comentários, não extraídos da
@@ -111,6 +112,7 @@ const PADRAO: ScannerParams = {
       manual: new Map(),
       byItemCity: new Map(),
       manualSale: new Map(),
+      saleByItem: new Map(),
     },
   strategy: { acquisition: 'best', sale: 'best' },
   quantityMeans: 'initial_recipes',
@@ -427,6 +429,7 @@ describe('linha sem NADA observado (regressão da tela branca)', () => {
           ]),
           byItemCity: new Map(),
           manualSale: new Map([['T4_CLOTH', '2000']]),
+          saleByItem: new Map(),
         },
       },
     )[0]!
@@ -819,5 +822,63 @@ describe('o que a tabela enxuta precisa (task 4/20)', () => {
     expect(linha.saleUnitPrice).toBeNull()
     expect(linha.saleObservedAt).toBeNull()
     expect(linha.ingredients.every((i) => i.observedAt === null)).toBe(true)
+  })
+})
+
+describe('origem da venda escolhida por item (task 24)', () => {
+  // A mesma receita em duas cidades: ingredientes iguais, e o tecido paga 1000 em 1002 e 1800 em
+  // 3005 (lado `buy`, venda imediata).
+  const DUAS_CIDADES = () =>
+    snapshot([
+      { item: 'T4_FIBER', location: '1002', sell: '100' },
+      { item: 'T3_CLOTH', location: '1002', sell: '200' },
+      { item: 'T4_CLOTH', location: '1002', buy: '1000' },
+      { item: 'T4_FIBER', location: '3005', sell: '100' },
+      { item: 'T3_CLOTH', location: '3005', sell: '200' },
+      { item: 'T4_CLOTH', location: '3005', buy: '1800' },
+    ])
+
+  const venda = (
+    saleByItem: Map<string, string>,
+    extra: Partial<ScannerParams> = {},
+    manualSale = new Map<string, string>(),
+  ): Partial<ScannerParams> => ({
+    locations: ['1002'],
+    priceLocations: ['1002', '3005'],
+    pricing: { ...PADRAO.pricing, base: { kind: 'average' }, saleByItem, manualSale },
+    ...extra,
+  })
+
+  test('cidade escolhida gera linha só nela — mesmo desmarcada em Vender em', () => {
+    // Vender em só tem 1002; a escolha do item é Caerleon. A escolha mais explícita vence.
+    const linhas = rodar(DUAS_CIDADES(), venda(new Map([['T4_CLOTH', '3005']])))
+
+    expect(linhas.map((l) => l.locationId)).toEqual(['3005'])
+    expect(linhas[0]!.saleUnitPrice?.toString()).toBe('1800')
+    expect(linhas[0]!.saleBasis).toBe('city')
+  })
+
+  test('venda pela média diz que a base é média, e não finge uma cidade', () => {
+    const linha = bestPerRecipe(
+      rodar(
+        DUAS_CIDADES(),
+        venda(new Map([['T4_CLOTH', ORIGEM_MEDIA]]), { locations: ['1002', '3005'] }),
+      ),
+    )[0]!
+
+    // (1000 + 1800) / 2
+    expect(linha.saleUnitPrice?.toString()).toBe('1400')
+    expect(linha.saleBasis).toBe('average')
+    expect(linha.saleSource).toContain('média')
+  })
+
+  test('preço fixo diz que a base é fixa', () => {
+    const linha = rodar(DUAS_CIDADES(), venda(new Map(), {}, new Map([['T4_CLOTH', '1234']])))[0]!
+    expect(linha.saleBasis).toBe('manual')
+  })
+
+  test('sem escolha, a base é a cidade da linha', () => {
+    const linha = rodar(DUAS_CIDADES(), venda(new Map()))[0]!
+    expect(linha.saleBasis).toBe('city')
   })
 })

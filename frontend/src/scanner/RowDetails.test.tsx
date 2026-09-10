@@ -2,10 +2,12 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 
+import type { Cidade } from '@/lib/locations'
 import { formatSilver, money } from '@/lib/money'
 
 import { computeScanner, explainRow, type ScannerCatalog, type ScannerParams } from './engine'
 import { buildPriceIndex, type PriceSnapshotOut } from './prices'
+import type { Origem } from './pricing'
 import { RowDetails } from './RowDetails'
 
 /**
@@ -68,6 +70,7 @@ const PARAMS: ScannerParams = {
     manual: new Map(),
     byItemCity: new Map(),
     manualSale: new Map(),
+    saleByItem: new Map(),
   },
   strategy: { acquisition: 'best', sale: 'best' },
   quantityMeans: 'initial_recipes',
@@ -80,7 +83,13 @@ const PARAMS: ScannerParams = {
   quantity: 1,
 }
 
-function montar(onExcecao = vi.fn(), precoDeVendaFixado?: string) {
+const CIDADES = [
+  { id: '1002', name: 'Lymhurst', ids: ['1002'] },
+  { id: '3005', name: 'Caerleon', ids: ['3005'] },
+] as Cidade[]
+
+/** `origens` por `lado:item` — o que a URL diria para cada item. */
+function montar(onOrigem = vi.fn(), origens: Record<string, Origem> = {}) {
   const index = buildPriceIndex(SNAPSHOT)
   const detail = explainRow(CATALOGO, index, PARAMS, {
     outputItem: 'T4_CLOTH',
@@ -96,13 +105,13 @@ function montar(onExcecao = vi.fn(), precoDeVendaFixado?: string) {
         { locationId: '1002', sell: money('1100'), buy: money('1000') },
         { locationId: '3005', sell: money('1500'), buy: money('1400') },
       ]}
-      precoDeVendaFixado={precoDeVendaFixado}
-      precosFixados={new Map()}
-      onExcecao={onExcecao}
+      cidades={CIDADES}
+      origemDe={(lado, item) => origens[`${lado}:${item}`] ?? { tipo: 'padrao' }}
+      onOrigem={onOrigem}
       agora={new Date(T * 1000)}
     />,
   )
-  return { detail, onExcecao }
+  return { detail, onOrigem }
 }
 
 /** Consulta dentro de uma seção do painel, pelo título dela. */
@@ -120,7 +129,6 @@ describe('extrato', () => {
 
     expect(detail.breakdown.totalCost.toString()).toBe(daTabela.totalCost!.toString())
     expect(detail.breakdown.netRevenue.toString()).toBe(daTabela.netRevenue!.toString())
-    // Aparece duas vezes de propósito: no extrato e na linha do cenário vencedor.
     expect(screen.getAllByText('370 silver').length).toBeGreaterThan(0)
   })
 
@@ -153,37 +161,42 @@ describe('cenários', () => {
 })
 
 describe('edição de preço', () => {
-  test('fixar o preço de venda publica a exceção com o item de saída', async () => {
+  test('fixar o preço de venda publica a origem fixa do item de saída', async () => {
     const user = userEvent.setup()
-    const { onExcecao } = montar()
+    const { onOrigem } = montar()
 
-    await user.click(screen.getByRole('button', { name: 'Fixar preço de venda de T4_CLOTH' }))
+    await user.selectOptions(
+      screen.getByLabelText('Origem do preço de venda de T4_CLOTH'),
+      'Fixar preço…',
+    )
     const campo = screen.getByLabelText('Fixar preço de venda de T4_CLOTH')
     await user.type(campo, '1200')
-    // O botão do próprio campo — há um "Fixar" por ingrediente também.
     await user.click(within(campo.parentElement!).getByRole('button'))
 
-    expect(onExcecao).toHaveBeenCalledWith('sx', 'T4_CLOTH', '1200')
+    expect(onOrigem).toHaveBeenCalledWith('venda', 'T4_CLOTH', { tipo: 'fixo', valor: '1200' })
   })
 
-  test('campo vazio REMOVE a exceção em vez de gravar zero', async () => {
+  test('campo vazio volta ao padrão em vez de gravar zero', async () => {
     // Apagar o número é "volta a usar o mercado", não "vale zero".
     const user = userEvent.setup()
-    const { onExcecao } = montar()
+    const { onOrigem } = montar()
 
-    await user.click(screen.getByRole('button', { name: 'Fixar preço de venda de T4_CLOTH' }))
+    await user.selectOptions(
+      screen.getByLabelText('Origem do preço de venda de T4_CLOTH'),
+      'Fixar preço…',
+    )
     const campo = screen.getByLabelText('Fixar preço de venda de T4_CLOTH')
     await user.click(within(campo.parentElement!).getByRole('button'))
 
-    expect(onExcecao).toHaveBeenCalledWith('sx', 'T4_CLOTH', null)
+    expect(onOrigem).toHaveBeenCalledWith('venda', 'T4_CLOTH', { tipo: 'padrao' })
   })
 })
 
 describe('comparação entre cidades', () => {
-  test('lista o preço da saída em cada cidade, destacando a da linha', () => {
+  test('lista o preço da saída em cada cidade', () => {
     montar()
 
-    expect(screen.getByText('Caerleon')).toBeInTheDocument()
+    expect(secao('Venda').getByRole('cell', { name: 'Caerleon' })).toBeInTheDocument()
     expect(secao('Venda').getByText('1.500')).toBeInTheDocument()
   })
 })
@@ -235,32 +248,93 @@ describe('organização do painel (task 20, revista no uso)', () => {
     expect(venda.getByText(/client · agora/)).toBeInTheDocument()
   })
 
-  test('os campos de preço na mão começam fechados', async () => {
-    // Três campos sempre abertos — um por ingrediente e um da venda — eram o que mais ocupava o
-    // painel. Ficam a um clique.
+  test('o campo de preço na mão só aparece ao escolher "Fixar preço…"', async () => {
+    // Campos sempre abertos — um por ingrediente e um da venda — eram o que mais ocupava o
+    // painel.
     const user = userEvent.setup()
     montar()
     expect(screen.queryByPlaceholderText('preço na mão')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Fixar preço de venda de T4_CLOTH' }))
+    await user.selectOptions(
+      screen.getByLabelText('Origem do preço de venda de T4_CLOTH'),
+      'Fixar preço…',
+    )
     expect(screen.getByLabelText('Fixar preço de venda de T4_CLOTH')).toBeInTheDocument()
   })
 
   test('preço que já está fixado aparece aberto, com o valor', () => {
     // Fechado ele esconderia justamente o que o jogador declarou.
-    montar(vi.fn(), '1200')
+    montar(vi.fn(), { 'venda:T4_CLOTH': { tipo: 'fixo', valor: '1200' } })
     expect(screen.getByLabelText('Fixar preço de venda de T4_CLOTH')).toHaveValue('1200')
   })
 })
 
-describe('fixar a venda fica à vista (task 20, revista no uso)', () => {
-  test('o campo da venda vem junto da melhor venda, antes da tabela de cidades', () => {
+describe('a origem da venda fica à vista (task 20, revista no uso)', () => {
+  test('o seletor da venda vem junto da melhor venda, antes da tabela de cidades', () => {
     // No fim da seção, embaixo de nove cidades e fechado atrás de um link, parecia ter sumido.
     montar()
     const venda = secao('Venda')
-    const botao = venda.getByRole('button', { name: 'Fixar preço de venda de T4_CLOTH' })
+    const seletor = venda.getByLabelText('Origem do preço de venda de T4_CLOTH')
     const tabela = venda.getByRole('table')
 
-    expect(botao.compareDocumentPosition(tabela) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(seletor.compareDocumentPosition(tabela) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+
+describe('origem do preço por item (task 24)', () => {
+  function opcoes(rotulo: string) {
+    return within(screen.getByLabelText(rotulo))
+      .getAllByRole('option')
+      .map((opcao) => opcao.textContent)
+  }
+
+  test('a venda oferece melhor cidade, média, cada cidade e fixar', () => {
+    montar()
+    expect(opcoes('Origem do preço de venda de T4_CLOTH')).toEqual([
+      'Melhor cidade',
+      'Média das cidades de venda',
+      'Lymhurst',
+      'Caerleon',
+      'Fixar preço…',
+    ])
+  })
+
+  test('cada ingrediente oferece a média de compra, cada cidade e fixar', () => {
+    montar()
+    expect(opcoes('Origem do preço de T4_FIBER')).toEqual([
+      'Média das cidades de compra',
+      'Lymhurst',
+      'Caerleon',
+      'Fixar preço…',
+    ])
+  })
+
+  test('escolher uma cidade no ingrediente publica a origem dele, do lado da compra', async () => {
+    const user = userEvent.setup()
+    const { onOrigem } = montar()
+
+    await user.selectOptions(screen.getByLabelText('Origem do preço de T4_FIBER'), 'Caerleon')
+
+    expect(onOrigem).toHaveBeenCalledWith('compra', 'T4_FIBER', {
+      tipo: 'cidade',
+      locationId: '3005',
+    })
+  })
+
+  test('escolher a média na venda publica a média, do lado da venda', async () => {
+    const user = userEvent.setup()
+    const { onOrigem } = montar()
+
+    await user.selectOptions(
+      screen.getByLabelText('Origem do preço de venda de T4_CLOTH'),
+      'Média das cidades de venda',
+    )
+
+    expect(onOrigem).toHaveBeenCalledWith('venda', 'T4_CLOTH', { tipo: 'media' })
+  })
+
+  test('o seletor mostra a escolha que já está na URL', () => {
+    montar(vi.fn(), { 'compra:T3_CLOTH': { tipo: 'cidade', locationId: '3005' } })
+    expect(screen.getByLabelText('Origem do preço de T3_CLOTH')).toHaveValue('cidade:3005')
   })
 })

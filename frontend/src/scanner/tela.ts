@@ -1,6 +1,7 @@
 import { formatarIdade } from '@/lib/formatters'
 import type { Cidade } from '@/lib/locations'
 
+import type { ScannerRow } from './engine'
 import type { PricingPolicy } from './pricing'
 
 /**
@@ -35,11 +36,11 @@ export function estadoDaTela({
 }
 
 /**
- * As cidades que disputam a melhor venda. Nenhuma marcada = todas. Cidade da URL que não existe
+ * As cidades de um filtro — Vender em ou Comprar em (task 24). Nenhuma marcada = todas. Cidade da URL que não existe
  * mais é ignorada; se nenhuma marcada sobreviver, vale todas — uma tabela vazia sem nada na tela
  * explicando por quê seria pior que ignorar um link velho.
  */
-export function cidadesDeVendaPara(
+export function cidadesFiltradas(
   marcadas: readonly string[],
   cidades: readonly Cidade[],
 ): string[] {
@@ -83,4 +84,15 @@ export function precosNaMaoPara(
     precos[outputItem] = { offer: venda, request: venda }
   }
   return precos
+}
+
+/**
+ * O "Analisar com o livro real" só existe para venda num mercado (task 24).
+ *
+ * O livro de ordens é por cidade; a média não é um mercado. Com ela, o botão analisaria uma cidade
+ * qualquer, e o número exato responderia outra pergunta que a estimativa da linha. Preço fixo pode:
+ * a análise leva o preço declarado (`precosNaMaoPara`).
+ */
+export function podeAnalisar(row: Pick<ScannerRow, 'profit' | 'saleBasis'>): boolean {
+  return row.profit !== null && row.saleBasis !== 'average'
 }

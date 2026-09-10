@@ -58,6 +58,7 @@ class WorkerFalso {
             saleUnitPrice: null,
             saleObservedAt: null,
             saleSource: null,
+            saleBasis: 'city',
             executions: 1,
             producedQuantity: 1,
             focusConsumed: 0,

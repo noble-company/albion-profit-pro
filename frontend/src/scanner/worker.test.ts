@@ -68,6 +68,7 @@ const PARAMS: ScannerParams = {
     manual: new Map(),
     byItemCity: new Map(),
     manualSale: new Map(),
+    saleByItem: new Map(),
   },
   strategy: { acquisition: 'best', sale: 'best' },
   quantityMeans: 'initial_recipes',

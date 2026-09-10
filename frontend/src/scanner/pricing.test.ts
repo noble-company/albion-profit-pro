@@ -3,6 +3,8 @@ import { describe, expect, test } from 'vitest'
 import { priceKey, type PriceIndex } from './prices'
 import {
   DEFAULT_PRICING,
+  ORIGEM_MEDIA,
+  origemDoItem,
   resolveIngredientPrice,
   resolveOutputPrice,
   type PricingPolicy,
@@ -174,5 +176,103 @@ describe('preço de venda na mão (task 11.4)', () => {
 
     expect(preco.sell?.price).toBe('1100')
     expect(preco.buy?.price).toBe('1000')
+  })
+})
+
+describe('origem escolhida por item (task 24)', () => {
+  test('ingrediente com média usa as cidades de compra, mesmo com outra base', () => {
+    // A média escolhida no item vence a base — até a de um link antigo com `ing_price=4002`.
+    const index = indice([
+      { item: 'T4_FIBER', local: '1002', sell: '100' },
+      { item: 'T4_FIBER', local: '3005', sell: '300' },
+      { item: 'T4_FIBER', local: '4002', sell: '900' },
+    ])
+    const policy: PricingPolicy = {
+      ...DEFAULT_PRICING,
+      base: { kind: 'city', locationId: '4002' },
+      byItemCity: new Map([['T4_FIBER', ORIGEM_MEDIA]]),
+    }
+
+    // Comprar em = 1002 e 3005: Fort Sterling (900) não entra.
+    expect(
+      resolveIngredientPrice(index, policy, ['1002', '3005'], {
+        item: 'T4_FIBER',
+        enchantmentLevel: 0,
+        saleLocationId: '1002',
+      }).sell?.price,
+    ).toBe('200')
+  })
+
+  test('venda com cidade escolhida cota nela, não na cidade da linha', () => {
+    const index = indice([
+      { item: 'T4_CLOTH', local: '1002', sell: '1100', buy: '1000' },
+      { item: 'T4_CLOTH', local: '3005', sell: '1900', buy: '1800' },
+    ])
+    const preco = resolveOutputPrice(
+      index,
+      { ...DEFAULT_PRICING, saleByItem: new Map([['T4_CLOTH', '3005']]) },
+      { item: 'T4_CLOTH', quality: 1, enchantmentLevel: 0, locationId: '1002' },
+      ['1002', '3005'],
+    )
+
+    expect(preco.sell?.price).toBe('1900')
+  })
+
+  test('venda pela média usa as cidades de venda NA QUALIDADE DA SAÍDA', () => {
+    // A média de ingrediente fixa qualidade 1, e está certo para ingrediente. Na venda o
+    // jogador vende a qualidade que pediu: a armadilha abaixo é a qualidade 1 custando 50.
+    const index: PriceIndex = new Map()
+    const lado = (price: string) => ({ price, observedAt: T, source: 'client' })
+    index.set(priceKey('T4_CLOTH', '1002', 1, 0), { sell: lado('50'), buy: null })
+    index.set(priceKey('T4_CLOTH', '3005', 1, 0), { sell: lado('50'), buy: null })
+    index.set(priceKey('T4_CLOTH', '1002', 2, 0), { sell: lado('1000'), buy: null })
+    index.set(priceKey('T4_CLOTH', '3005', 2, 0), { sell: lado('2000'), buy: null })
+
+    const preco = resolveOutputPrice(
+      index,
+      { ...DEFAULT_PRICING, saleByItem: new Map([['T4_CLOTH', ORIGEM_MEDIA]]) },
+      { item: 'T4_CLOTH', quality: 2, enchantmentLevel: 0, locationId: '1002' },
+      ['1002', '3005'],
+    )
+
+    expect(preco.sell?.price).toBe('1500')
+    expect(preco.sell?.source).toContain('média')
+  })
+
+  test('preço fixo vence a cidade escolhida', () => {
+    const index = indice([{ item: 'T4_CLOTH', local: '3005', sell: '1900' }])
+    const preco = resolveOutputPrice(
+      index,
+      {
+        ...DEFAULT_PRICING,
+        manualSale: new Map([['T4_CLOTH', '1200']]),
+        saleByItem: new Map([['T4_CLOTH', '3005']]),
+      },
+      { item: 'T4_CLOTH', quality: 1, enchantmentLevel: 0, locationId: '1002' },
+      ['1002', '3005'],
+    )
+
+    expect(preco.sell?.price).toBe('1200')
+  })
+
+  test('origemDoItem lê a escolha de cada lado, na mesma precedência do engine', () => {
+    const policy: PricingPolicy = {
+      ...DEFAULT_PRICING,
+      manual: new Map([['T4_FIBER', '250']]),
+      byItemCity: new Map([
+        ['T4_FIBER', '4002'],
+        ['T3_CLOTH', ORIGEM_MEDIA],
+      ]),
+      saleByItem: new Map([['T4_CLOTH', '3005']]),
+    }
+
+    // Fixo vence a cidade do mesmo item.
+    expect(origemDoItem(policy, 'compra', 'T4_FIBER')).toEqual({ tipo: 'fixo', valor: '250' })
+    expect(origemDoItem(policy, 'compra', 'T3_CLOTH')).toEqual({ tipo: 'media' })
+    expect(origemDoItem(policy, 'venda', 'T4_CLOTH')).toEqual({
+      tipo: 'cidade',
+      locationId: '3005',
+    })
+    expect(origemDoItem(policy, 'venda', 'T5_CLOTH')).toEqual({ tipo: 'padrao' })
   })
 })

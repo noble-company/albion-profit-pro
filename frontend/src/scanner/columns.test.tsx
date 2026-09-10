@@ -49,6 +49,7 @@ function row(overrides: Partial<ScannerRow> = {}): ScannerRow {
     saleUnitPrice: money('1000'),
     saleObservedAt: T,
     saleSource: 'client',
+    saleBasis: 'city',
     executions: 1,
     producedQuantity: 1,
     focusConsumed: 0,
@@ -181,9 +182,20 @@ describe('venda', () => {
     expect(screen.getByText(IDADE)).toBeInTheDocument()
   })
 
-  test('preço fixado na mão diz que é fixo, sem inventar idade', () => {
-    renderCell('venda', row({ saleObservedAt: null }))
+  test('preço fixado na mão diz que é fixo, sem inventar idade nem cidade', () => {
+    // Com a venda empatada em todas as cidades, a linha foi avaliada numa qualquer.
+    renderCell(
+      'venda',
+      row({ saleObservedAt: null, saleBasis: 'manual', saleSource: 'manual' }),
+    )
     expect(screen.getByText('preço fixo')).toBeInTheDocument()
+    expect(screen.queryByText('Lymhurst')).not.toBeInTheDocument()
+  })
+
+  test('venda pela média diz a média, e não afirma uma cidade (task 24)', () => {
+    renderCell('venda', row({ saleBasis: 'average', saleSource: 'média de 3' }))
+    expect(screen.getByText('média de 3')).toBeInTheDocument()
+    expect(screen.queryByText('Lymhurst')).not.toBeInTheDocument()
   })
 
   test('sem preço de venda, traço', () => {

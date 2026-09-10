@@ -127,14 +127,22 @@ export function buildColumns(
         const idade = idadeDaCotacao(row.saleObservedAt, agora)
         return (
           <span className="flex min-w-0 flex-col leading-tight">
+            {/* Média e preço fixo não têm cidade: a venda empata em todas e a linha foi
+                avaliada numa qualquer — mostrar o nome dela afirmaria um mercado (task 24). */}
             <span className="truncate text-xs text-buy-side">
-              {locationName(row.locationId)}
+              {row.saleBasis === 'city'
+                ? locationName(row.locationId)
+                : row.saleBasis === 'average'
+                  ? (row.saleSource ?? 'média')
+                  : 'preço fixo'}
             </span>
             <span className="flex min-w-0 items-baseline gap-1 text-xs">
               <span className="tabular-nums text-foreground">
                 {formatQuantity(row.saleUnitPrice, 0)}
               </span>
-              <span className="truncate text-foreground-subtle">{idade ?? 'preço fixo'}</span>
+              {row.saleBasis !== 'manual' && (
+                <span className="truncate text-foreground-subtle">{idade ?? TRACO}</span>
+              )}
             </span>
           </span>
         )

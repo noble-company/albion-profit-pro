@@ -103,6 +103,7 @@ function paramsFor(vector: Vector): ScannerParams {
       manual: new Map(),
       byItemCity: new Map(),
       manualSale: new Map(),
+      saleByItem: new Map(),
     },
     premium: vector.params.premium,
     returnRate: vector.params.return_rate,

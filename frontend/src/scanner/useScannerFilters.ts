@@ -5,7 +5,7 @@ import { money, percentageToRate } from '@/lib/money'
 
 import { DEFAULT_FILTERS, type ScannerFilters } from './filters'
 import { DEFAULT_STRATEGY, type ScannerStrategy } from './engine'
-import type { PriceBasis, PricingPolicy } from './pricing'
+import { ORIGEM_MEDIA, type Origem, type PriceBasis, type PricingPolicy } from './pricing'
 
 /**
  * Filtros do scanner sincronizados com a URL (task 4/09).
@@ -153,7 +153,7 @@ export function useScannerFilters() {
    * a maioria dos players que refinam usa preço médio". `sale` reproduz o comportamento antigo
    * (cotar na cidade da venda), e um `location_id` fixa uma cidade.
    */
-  const chaveDosPrecos = chaveDe(params, ['ing_price', 'px', 'pc', 'sx'])
+  const chaveDosPrecos = chaveDe(params, ['ing_price', 'px', 'pc', 'sx', 'sc'])
 
   const pricing = useMemo<PricingPolicy>(() => {
     const bruto = params.get('ing_price')
@@ -169,6 +169,7 @@ export function useScannerFilters() {
       manual: pares(params.getAll('px')),
       byItemCity: pares(params.getAll('pc')),
       manualSale: pares(params.getAll('sx')),
+      saleByItem: pares(params.getAll('sc')),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
   }, [chaveDosPrecos])
@@ -181,6 +182,18 @@ export function useScannerFilters() {
     () => params.getAll('sell_in').filter((id) => id !== '' && id !== 'all'),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
     [chaveDeVenda],
+  )
+
+  /**
+   * As cidades onde o jogador **aceita comprar** (task 24). Vazio = todas. O mesmo formato e o
+   * mesmo motivo do Vender em: ninguém busca fibra onde não vai vender tecido. A média de cada
+   * ingrediente varre só estas.
+   */
+  const chaveDeCompra = params.getAll('buy_in').join(',')
+  const buyIn = useMemo<SellIn>(
+    () => params.getAll('buy_in').filter((id) => id !== ''),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
+    [chaveDeCompra],
   )
 
   /**
@@ -238,6 +251,42 @@ export function useScannerFilters() {
     [params, setList],
   )
 
+  /**
+   * Muda de onde vem o preço de UM item, num lado — compra ou venda (task 24).
+   *
+   * Uma escrita só na URL, mexendo nas duas chaves do lado de uma vez. Duas chamadas de
+   * `setExcecao` seguidas leriam o mesmo `params` antigo, e a segunda desfaria a primeira: a
+   * cidade escolhida entraria e o preço fixo antigo continuaria lá, vencendo ela.
+   */
+  const definirOrigem = useCallback(
+    (lado: 'compra' | 'venda', item: string, origem: Origem) => {
+      const [chaveDoFixo, chaveDaEscolha] = lado === 'compra' ? ['px', 'pc'] : ['sx', 'sc']
+      const next = new URLSearchParams(params)
+
+      const reescrever = (chave: string, valor: string | null) => {
+        const atual = pares(next.getAll(chave))
+        if (valor === null) atual.delete(item)
+        else atual.set(item, valor)
+        next.delete(chave)
+        for (const [itemDaLista, valorDoItem] of atual) {
+          next.append(chave, `${itemDaLista}:${valorDoItem}`)
+        }
+      }
+
+      reescrever(chaveDoFixo, origem.tipo === 'fixo' ? origem.valor : null)
+      reescrever(
+        chaveDaEscolha,
+        origem.tipo === 'cidade'
+          ? origem.locationId
+          : origem.tipo === 'media'
+            ? ORIGEM_MEDIA
+            : null,
+      )
+      setParams(next, { replace: true })
+    },
+    [params, setParams],
+  )
+
   /** Alterna um valor numa multi-seleção (tier, encantamento). */
   const toggleNumber = useCallback(
     (key: string, value: number) => {
@@ -277,8 +326,10 @@ export function useScannerFilters() {
     scenario,
     pricing,
     sellIn,
+    buyIn,
     strategy,
     setExcecao,
+    definirOrigem,
     setParam,
     setList,
     toggleNumber,

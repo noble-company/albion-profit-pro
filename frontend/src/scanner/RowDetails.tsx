@@ -3,24 +3,25 @@ import { useState, type ReactNode } from 'react'
 import { filterControl } from '@/components/filters'
 import { Button } from '@/components/ui/button'
 import { formatarIdade } from '@/lib/formatters'
+import type { Cidade } from '@/lib/locations'
 import { formatQuantity, formatSilver, type Money } from '@/lib/money'
 
 import type { ScannerDetail } from './engine'
+import type { Origem } from './pricing'
 
 /**
- * O que a linha esconde (task 4/11.4, reorganizado na 4/20).
+ * O que a linha esconde (task 4/11.4, reorganizado na 4/20, origem por item na 4/24).
  *
  * A tabela dá um número e pede confiança. Aqui ela mostra o serviço: de onde veio cada preço,
  * quanto de cada taxa, o que os outros três cenários dariam, e por quanto no mínimo dá para
- * vender sem perder dinheiro. É também onde o jogador **discorda** — fixando o preço que ele
- * realmente pratica.
+ * vender sem perder dinheiro. É também onde o jogador **discorda** — escolhendo de onde vem cada
+ * preço, ou fixando o que ele realmente pratica.
  *
  * Tudo é derivado de `explainRow`, que roda o mesmo `evaluate` da tabela. Se este painel fosse
  * uma segunda conta, ele poderia contradizer a linha que explica.
  *
  * **Três colunas por assunto** — o dinheiro, o que comprar, onde vender —, cada uma empilhando
- * as suas seções. A primeira versão soltava cinco seções numa grade: ela alinhava por linha, e a
- * seção mais alta de cada linha abria buraco nas vizinhas ("ta muito bagunçado", com print).
+ * as suas seções.
  */
 
 const TRACO = '—'
@@ -31,6 +32,8 @@ const MODO: Record<string, string> = {
   buy_order: 'ordem',
   sell_order: 'ordem',
 }
+
+type Lado = 'compra' | 'venda'
 
 function Secao({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
@@ -90,9 +93,9 @@ export function RowDetails({
   nomeItem,
   locationName,
   precoPorCidade,
-  precoDeVendaFixado,
-  precosFixados,
-  onExcecao,
+  cidades,
+  origemDe,
+  onOrigem,
   analise,
   agora = new Date(),
 }: {
@@ -101,14 +104,33 @@ export function RowDetails({
   locationName: (id: string) => string
   /** preço da saída em cada cidade, para responder "e se eu vendesse em outro lugar?" */
   precoPorCidade: PrecoDaCidade[]
-  precoDeVendaFixado: string | undefined
-  precosFixados: Map<string, string>
-  onExcecao: (key: 'px' | 'sx', item: string, valor: string | null) => void
+  /** as cidades que os seletores de origem oferecem */
+  cidades: Cidade[]
+  /** a escolha atual de um item, num lado */
+  origemDe: (lado: Lado, item: string) => Origem
+  onOrigem: (lado: Lado, item: string, origem: Origem) => void
   /** a ponte para o número exato; ausente = o painel só mostra a estimativa */
   analise?: ReactNode
   agora?: Date
 }) {
   const { row, breakdown, scenarios, ingredients } = detail
+  const origemDaVenda = origemDe('venda', row.outputItem)
+
+  const rotuloDaVenda =
+    row.saleBasis === 'average'
+      ? 'Venda pela média'
+      : row.saleBasis === 'manual'
+        ? 'Venda com preço fixo'
+        : origemDaVenda.tipo === 'cidade'
+          ? 'Venda escolhida'
+          : 'Melhor venda'
+
+  const valorDaVenda =
+    row.saleUnitPrice === null
+      ? TRACO
+      : row.saleBasis === 'city'
+        ? `${formatSilver(row.saleUnitPrice)} em ${locationName(row.locationId)}`
+        : formatSilver(row.saleUnitPrice)
 
   return (
     <div className="grid gap-x-8 gap-y-5 text-sm lg:grid-cols-3">
@@ -180,35 +202,43 @@ export function RowDetails({
       <div className="min-w-0 space-y-5">
         <Secao titulo="Compra">
           <ul className="space-y-3">
-            {ingredients.map((ingrediente) => (
-              <li key={ingrediente.item} className="space-y-0.5">
-                <div className="flex items-baseline justify-between gap-2 text-xs">
-                  <span className="min-w-0 truncate font-medium text-foreground">
-                    {nomeItem(ingrediente.item)}
-                    <span className="ml-1 tabular-nums text-foreground-subtle">
-                      ×{ingrediente.purchaseQuantity.toLocaleString('pt-BR')}
+            {ingredients.map((ingrediente) => {
+              const origem = origemDe('compra', ingrediente.item)
+              return (
+                <li key={ingrediente.item} className="space-y-1">
+                  <div className="flex items-baseline justify-between gap-2 text-xs">
+                    <span className="min-w-0 truncate font-medium text-foreground">
+                      {nomeItem(ingrediente.item)}
+                      <span className="ml-1 tabular-nums text-foreground-subtle">
+                        ×{ingrediente.purchaseQuantity.toLocaleString('pt-BR')}
+                      </span>
                     </span>
-                  </span>
-                  <span className="shrink-0 tabular-nums">
-                    {ingrediente.unitPrice ? formatSilver(ingrediente.unitPrice) : TRACO}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between gap-2 text-[0.6875rem] text-foreground-subtle">
-                  <span className="min-w-0 truncate">
-                    {ingrediente.source ?? 'sem cotação'} ·{' '}
-                    {idade(ingrediente.observedAt, agora)}
-                  </span>
-                  <span className="shrink-0 tabular-nums">
-                    {ingrediente.subtotal ? formatSilver(ingrediente.subtotal) : TRACO}
-                  </span>
-                </div>
-                <PrecoEditavel
-                  rotulo={`Fixar preço de ${nomeItem(ingrediente.item)}`}
-                  valor={precosFixados.get(ingrediente.item)}
-                  onAplicar={(valor) => onExcecao('px', ingrediente.item, valor)}
-                />
-              </li>
-            ))}
+                    <span className="shrink-0 tabular-nums">
+                      {ingrediente.unitPrice ? formatSilver(ingrediente.unitPrice) : TRACO}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2 text-[0.6875rem] text-foreground-subtle">
+                    <span className="min-w-0 truncate">
+                      {ingrediente.source ?? 'sem cotação'} ·{' '}
+                      {idade(ingrediente.observedAt, agora)}
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {ingrediente.subtotal ? formatSilver(ingrediente.subtotal) : TRACO}
+                    </span>
+                  </div>
+                  <OrigemDoPreco
+                    // A chave pela escolha: quando a URL muda a origem, o seletor recomeça do
+                    // estado novo em vez de carregar o rascunho da escolha anterior.
+                    key={`${ingrediente.item}:${JSON.stringify(origem)}`}
+                    lado="compra"
+                    rotulo={`de ${nomeItem(ingrediente.item)}`}
+                    origem={origem}
+                    cidades={cidades}
+                    onOrigem={(escolha) => onOrigem('compra', ingrediente.item, escolha)}
+                  />
+                </li>
+              )
+            })}
           </ul>
         </Secao>
       </div>
@@ -216,26 +246,25 @@ export function RowDetails({
       {/* ---------------- onde vender ---------------- */}
       <div className="min-w-0 space-y-5">
         <Secao titulo="Venda">
-          {row.saleUnitPrice && (
-            <div className="space-y-0.5">
-              <Linha
-                rotulo="Melhor venda"
-                valor={`${formatSilver(row.saleUnitPrice)} em ${locationName(row.locationId)}`}
-              />
+          <div className="space-y-0.5">
+            <Linha rotulo={rotuloDaVenda} valor={valorDaVenda} />
+            {row.saleUnitPrice && (
               <p className="text-right text-[0.6875rem] text-foreground-subtle">
                 {row.saleSource ?? 'sem cotação'} ·{' '}
                 {row.saleObservedAt === null ? 'preço fixo' : idade(row.saleObservedAt, agora)}
               </p>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Junto da melhor venda, onde o olho está. No fim da seção, embaixo de nove
-              cidades, parecia ter sumido. E fica fora do `saleUnitPrice &&`: fixar o preço
-              de um item SEM cotação é justamente quando o jogador mais precisa. */}
-          <PrecoEditavel
-            rotulo={`Fixar preço de venda de ${nomeItem(row.outputItem)}`}
-            valor={precoDeVendaFixado}
-            onAplicar={(valor) => onExcecao('sx', row.outputItem, valor)}
+          {/* Junto da venda, onde o olho está — e fora do bloco que só aparece com cotação:
+              escolher a origem de um item SEM mercado é quando o jogador mais precisa dela. */}
+          <OrigemDoPreco
+            key={`${row.outputItem}:${JSON.stringify(origemDaVenda)}`}
+            lado="venda"
+            rotulo={`de venda de ${nomeItem(row.outputItem)}`}
+            origem={origemDaVenda}
+            cidades={cidades}
+            onOrigem={(escolha) => onOrigem('venda', row.outputItem, escolha)}
           />
 
           <table className="w-full whitespace-nowrap text-xs">
@@ -250,8 +279,12 @@ export function RowDetails({
               {precoPorCidade.map((preco) => (
                 <tr
                   key={preco.locationId}
+                  // Destaca a cidade da linha só quando ela é de fato a cidade da venda. Na média
+                  // e no preço fixo a linha foi avaliada numa cidade qualquer.
                   className={
-                    preco.locationId === row.locationId ? 'font-semibold text-primary' : ''
+                    row.saleBasis === 'city' && preco.locationId === row.locationId
+                      ? 'font-semibold text-primary'
+                      : ''
                   }
                 >
                   <td className="py-0.5 pr-2">{locationName(preco.locationId)}</td>
@@ -261,7 +294,6 @@ export function RowDetails({
               ))}
             </tbody>
           </table>
-
         </Secao>
 
         <Secao titulo="Cenários">
@@ -320,63 +352,107 @@ export function RowDetails({
 }
 
 /**
- * Campo de preço fixo: aplica no Enter ou no botão, e some quando limpo.
+ * De onde vem o preço de um item, num lado (task 24): o padrão, a média das cidades filtradas,
+ * uma cidade específica, ou um preço fixo.
  *
- * **Fechado por padrão.** Três campos sempre abertos — um por ingrediente e um da venda — eram o
- * que mais ocupava o painel. Preço que já está fixado abre sozinho: fechado, ele esconderia
- * justamente o que o jogador declarou.
+ * "Fixar preço…" abre o campo; aplicar vazio volta ao padrão — apagar o número é "volta a usar o
+ * mercado", nunca "vale zero". Preço já fixado aparece aberto: fechado, esconderia justamente o
+ * que o jogador declarou.
  */
-function PrecoEditavel({
+function OrigemDoPreco({
+  lado,
   rotulo,
-  valor,
-  onAplicar,
+  origem,
+  cidades,
+  onOrigem,
 }: {
+  lado: Lado
+  /** complemento dos rótulos acessíveis: "de T4_FIBER", "de venda de T4_CLOTH" */
   rotulo: string
-  valor: string | undefined
-  onAplicar: (valor: string | null) => void
+  origem: Origem
+  cidades: Cidade[]
+  onOrigem: (origem: Origem) => void
 }) {
-  const [aberto, setAberto] = useState(valor !== undefined)
+  const [fixando, setFixando] = useState(origem.tipo === 'fixo')
   const [rascunho, setRascunho] = useState<string | null>(null)
-  const atual = rascunho ?? valor ?? ''
+  const atual = rascunho ?? (origem.tipo === 'fixo' ? origem.valor : '')
 
-  if (!aberto) {
-    return (
-      <button
-        type="button"
-        aria-label={rotulo}
-        onClick={() => setAberto(true)}
-        className="text-[0.6875rem] font-medium text-primary hover:underline"
-      >
-        fixar preço
-      </button>
-    )
+  // Na compra, o padrão JÁ É a média das cidades de compra — as duas escolhas são a mesma.
+  const valorAtual = fixando
+    ? 'fixo'
+    : origem.tipo === 'cidade'
+      ? `cidade:${origem.locationId}`
+      : origem.tipo === 'media' && lado === 'venda'
+        ? 'media'
+        : 'padrao'
+
+  const escolher = (valor: string) => {
+    if (valor === 'fixo') {
+      setFixando(true)
+      return
+    }
+    setFixando(false)
+    setRascunho(null)
+    if (valor === 'media') onOrigem({ tipo: 'media' })
+    else if (valor.startsWith('cidade:')) {
+      onOrigem({ tipo: 'cidade', locationId: valor.slice('cidade:'.length) })
+    } else onOrigem({ tipo: 'padrao' })
   }
 
   const aplicar = () => {
     const limpo = atual.trim()
-    onAplicar(limpo === '' ? null : limpo)
     setRascunho(null)
-    // Aplicar vazio é "volta a usar o mercado": o campo fecha junto.
-    if (limpo === '') setAberto(false)
+    if (limpo === '') {
+      setFixando(false)
+      onOrigem({ tipo: 'padrao' })
+    } else {
+      onOrigem({ tipo: 'fixo', valor: limpo })
+    }
   }
 
   return (
-    <div className="flex items-center gap-1">
-      <input
-        type="text"
-        inputMode="decimal"
-        aria-label={rotulo}
-        value={atual}
-        placeholder="preço na mão"
-        onChange={(event) => setRascunho(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') aplicar()
-        }}
-        className={`${filterControl} mt-0 h-8 tabular-nums`}
-      />
-      <Button variant="outline" size="sm" className="h-8 shrink-0" onClick={aplicar}>
-        {valor ? 'Trocar' : 'Fixar'}
-      </Button>
+    <div className="space-y-1">
+      <select
+        aria-label={`Origem do preço ${rotulo}`}
+        value={valorAtual}
+        onChange={(event) => escolher(event.target.value)}
+        className={`${filterControl} mt-0 h-7 py-0 text-xs`}
+      >
+        {lado === 'venda' ? (
+          <>
+            <option value="padrao">Melhor cidade</option>
+            <option value="media">Média das cidades de venda</option>
+          </>
+        ) : (
+          <option value="padrao">Média das cidades de compra</option>
+        )}
+        {cidades.map((cidade) => (
+          <option key={cidade.id} value={`cidade:${cidade.id}`}>
+            {cidade.name}
+          </option>
+        ))}
+        <option value="fixo">Fixar preço…</option>
+      </select>
+
+      {fixando && (
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            inputMode="decimal"
+            aria-label={`Fixar preço ${rotulo}`}
+            value={atual}
+            placeholder="preço na mão"
+            onChange={(event) => setRascunho(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') aplicar()
+            }}
+            className={`${filterControl} mt-0 h-8 tabular-nums`}
+          />
+          <Button variant="outline" size="sm" className="h-8 shrink-0" onClick={aplicar}>
+            {origem.tipo === 'fixo' ? 'Trocar' : 'Fixar'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

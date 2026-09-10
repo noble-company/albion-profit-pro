@@ -3,9 +3,9 @@ import { add, divide, money } from '@/lib/money'
 import { priceKey, type PriceIndex, type PriceSide } from './prices'
 
 /**
- * De onde vem o preço de cada ingrediente (task 4/11.3).
+ * De onde vem cada preço (task 4/11.3, estendida à venda na 4/24).
  *
- * Até aqui o engine cotava **ingrediente e saída na mesma cidade** da linha. Isso descreve um
+ * Até a 11.3 o engine cotava **ingrediente e saída na mesma cidade** da linha. Isso descreve um
  * jogador que compra, refina e vende sem sair do lugar — não é como se refina de verdade, e
  * transformava "não observamos a fibra em Martlock" em "essa receita não dá lucro em Martlock",
  * que é outra afirmação.
@@ -13,23 +13,33 @@ import { priceKey, type PriceIndex, type PriceSide } from './prices'
  * A ordem de precedência é **do mais específico para o mais geral**, e cada degrau é uma
  * escolha explícita de quem está olhando a tela:
  *
- *   1. preço na mão para aquele item      → o jogador já sabe por quanto compra
- *   2. cidade fixa para aquele item       → "essa fibra eu sempre pego em Fort Sterling"
- *   3. base global (média / cidade / venda)
+ *   1. preço na mão para aquele item            → o jogador já sabe por quanto compra/vende
+ *   2. origem escolhida para aquele item        → uma cidade, ou a média das cidades filtradas
+ *   3. o padrão (média de Comprar em / a cidade de cada linha de Vender em)
+ *
+ * **A escolha é por item, não por receita.** Quem marca Fort Sterling para a Fibra T5 está dizendo
+ * onde compra fibra T5, e isso vale em toda receita que a use.
  */
 
-/** Onde a base global busca preço quando não há exceção para o item. */
+/** Valor de "média" numa escolha por item — `pc=T4_FIBER:media`, `sc=T4_CLOTH:media`. */
+export const ORIGEM_MEDIA = 'media'
+
+/** Onde a base global busca preço de ingrediente quando não há escolha para o item. */
 export type PriceBasis =
   | { kind: 'average' }
   | { kind: 'city'; locationId: string }
-  /** o comportamento antigo: cota o ingrediente na mesma cidade em que o item é vendido */
+  /**
+   * Cota o ingrediente na mesma cidade em que o item é vendido. **Não aparece mais na tela**
+   * (task 24), mas fica: é assim que o servidor cota no `simulate_craft`, e os vetores dourados
+   * (task 06) travam o cliente contra ele nesse modo.
+   */
   | { kind: 'sale_city' }
 
 export interface PricingPolicy {
   base: PriceBasis
   /** item → preço decimal digitado; vale nos dois lados (não existe spread num número na mão) */
   manual: Map<string, string>
-  /** item → `location_id` de onde cotar aquele item */
+  /** item → `location_id` de onde cotar aquele ingrediente, ou `ORIGEM_MEDIA` */
   byItemCity: Map<string, string>
   /**
    * Preço de **venda** na mão, por item de saída (task 11.4). Separado de `manual` de propósito:
@@ -37,6 +47,11 @@ export interface PricingPolicy {
    * é a mesma afirmação que "vendo fibra por 250".
    */
   manualSale: Map<string, string>
+  /**
+   * Origem da **venda** escolhida por item de saída (task 24): um `location_id`, que vence o
+   * filtro de Vender em, ou `ORIGEM_MEDIA`, a média das cidades de Vender em.
+   */
+  saleByItem: Map<string, string>
 }
 
 /**
@@ -49,6 +64,29 @@ export const DEFAULT_PRICING: PricingPolicy = {
   manual: new Map(),
   byItemCity: new Map(),
   manualSale: new Map(),
+  saleByItem: new Map(),
+}
+
+/** De onde vem o preço de um item, num lado — a mesma escolha que o painel mostra e edita. */
+export type Origem =
+  | { tipo: 'padrao' }
+  | { tipo: 'media' }
+  | { tipo: 'cidade'; locationId: string }
+  | { tipo: 'fixo'; valor: string }
+
+/** Lê a escolha atual de um item, na mesma precedência em que o engine a aplica. */
+export function origemDoItem(
+  policy: PricingPolicy,
+  lado: 'compra' | 'venda',
+  item: string,
+): Origem {
+  const fixo = (lado === 'compra' ? policy.manual : policy.manualSale).get(item)
+  if (fixo !== undefined && fixo !== '') return { tipo: 'fixo', valor: fixo }
+
+  const escolha = (lado === 'compra' ? policy.byItemCity : policy.saleByItem).get(item)
+  if (escolha === ORIGEM_MEDIA) return { tipo: 'media' }
+  if (escolha) return { tipo: 'cidade', locationId: escolha }
+  return { tipo: 'padrao' }
 }
 
 /** Um lado cotado. `observedAt` nulo = número digitado, que não tem idade. */
@@ -76,8 +114,10 @@ function deCidade(
   item: string,
   locationId: string,
   enchantmentLevel: number,
+  /** ingrediente é sempre qualidade 1; a saída é cotada na qualidade pedida */
+  quality = 1,
 ): ResolvedPrice {
-  const entry = prices.get(priceKey(item, locationId, 1, enchantmentLevel))
+  const entry = prices.get(priceKey(item, locationId, quality, enchantmentLevel))
   return { sell: paraLado(entry?.sell ?? null), buy: paraLado(entry?.buy ?? null) }
 }
 
@@ -94,18 +134,22 @@ function media(
   locations: string[],
   enchantmentLevel: number,
   cache?: Map<string, ResolvedPrice>,
+  { quality = 1, lado = 'compra' }: { quality?: number; lado?: 'compra' | 'venda' } = {},
 ): ResolvedPrice {
   // A média de um item é a mesma para toda linha que o usa — sem cache ela seria refeita uma
   // vez por (receita × cidade × ingrediente). No refino isso é irrelevante; nas 5.523 receitas
   // do craft (task 12) seriam mais de um milhão de varreduras.
-  const chave = `${item}|${enchantmentLevel}`
+  //
+  // O lado entra na chave (task 24): o mesmo item pode ser ingrediente de uma receita e saída
+  // de outra, e as duas médias varrem conjuntos de cidades diferentes — Comprar em e Vender em.
+  const chave = `${lado}|${item}|${enchantmentLevel}|${quality}`
   const guardado = cache?.get(chave)
   if (guardado) return guardado
 
   const lados = { sell: [] as PriceSide[], buy: [] as PriceSide[] }
 
   for (const locationId of locations) {
-    const entry = prices.get(priceKey(item, locationId, 1, enchantmentLevel))
+    const entry = prices.get(priceKey(item, locationId, quality, enchantmentLevel))
     if (entry?.sell) lados.sell.push(entry.sell)
     if (entry?.buy) lados.buy.push(entry.buy)
   }
@@ -131,9 +175,10 @@ function naMao(valor: string): ResolvedSide {
 }
 
 /**
- * Preço da **saída** (task 11.4). Diferente do ingrediente, ele continua vindo da cidade da
- * linha — é lá que o item é vendido, e é essa a pergunta que a coluna `Cidade` responde. A
- * única exceção é o preço na mão: "eu vendo esse tecido por 1.200".
+ * Preço da **saída** (task 11.4, com a escolha por item da 24).
+ *
+ * Sem escolha, ele vem da cidade da linha — é lá que o item é vendido. Com escolha, a cidade da
+ * linha deixa de mandar: preço na mão, uma cidade fixa, ou a média das cidades de Vender em.
  */
 export function resolveOutputPrice(
   prices: PriceIndex,
@@ -144,6 +189,9 @@ export function resolveOutputPrice(
     enchantmentLevel: number
     locationId: string
   },
+  /** as cidades de Vender em — a base da média, quando ela é a escolha do item */
+  saleLocations: string[] = [output.locationId],
+  cacheDaMedia?: Map<string, ResolvedPrice>,
 ): ResolvedPrice {
   const fixado = policy.manualSale.get(output.item)
   if (fixado !== undefined && fixado !== '') {
@@ -151,10 +199,26 @@ export function resolveOutputPrice(
     return { sell: lado, buy: lado }
   }
 
-  const entry = prices.get(
-    priceKey(output.item, output.locationId, output.quality, output.enchantmentLevel),
+  const escolha = policy.saleByItem.get(output.item)
+  if (escolha === ORIGEM_MEDIA) {
+    // Na qualidade da SAÍDA. A média de ingrediente fixa qualidade 1, o que está certo para
+    // ingrediente; aqui o jogador vende a qualidade que pediu, e a média tem que ser dela.
+    return media(prices, output.item, saleLocations, output.enchantmentLevel, cacheDaMedia, {
+      quality: output.quality,
+      lado: 'venda',
+    })
+  }
+  if (escolha) {
+    return deCidade(prices, output.item, escolha, output.enchantmentLevel, output.quality)
+  }
+
+  return deCidade(
+    prices,
+    output.item,
+    output.locationId,
+    output.enchantmentLevel,
+    output.quality,
   )
-  return { sell: paraLado(entry?.sell ?? null), buy: paraLado(entry?.buy ?? null) }
 }
 
 export function resolveIngredientPrice(
@@ -175,8 +239,13 @@ export function resolveIngredientPrice(
     return { sell: lado, buy: lado }
   }
 
-  const cidadeDoItem = policy.byItemCity.get(item)
-  if (cidadeDoItem) return deCidade(prices, item, cidadeDoItem, enchantmentLevel)
+  const escolha = policy.byItemCity.get(item)
+  // A média escolhida no item vence qualquer base — inclusive a de um link antigo com
+  // `ing_price=<cidade>`. `locations` são as cidades de Comprar em (task 24).
+  if (escolha === ORIGEM_MEDIA) {
+    return media(prices, item, locations, enchantmentLevel, cacheDaMedia)
+  }
+  if (escolha) return deCidade(prices, item, escolha, enchantmentLevel)
 
   switch (policy.base.kind) {
     case 'city':

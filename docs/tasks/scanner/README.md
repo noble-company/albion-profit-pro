@@ -81,6 +81,7 @@ BLOCO 4 — a tela que o jogador pediu (achados do uso real, 2026-09-10)
 21 Abrir vazio e escolher a categoria       ── depende de 19, 20
 22 Snapshot so da categoria (opcional)      ── depende de 21
 23 Historico da API publica (volume/dia)    ── depende de 04, 20
+24 Comprar em, Vender em e escolha por item ── depende de 11.3, 19, 20
 15 Aposentar o ranking materializado       ── depende de 11, 12
 16 Documentos reconciliados                ── depende de 15
 ```
@@ -122,6 +123,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | [21](21-abrir-vazio-e-escolher-a-categoria.md) | Abrir vazio e escolher a categoria | — | Calcula só a categoria escolhida — substitui a paginação descartada |
 | [22](22-snapshot-so-da-categoria.md) | Snapshot só da categoria (opcional) | — | Polling de 30 s com o payload da categoria, não do realm |
 | [23](23-historico-da-api-publica.md) | Histórico da API pública | — | Unidades por dia ao lado do preço de venda, com 30 dias desde o primeiro dia |
+| [24](24-comprar-em-vender-em-e-escolha-por-item.md) | Comprar em, Vender em e escolha por item | — | Nenhum preço vem de cidade que o jogador não frequenta; cada preço escolhe sua origem no painel |
 | [15](15-aposentar-o-ranking-materializado.md) | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
 | 16 | Documentos reconciliados | — | Specs param de descrever a arquitetura revogada |
 
@@ -160,6 +162,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [ ] 21 — Abrir vazio e escolher a categoria
 - [ ] 22 — Snapshot só da categoria (opcional)
 - [ ] 23 — Histórico da API pública
+- [x] 24 — Comprar em, Vender em e escolha por item
 - [x] 15 — Aposentar o ranking materializado
 - [ ] 16 — Documentos reconciliados
 

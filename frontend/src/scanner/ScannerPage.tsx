@@ -24,14 +24,14 @@ import { buildColumns, motivoSemPreco } from './columns'
 import { bestPerRecipe, computeScanner, explainRow, type ScannerRow } from './engine'
 import { applyFilters } from './filters'
 import { buildPriceIndex, priceKey } from './prices'
+import { origemDoItem } from './pricing'
 import { ExactAnalysis } from './ExactAnalysis'
 import { RowDetails } from './RowDetails'
 import { ScannerTable } from './ScannerTable'
-import { cidadesDeVendaPara, estadoDaTela, precosNaMaoPara } from './tela'
+import { cidadesFiltradas, estadoDaTela, podeAnalisar, precosNaMaoPara } from './tela'
 import { DEFAULT_SORT, sortRows, type SortState } from './sorting'
 import { usePriceSnapshot } from './usePriceSnapshot'
 import { useScannerWorker } from './useScannerWorker'
-import { IngredientPrices } from './IngredientPrices'
 import { RETORNOS_PADRAO, rendimentoPorCemRecursos } from './return-rates'
 import { DEFAULT_QUANTITY, useScannerFilters } from './useScannerFilters'
 
@@ -67,8 +67,9 @@ export function ScannerPage({
     scenario,
     pricing,
     sellIn,
+    buyIn,
     strategy,
-    setExcecao,
+    definirOrigem,
     setParam,
     toggleNumber,
     toggleText,
@@ -98,8 +99,14 @@ export function ScannerPage({
    * reduz para a melhor — a comparação completa mora no painel expandido.
    */
   const cidadesDeVenda = useMemo(
-    () => cidadesDeVendaPara(sellIn, cidades),
+    () => cidadesFiltradas(sellIn, cidades),
     [sellIn, cidades],
+  )
+
+  /** Onde se **compra**: a média de cada ingrediente varre só estas (task 24). */
+  const cidadesDeCompra = useMemo(
+    () => cidadesFiltradas(buyIn, cidades),
+    [buyIn, cidades],
   )
 
   /** `1301` → `1002`: dois mercados, uma Lymhurst. Ver `agruparCidades`. */
@@ -125,14 +132,15 @@ export function ScannerPage({
       ...scenario,
       // Uma linha por CIDADE, não por mercado: os ids fundidos já viraram um só no índice.
       locations: cidadesDeVenda,
-      // A média varre TODAS as cidades, mesmo com a venda restrita a uma: filtrar onde se
-      // vende não pode encolher a base de preço da compra.
-      priceLocations: cidades.map((c) => c.id),
+      // A média de ingrediente varre só as cidades de Comprar em (task 24). Até ali varria todas,
+      // de propósito (task 11.3); o jogador decidiu o contrário — não compra onde não vai, e zona
+      // de PvP é o caso típico.
+      priceLocations: cidadesDeCompra,
       pricing,
       strategy,
       destinyBoard: painelDoDestino,
     }),
-    [scenario, cidadesDeVenda, cidades, pricing, strategy, painelDoDestino],
+    [scenario, cidadesDeVenda, cidadesDeCompra, pricing, strategy, painelDoDestino],
   )
 
   /**
@@ -253,11 +261,11 @@ export function ScannerPage({
               buy: entrada?.buy ? money(entrada.buy.price) : null,
             }
           })}
-          precoDeVendaFixado={pricing.manualSale.get(row.outputItem)}
-          precosFixados={pricing.manual}
-          onExcecao={setExcecao}
+          cidades={cidades}
+          origemDe={(lado, item) => origemDoItem(pricing, lado, item)}
+          onOrigem={definirOrigem}
           analise={
-            realm && detail.row.profit ? (
+            realm && detail.row.profit && podeAnalisar(detail.row) ? (
               <ExactAnalysis
                 request={{
                   server: realm,
@@ -278,6 +286,11 @@ export function ScannerPage({
                 acquisitionMode={detail.row.acquisitionMode ?? 'immediate'}
                 saleMode={detail.row.saleMode ?? 'immediate'}
               />
+            ) : detail.row.saleBasis === 'average' ? (
+              // A média não é um mercado: não há livro de ordens para analisar (task 24).
+              <p className="text-xs text-foreground-subtle">
+                A análise exata precisa de uma cidade de venda. Escolha uma no seletor da Venda.
+              </p>
             ) : undefined
           }
         />
@@ -293,20 +306,9 @@ export function ScannerPage({
       pricing,
       realm,
       scenario,
-      setExcecao,
+      definirOrigem,
     ],
   )
-
-  /** Ingredientes distintos do catálogo — o universo de itens que uma exceção pode fixar. */
-  const ingredientes = useMemo(() => {
-    const itens = new Set<string>()
-    for (const receita of catalogo.catalog?.recipes ?? []) {
-      for (const ingrediente of receita.ingredients) itens.add(ingrediente.item)
-    }
-    return [...itens]
-      .map((item) => ({ value: item, label: nomeItem(item) }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
-  }, [catalogo.catalog, nomeItem])
 
   const comPreco = useMemo(
     () => linhas.filter((l) => l.state === 'priced').length,
@@ -366,33 +368,19 @@ export function ScannerPage({
               formatOption={locationName}
               emptyHint="todas"
             />
-          </FilterGroup>
-
-          <FilterGroup legend="Preço dos ingredientes">
-            <FilterSelectField
-              label="Base"
-              value={
-                pricing.base.kind === 'average'
-                  ? ''
-                  : pricing.base.kind === 'sale_city'
-                    ? 'sale'
-                    : pricing.base.locationId
-              }
-              onChange={(v) => setParam('ing_price', v)}
-              options={[
-                { value: 'sale', label: 'Cidade da venda' },
-                ...cidades.map((c) => ({ value: c.id, label: c.name })),
-              ]}
-              allLabel="Média das cidades"
+            {/* O mesmo motivo vale para comprar (task 24): ninguém busca fibra onde não vai
+                vender tecido. A média de cada ingrediente varre só estas. */}
+            <FilterChips
+              label="Comprar em"
+              options={cidades.map((c) => c.id)}
+              selected={buyIn}
+              onToggle={(id) => toggleText('buy_in', id)}
+              formatOption={locationName}
+              emptyHint="todas"
             />
-            <IngredientPrices
-              pricing={pricing}
-              ingredientes={ingredientes}
-              cidades={cidades}
-              nomeItem={nomeItem}
-              locationName={locationName}
-              onExcecao={setExcecao}
-            />
+            <p className="text-xs text-foreground-subtle">
+              Para um item específico, escolha de onde vem o preço no painel da linha.
+            </p>
           </FilterGroup>
 
           <FilterGroup legend="Item">
