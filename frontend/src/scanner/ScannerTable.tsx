@@ -185,10 +185,13 @@ export function ScannerTable({
                             {i > 0 && (
                               <span aria-hidden="true" className="h-3 w-px bg-border-strong" />
                             )}
+                            {/* `uppercase` explícito: o preflight do Tailwind zera
+                                `text-transform` em botão, e o rótulo ordenável
+                                saía em minúsculas ao lado dos outros. */}
                             <button
                               type="button"
                               onClick={() => toggleSort(alvo.field)}
-                              className={`inline-flex items-center gap-1 transition hover:text-foreground ${
+                              className={`inline-flex items-center gap-1 uppercase tracking-wide transition hover:text-foreground ${
                                 ativo ? 'text-primary' : ''
                               }`}
                             >

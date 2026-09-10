@@ -80,7 +80,7 @@ const PARAMS: ScannerParams = {
   quantity: 1,
 }
 
-function montar(onExcecao = vi.fn()) {
+function montar(onExcecao = vi.fn(), precoDeVendaFixado?: string) {
   const index = buildPriceIndex(SNAPSHOT)
   const detail = explainRow(CATALOGO, index, PARAMS, {
     outputItem: 'T4_CLOTH',
@@ -96,13 +96,18 @@ function montar(onExcecao = vi.fn()) {
         { locationId: '1002', sell: money('1100'), buy: money('1000') },
         { locationId: '3005', sell: money('1500'), buy: money('1400') },
       ]}
-      precoDeVendaFixado={undefined}
+      precoDeVendaFixado={precoDeVendaFixado}
       precosFixados={new Map()}
       onExcecao={onExcecao}
       agora={new Date(T * 1000)}
     />,
   )
   return { detail, onExcecao }
+}
+
+/** Consulta dentro de uma seção do painel, pelo título dela. */
+function secao(titulo: string) {
+  return within(screen.getByRole('heading', { name: titulo }).closest('section')!)
 }
 
 describe('extrato', () => {
@@ -130,7 +135,7 @@ describe('procedência do preço', () => {
   test('cada ingrediente diz de onde veio o preço e de quando', () => {
     montar()
     // Duas linhas de ingrediente, ambas com fonte `client` e idade "agora".
-    expect(screen.getAllByText(/client · agora/)).toHaveLength(2)
+    expect(secao('Compra').getAllByText(/client · agora/)).toHaveLength(2)
   })
 })
 
@@ -138,9 +143,12 @@ describe('cenários', () => {
   test('os quatro aparecem e o vencedor está marcado', () => {
     montar()
 
-    expect(screen.getByText(/compra imediata · venda imediata/)).toBeInTheDocument()
-    const vencedor = screen.getByText(/ordem de compra · ordem de venda/)
-    expect(within(vencedor.closest('tr')!).getByTitle('É o que a tabela mostra')).toBeInTheDocument()
+    const cenarios = secao('Cenários')
+    // Compra e venda em colunas próprias. O rótulo "compra imediata · venda imediata" numa
+    // coluna estreita quebrava em duas linhas, e os números ao lado também.
+    expect(cenarios.getAllByRole('row')).toHaveLength(5) // cabeçalho + 4 cenários
+    const vencedor = cenarios.getByTitle('É o que a tabela mostra').closest('tr')!
+    expect(within(vencedor).getAllByText('ordem')).toHaveLength(2)
   })
 })
 
@@ -149,6 +157,7 @@ describe('edição de preço', () => {
     const user = userEvent.setup()
     const { onExcecao } = montar()
 
+    await user.click(screen.getByRole('button', { name: 'Fixar preço de venda de T4_CLOTH' }))
     const campo = screen.getByLabelText('Fixar preço de venda de T4_CLOTH')
     await user.type(campo, '1200')
     // O botão do próprio campo — há um "Fixar" por ingrediente também.
@@ -162,6 +171,7 @@ describe('edição de preço', () => {
     const user = userEvent.setup()
     const { onExcecao } = montar()
 
+    await user.click(screen.getByRole('button', { name: 'Fixar preço de venda de T4_CLOTH' }))
     const campo = screen.getByLabelText('Fixar preço de venda de T4_CLOTH')
     await user.click(within(campo.parentElement!).getByRole('button'))
 
@@ -174,15 +184,11 @@ describe('comparação entre cidades', () => {
     montar()
 
     expect(screen.getByText('Caerleon')).toBeInTheDocument()
-    expect(screen.getByText('1.500 silver')).toBeInTheDocument()
+    expect(secao('Venda').getByText('1.500')).toBeInTheDocument()
   })
 })
 
 describe('o que saiu da tabela (task 4/20)', () => {
-  function secao(titulo: string) {
-    return within(screen.getByRole('heading', { name: titulo }).closest('section')!)
-  }
-
   test('custo por item, lucro por kg e lucro por foco ficam no painel', () => {
     const { detail } = montar()
     const resultado = secao('Resultado')
@@ -193,12 +199,56 @@ describe('o que saiu da tabela (task 4/20)', () => {
     expect(resultado.getByText('Lucro por foco')).toBeInTheDocument()
   })
 
-  test('de onde e de quando é o dado da linha', () => {
+  test('a idade do dado mora no Resultado; a fonte, ao lado de cada preço', () => {
     montar()
-    const resultado = secao('Resultado')
+    // "Fonte: média de 7, média de 5, média de 6, aodp" numa linha só era ruído: cada preço já
+    // diz de onde veio, junto dele.
+    expect(secao('Resultado').getByText('Dado mais velho')).toBeInTheDocument()
+    expect(secao('Resultado').queryByText('Fonte')).not.toBeInTheDocument()
+  })
+})
 
-    expect(resultado.getByText('Fonte')).toBeInTheDocument()
-    expect(resultado.getByText('client')).toBeInTheDocument()
-    expect(resultado.getByText('Dado mais velho')).toBeInTheDocument()
+describe('organização do painel (task 20, revista no uso)', () => {
+  // Reportado com print: "ta muito bagunçado". Cinco seções soltas numa grade de três colunas
+  // alinhavam por linha, e a mais alta de cada linha abria buraco nas vizinhas.
+
+  test('o extrato fecha no lucro', () => {
+    const { detail } = montar()
+    const extrato = secao('Extrato')
+
+    expect(extrato.getByText('Lucro')).toBeInTheDocument()
+    expect(extrato.getByText(formatSilver(detail.row.profit))).toBeInTheDocument()
+  })
+
+  test('o preço de equilíbrio mora no Resultado, com os outros números derivados', () => {
+    montar()
+
+    expect(secao('Resultado').getByText('Preço de equilíbrio (por item)')).toBeInTheDocument()
+    expect(secao('Extrato').queryByText('Preço de equilíbrio (por item)')).not.toBeInTheDocument()
+  })
+
+  test('a venda diz por quanto, onde, de que fonte e de quando é o preço usado', () => {
+    montar()
+    const venda = secao('Venda')
+
+    expect(venda.getByText('Melhor venda')).toBeInTheDocument()
+    expect(venda.getByText(/client · agora/)).toBeInTheDocument()
+  })
+
+  test('os campos de preço na mão começam fechados', async () => {
+    // Três campos sempre abertos — um por ingrediente e um da venda — eram o que mais ocupava o
+    // painel. Ficam a um clique.
+    const user = userEvent.setup()
+    montar()
+    expect(screen.queryByPlaceholderText('preço na mão')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Fixar preço de venda de T4_CLOTH' }))
+    expect(screen.getByLabelText('Fixar preço de venda de T4_CLOTH')).toBeInTheDocument()
+  })
+
+  test('preço que já está fixado aparece aberto, com o valor', () => {
+    // Fechado ele esconderia justamente o que o jogador declarou.
+    montar(vi.fn(), '1200')
+    expect(screen.getByLabelText('Fixar preço de venda de T4_CLOTH')).toHaveValue('1200')
   })
 })

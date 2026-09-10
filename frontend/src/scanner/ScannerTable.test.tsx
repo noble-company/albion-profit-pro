@@ -221,3 +221,12 @@ describe('cabeçalho com dois alvos de ordenação (task 4/20)', () => {
     expect(screen.getAllByRole('columnheader')[1]).toHaveAttribute('aria-sort', 'ascending')
   })
 })
+
+describe('cabeçalho legível (task 20, revista no uso)', () => {
+  test('o rótulo ordenável fica em maiúsculas como os outros', () => {
+    // O preflight do Tailwind zera `text-transform` em botão: "Investimento" e "Lucro" saíam em
+    // minúsculas ao lado de "VENDA BRUTA", que não é botão.
+    renderTable([row('a', '10')])
+    expect(screen.getByRole('button', { name: /Lucro/ })).toHaveClass('uppercase')
+  })
+})

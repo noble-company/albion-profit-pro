@@ -127,3 +127,48 @@ com idade nula, e a célula diz **"preço fixo"** em vez de inventar uma.
 3. Clicar em **Lucro** e em **%** no mesmo cabeçalho e conferir as duas ordenações.
 4. Abrir uma linha e achar, na seção **Resultado**, custo por item, lucro por kg, lucro por foco,
    fonte e idade.
+
+## Correção: o painel reorganizado (2026-09-10)
+
+Reportado com print logo depois da entrega: "tem como só reorganizar melhor isso aqui? Ta muito
+bagunçado".
+
+### O que bagunçava
+
+- **Cinco seções soltas numa grade de três colunas.** A grade alinha por linha: o Extrato, alto,
+  abria um buraco embaixo do Resultado, e Venda e Cenários desciam desalinhados.
+- **Três campos "preço na mão" sempre abertos** — um por ingrediente e um da venda.
+- **Cenários quebrando linha:** "263.819 / silver" e "compra imediata · / venda imediata" numa
+  coluna estreita.
+- **"Fonte: média de 7, média de 5, média de 6, aodp"** — a fonte de cada preço já aparecia ao
+  lado dele.
+- **Cabeçalho da tabela misturando caixa:** "Investimento" e "Lucro | %" em minúsculas ao lado de
+  "VENDA BRUTA". O preflight do Tailwind zera `text-transform` em botão, e só os rótulos
+  ordenáveis são botões.
+
+### Como ficou
+
+Três colunas **por assunto**, cada uma empilhando as suas seções:
+
+1. **O dinheiro** — Extrato, que agora **fecha no Lucro**; Resultado, que recebe o preço de
+   equilíbrio (é um número derivado, como custo por item e lucro por kg); e o "Analisar com o
+   livro real" embaixo.
+2. **O que comprar** — a seção passou a se chamar **Compra**, como a coluna da tabela.
+3. **Onde vender** — Venda, abrindo com **"Melhor venda"** (por quanto, onde, fonte e idade do
+   preço usado), a comparação entre cidades e, abaixo, Cenários.
+
+- **"Fixar preço" fechado por padrão**, a um clique. Preço que já está fixado abre sozinho, com o
+  valor — fechado, esconderia justamente o que o jogador declarou.
+- **Cenários com Compra e Venda em colunas próprias** ("ordem", "imediata"), números sem o
+  "silver" repetido e sem quebra de linha; uma nota diz que os valores são em silver.
+- **A linha "Fonte" saiu do Resultado.**
+- **Rótulos ordenáveis com `uppercase` explícito.**
+
+### Testes
+
+Onze vermelhos contra o painel anterior. Um passou contra ele, e é esperado: "preço já fixado
+aparece aberto" passava porque o campo antigo estava sempre aberto — é o par de "os campos
+começam fechados", que ficou vermelho. `npm run test` **417/417** · `lint` 0 erros (7 avisos) ·
+`typecheck` limpo.
+
+A organização visual em si não é testável em jsdom; a conferência é na tela.
