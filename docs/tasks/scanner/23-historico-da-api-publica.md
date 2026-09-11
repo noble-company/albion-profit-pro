@@ -13,6 +13,9 @@ por dia não é lucro. Sem volume, a tabela mostra oportunidades que o mercado n
 ### O que temos hoje
 
 - **208 itens** com histórico de 6 h no banco, 105 com o de 1 h; o rollup diário tem 66.
+  _Atualização de 2026-09-11:_ esse número estava baixo porque o rollup tinha parado (achado
+  `W8`). Corrigido, o banco local passou a 11.210 linhas diárias e 792 mensais. A task 23 grava na
+  mesma tabela que o rollup agrega, e agora ele aguenta o volume.
 - É só o que o nosso client captura, e ele captura **apenas quando o jogador abre o gráfico de
   histórico do item** (`opAuctionGetItemAverageStats`). Olhar a lista de ordens manda
   `opAuctionGetOffers`/`opAuctionGetRequests`, que vira ordem, não histórico.

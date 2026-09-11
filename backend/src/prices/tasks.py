@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import httpx
 import structlog
-from sqlalchemy import Date, cast, delete, func, select
+from sqlalchemy import BigInteger, Date, case, cast, delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -108,15 +108,19 @@ async def _rollup_diario(sessionmaker, now: datetime | None = None) -> tuple[dat
                 MarketHistoryDaily.dia <= end.date(),
             )
         )
-        stmt = (
+        soma_itens = func.sum(MarketHistoryEntry.item_amount)
+        soma_prata = func.sum(MarketHistoryEntry.silver_amount)
+        agregado = (
             select(
+                func.gen_random_uuid(),
                 MarketHistoryEntry.server_id,
                 MarketHistoryEntry.item_id,
                 MarketHistoryEntry.location_id,
                 MarketHistoryEntry.quality_level,
-                dia_expr.label("dia"),
-                func.sum(MarketHistoryEntry.item_amount).label("item_amount"),
-                func.sum(MarketHistoryEntry.silver_amount).label("silver_amount"),
+                dia_expr,
+                cast(soma_itens, BigInteger),
+                soma_prata,
+                case((soma_itens == 0, 0), else_=soma_prata / soma_itens),
             )
             .where(
                 MarketHistoryEntry.bucket_seconds == 21600,
@@ -131,31 +135,32 @@ async def _rollup_diario(sessionmaker, now: datetime | None = None) -> tuple[dat
                 dia_expr,
             )
         )
-        rows = (await session.execute(stmt)).all()
-        if rows:
-            values = [
-                {
-                    "server_id": r.server_id,
-                    "item_id": r.item_id,
-                    "location_id": r.location_id,
-                    "quality_level": r.quality_level,
-                    "dia": r.dia,
-                    "item_amount": int(r.item_amount),
-                    "silver_amount": r.silver_amount,
-                    "preco_medio": (r.silver_amount / r.item_amount) if r.item_amount else 0,
-                }
-                for r in rows
-            ]
-            stmt = pg_insert(MarketHistoryDaily).values(values)
-            stmt = stmt.on_conflict_do_update(
-                constraint="uq_market_history_daily",
-                set_={
-                    "item_amount": stmt.excluded.item_amount,
-                    "silver_amount": stmt.excluded.silver_amount,
-                    "preco_medio": stmt.excluded.preco_medio,
-                },
-            )
-            await session.execute(stmt)
+        # Uma instrução, agregada no banco. O `INSERT ... VALUES` com uma linha de parâmetros por
+        # dia agregado parou em 4.095 linhas: 8 colunas por linha passam do limite de 32.767
+        # parâmetros do asyncpg, e o histórico local já pedia 11.210 (achado de 2026-09-10).
+        stmt = pg_insert(MarketHistoryDaily).from_select(
+            [
+                "id",
+                "server_id",
+                "item_id",
+                "location_id",
+                "quality_level",
+                "dia",
+                "item_amount",
+                "silver_amount",
+                "preco_medio",
+            ],
+            agregado,
+        )
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_market_history_daily",
+            set_={
+                "item_amount": stmt.excluded.item_amount,
+                "silver_amount": stmt.excluded.silver_amount,
+                "preco_medio": stmt.excluded.preco_medio,
+            },
+        )
+        await session.execute(stmt)
         await session.commit()
     return cleanup_start.date(), end.date()
 
@@ -192,15 +197,19 @@ async def _rollup_mensal(
                 MarketHistoryMonthly.mes <= last_month,
             )
         )
-        stmt = (
+        soma_itens = func.sum(MarketHistoryDaily.item_amount)
+        soma_prata = func.sum(MarketHistoryDaily.silver_amount)
+        agregado = (
             select(
+                func.gen_random_uuid(),
                 MarketHistoryDaily.server_id,
                 MarketHistoryDaily.item_id,
                 MarketHistoryDaily.location_id,
                 MarketHistoryDaily.quality_level,
-                mes_expr.label("mes"),
-                func.sum(MarketHistoryDaily.item_amount).label("item_amount"),
-                func.sum(MarketHistoryDaily.silver_amount).label("silver_amount"),
+                mes_expr,
+                cast(soma_itens, BigInteger),
+                soma_prata,
+                case((soma_itens == 0, 0), else_=soma_prata / soma_itens),
             )
             .where(
                 MarketHistoryDaily.dia >= month_start,
@@ -214,31 +223,30 @@ async def _rollup_mensal(
                 mes_expr,
             )
         )
-        rows = (await session.execute(stmt)).all()
-        if rows:
-            values = [
-                {
-                    "server_id": r.server_id,
-                    "item_id": r.item_id,
-                    "location_id": r.location_id,
-                    "quality_level": r.quality_level,
-                    "mes": r.mes,
-                    "item_amount": int(r.item_amount),
-                    "silver_amount": r.silver_amount,
-                    "preco_medio": (r.silver_amount / r.item_amount) if r.item_amount else 0,
-                }
-                for r in rows
-            ]
-            stmt = pg_insert(MarketHistoryMonthly).values(values)
-            stmt = stmt.on_conflict_do_update(
-                constraint="uq_market_history_monthly",
-                set_={
-                    "item_amount": stmt.excluded.item_amount,
-                    "silver_amount": stmt.excluded.silver_amount,
-                    "preco_medio": stmt.excluded.preco_medio,
-                },
-            )
-            await session.execute(stmt)
+        # Mesma instrução única do diário, e pelo mesmo motivo: o mensal herda o volume dele.
+        stmt = pg_insert(MarketHistoryMonthly).from_select(
+            [
+                "id",
+                "server_id",
+                "item_id",
+                "location_id",
+                "quality_level",
+                "mes",
+                "item_amount",
+                "silver_amount",
+                "preco_medio",
+            ],
+            agregado,
+        )
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_market_history_monthly",
+            set_={
+                "item_amount": stmt.excluded.item_amount,
+                "silver_amount": stmt.excluded.silver_amount,
+                "preco_medio": stmt.excluded.preco_medio,
+            },
+        )
+        await session.execute(stmt)
         await session.commit()
 
 
