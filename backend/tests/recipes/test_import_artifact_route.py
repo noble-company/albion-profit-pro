@@ -3,7 +3,7 @@
 O dump dá duas receitas para cada arma, peça e mão secundária de artefato de facção: uma com o
 artefato do item, outra que troca o artefato por um token de favor. O catálogo guarda uma receita
 por item, e o importador pulava a lista inteira — 560 itens base e 2.240 níveis encantados fora da
-tela. O Arco do Guardião T6 não existia em `/craft`.
+tela. O Arco Badônico do Mestre (T6) não existia em `/craft`.
 
 Os outros casos de várias receitas não são essa troca (peça Royal a partir de três sets, peixe
 picado, transmutação de recurso bruto) e continuam fora.

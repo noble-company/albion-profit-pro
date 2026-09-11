@@ -12,7 +12,7 @@ devolve `None` quando `craftingrequirements` é uma lista e o item não é recur
 semeadura conta isso como `skipped_multiple_recipes`. No dump atual:
 
 - **727 itens base** e **2.420 níveis encantados** ficam fora do catálogo.
-- O Arco do Guardião T6 (`T6_2H_BOW_KEEPER`) não existe em `/craft`.
+- O Arco Badônico do Mestre (`T6_2H_BOW_KEEPER`, T6) não existe em `/craft`.
 
 | Itens base | Onde | O que diferencia as rotas |
 |---|---|---|
@@ -59,7 +59,7 @@ aumentaria o erro que a 26 corrige.
 
 ## Testes manuais
 
-`/craft` › Armas › Arcos: o Arco do Guardião aparece, com o artefato na lista de compras e na
+`/craft` › Armas › Arcos: o Arco Badônico aparece, com o artefato na lista de compras e na
 mesma quantidade do Rendimento.
 
 ## Estado da implementação
@@ -113,8 +113,8 @@ Os outros casos ficaram fora, por decisão junto com o usuário:
 
 ### Pendente pra você testar
 
-1. Dar F5 em `/craft` e escolher **Armas → Arcos**: o Arco do Guardião aparece, do T4 ao T8, com os
+1. Dar F5 em `/craft` e escolher **Armas → Arcos**: o Arco Badônico aparece, do T4 ao T8, com os
    encantamentos.
-2. Abrir a linha do Arco do Guardião T6 com 10 receitas e retorno 15,2%: Rendimento 11, e na coluna
+2. Abrir a linha do Arco Badônico do Mestre (T6) com 10 receitas e retorno 15,2%: Rendimento 11, e na coluna
    Compra o artefato ×11 e as tábuas ×320.
 3. Clicar em **Top 15** no craft e conferir que o "Calculando…" termina em poucos segundos.
