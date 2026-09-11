@@ -20,6 +20,13 @@ type CatalogRecipe = ScannerCatalog['recipes'][number]
 export const TOP_RECEITAS = 15
 
 /**
+ * "Todas" no seletor — `cat=all`, no mesmo espírito do `sell_in=all` de antes. A lista inteira, sem
+ * o corte do Top. No craft são 5.523 receitas e segundos de cálculo, e o cabeçalho diz isso. `all`
+ * não existe como código no bloco `shopcategories` do dump, então não colide com categoria real.
+ */
+export const TODAS_AS_CATEGORIAS = 'all'
+
+/**
  * Menos que isso a busca não seleciona. Uma letra casa milhares de receitas e traria de volta os
  * 2,7 s de antes, a cada tecla.
  */
@@ -224,7 +231,7 @@ export interface Selecao {
   top: boolean
 }
 
-export type ModoDaSelecao = 'nada' | 'categoria' | 'top' | 'busca'
+export type ModoDaSelecao = 'nada' | 'todas' | 'categoria' | 'top' | 'busca'
 
 export interface ReceitasDaSelecao {
   modo: ModoDaSelecao
@@ -233,7 +240,7 @@ export interface ReceitasDaSelecao {
 }
 
 /**
- * Quais receitas o engine calcula. Precedência: **categoria → Top → busca → nada**.
+ * Quais receitas o engine calcula. Precedência: **todas/categoria → Top → busca → nada**.
  *
  * A busca só seleciona quando não há categoria nem Top. Com uma categoria escolhida ela continua
  * filtrando o que aparece (`applyFilters`), mas não mexe no que é calculado — senão digitar
@@ -247,13 +254,16 @@ export function receitasDaSelecao(
   busca: string,
 ): ReceitasDaSelecao {
   const termo = busca.trim().toLocaleLowerCase('pt-BR')
-  const modo: ModoDaSelecao = selecao.categoria
-    ? 'categoria'
-    : selecao.top
-      ? 'top'
-      : termo.length >= MIN_LETRAS_DA_BUSCA
-        ? 'busca'
-        : 'nada'
+  const modo: ModoDaSelecao =
+    selecao.categoria === TODAS_AS_CATEGORIAS
+      ? 'todas'
+      : selecao.categoria
+        ? 'categoria'
+        : selecao.top
+          ? 'top'
+          : termo.length >= MIN_LETRAS_DA_BUSCA
+            ? 'busca'
+            : 'nada'
   if (modo === 'nada') return { modo, receitas: [] }
 
   const receitas: string[] = []

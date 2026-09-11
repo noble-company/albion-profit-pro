@@ -108,6 +108,9 @@ os mesmos de antes). Backend `tests/catalog` **17/17** · `ruff` limpo. Guards v
   vivo na tela vazia, e a primeira escolha não paga a criação da thread.
 - **O Top 15 vem depois dos filtros da barra:** marcar T6 pede as 15 melhores de T6. Abre ordenado
   por lucro, inclusive depois de um F5.
+- **"Todas" entrou no seletor depois, pedido no uso** ("faltou uma opção todos"). `cat=all` calcula
+  a lista inteira do que se vende, sem o corte do Top — no refino, as 110; no craft, os segundos
+  de cálculo que a tela diz no cabeçalho.
 - **O filtro `category` antigo saiu.** Ele lia `?category=` da URL, mas nenhum controle escrevia.
 - **`schema.d.ts` regenerado sem subir servidor.** A API local não recarregou o código; o OpenAPI
   saiu de `app.openapi()` e passou pelo mesmo `openapiTS`/`astToString` de `scripts/api-types.mjs`.

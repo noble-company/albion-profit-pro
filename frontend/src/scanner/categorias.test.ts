@@ -5,6 +5,7 @@ import { money } from '@/lib/money'
 
 import {
   arvoreDeCategorias,
+  TODAS_AS_CATEGORIAS,
   MIN_LETRAS_DA_BUSCA,
   ORDEM_DO_CRAFT,
   ORDEM_DO_REFINO,
@@ -184,6 +185,20 @@ describe('o que é calculado (task 21)', () => {
     const { modo, receitas } = saidas({ ...NADA, top: true })
 
     expect(modo).toBe('top')
+    expect(receitas.sort()).toEqual([
+      'T4_2H_BOW',
+      'T4_ARMOR_CLOTH_SET1',
+      'T4_MAIN_SWORD',
+      'T4_RANDOM_DUNGEON_TOKEN_2',
+    ])
+  })
+
+  test('"Todas" calcula tudo que se vende, sem cortar em 15', () => {
+    // Pedido no uso: "faltou uma opção todos". O Top corta em 15; aqui a lista vem inteira.
+    expect(TODAS_AS_CATEGORIAS).toBe('all')
+    const { modo, receitas } = saidas({ ...NADA, categoria: TODAS_AS_CATEGORIAS })
+
+    expect(modo).toBe('todas')
     expect(receitas.sort()).toEqual([
       'T4_2H_BOW',
       'T4_ARMOR_CLOTH_SET1',

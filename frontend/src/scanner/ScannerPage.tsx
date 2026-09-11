@@ -25,6 +25,7 @@ import {
   arvoreDeCategorias,
   MIN_LETRAS_DA_BUSCA,
   receitasDaSelecao,
+  TODAS_AS_CATEGORIAS,
   TOP_RECEITAS,
   topPorLucro,
 } from './categorias'
@@ -438,10 +439,18 @@ export function ScannerPage({
               label={kind === 'refining' ? 'Família' : 'Categoria'}
               value={selecao.categoria ?? ''}
               onChange={(v) => escolherCategoria(v || null)}
-              options={arvore.map((no) => ({
-                value: no.codigo,
-                label: `${no.rotulo} (${contagem(no.receitas)})`,
-              }))}
+              options={[
+                // A lista inteira, sem o corte do Top. No craft são segundos de cálculo, e o
+                // cabeçalho diz quantas receitas estão sendo calculadas.
+                {
+                  value: TODAS_AS_CATEGORIAS,
+                  label: `Todas (${contagem(arvore.reduce((soma, no) => soma + no.receitas, 0))})`,
+                },
+                ...arvore.map((no) => ({
+                  value: no.codigo,
+                  label: `${no.rotulo} (${contagem(no.receitas)})`,
+                })),
+              ]}
               allLabel="Escolha…"
             />
             {noDaCategoria && noDaCategoria.filhos.length > 0 && (
