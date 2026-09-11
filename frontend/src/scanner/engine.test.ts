@@ -960,3 +960,144 @@ describe('só as receitas escolhidas (task 21)', () => {
     expect(rodar(snapshot([]), { recipes: ['T5_CLOTH'] })).toEqual([])
   })
 })
+
+describe('retorno só de quem retorna (task 26)', () => {
+  // Cajado Arcano de Cristal T4: 20 tábuas, 12 barras e 1 artefato — que o dump marca com
+  // `@maxreturnamount="0"`.
+  const ARMA: ScannerCatalog = {
+    items: [
+      { unique_name: 'T4_2H_ARCANESTAFF_CRYSTAL', weight: '5', enchantment_level: 0, tier: 4 },
+    ] as ScannerCatalog['items'],
+    recipes: [
+      {
+        output_item: 'T4_2H_ARCANESTAFF_CRYSTAL',
+        production_kind: 'crafting',
+        enchantment_level: 0,
+        silver_cost: 0,
+        crafting_focus: 0,
+        amount_crafted: 1,
+        ingredients: [
+          { item: 'T4_PLANKS', count: 20, enchantment_level: 0, return_eligible: true },
+          { item: 'T4_METALBAR', count: 12, enchantment_level: 0, return_eligible: true },
+          {
+            item: 'T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL',
+            count: 1,
+            enchantment_level: 0,
+            return_eligible: false,
+          },
+        ],
+        upgrade_resource: null,
+      },
+    ] as ScannerCatalog['recipes'],
+  }
+
+  const comIngredientes = (quais: (nomes: string) => boolean): ScannerCatalog => ({
+    ...ARMA,
+    recipes: [
+      { ...ARMA.recipes[0]!, ingredients: ARMA.recipes[0]!.ingredients.filter((i) => quais(i.item)) },
+    ],
+  })
+
+  const PRECOS = () =>
+    snapshot([
+      { item: 'T4_PLANKS', location: '1002', sell: '180' },
+      { item: 'T4_METALBAR', location: '1002', sell: '210' },
+      { item: 'T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL', location: '1002', sell: '9500' },
+      { item: 'T4_2H_ARCANESTAFF_CRYSTAL', location: '1002', buy: '29000' },
+    ])
+
+  function calcular(
+    catalogo: ScannerCatalog,
+    extra: Partial<ScannerParams>,
+    precos = PRECOS(),
+  ) {
+    return computeScanner(catalogo, buildPriceIndex(precos), {
+      ...PADRAO,
+      locations: ['1002'],
+      priceLocations: ['1002'],
+      pricing: { ...PADRAO.pricing, base: { kind: 'sale_city' } },
+      ...extra,
+    })[0]!
+  }
+
+  const compras = (linha: { ingredients: Array<{ item: string; purchaseQuantity: number }> }) =>
+    Object.fromEntries(linha.ingredients.map((i) => [i.item, i.purchaseQuantity]))
+
+  // A taxa base do jogo. `⌊10 ÷ 0,848⌋ = 11`: é o exemplo do usuário.
+  const SESSAO: Partial<ScannerParams> = {
+    quantityMeans: 'initial_recipes',
+    quantity: 10,
+    returnRate: '0.152',
+  }
+
+  test('10 receitas a 15,2%: 11 execuções, refinado para 10 e artefato para 11', () => {
+    // "Se o player for craftar 10 armas, e der pra craftar mais 1, mostrar que precisa comprar
+    // 11 artefatos."
+    const linha = calcular(ARMA, SESSAO)
+
+    expect(linha.state).toBe('priced')
+    expect(linha.executions).toBe(11)
+    expect(linha.producedQuantity).toBe(11)
+    expect(compras(linha)).toEqual({
+      T4_PLANKS: 200,
+      T4_METALBAR: 120,
+      T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL: 11,
+    })
+  })
+
+  test('a lista de compras vale também para a receita sem preço', () => {
+    const linha = calcular(ARMA, SESSAO, snapshot([]))
+
+    expect(linha.state).not.toBe('priced')
+    expect(compras(linha).T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL).toBe(11)
+  })
+
+  test('o artefato entra no custo: 11 artefatos, não 10', () => {
+    const comArtefato = calcular(ARMA, SESSAO)
+    const semArtefato = calcular(
+      comIngredientes((nome) => !nome.includes('ARTEFACT')),
+      SESSAO,
+    )
+
+    // Só há oferta de venda do artefato, então a compra é imediata — sem taxa de montagem, que é
+    // da ordem de compra: 11 × 9.500 = 104.500. Antes eram 10 × 9.500.
+    expect(comArtefato.totalCost!.minus(semArtefato.totalCost!).toString()).toBe('104500')
+  })
+
+  test('receita em que tudo retorna dá o número de hoje', () => {
+    const linha = calcular(
+      comIngredientes((nome) => !nome.includes('ARTEFACT')),
+      SESSAO,
+    )
+
+    expect(linha.executions).toBe(11)
+    expect(compras(linha)).toEqual({ T4_PLANKS: 200, T4_METALBAR: 120 })
+  })
+
+  test('receita em que nada retorna não ganha execução a mais', () => {
+    // Não há o que devolver para pagar a execução extra.
+    const linha = calcular(
+      comIngredientes((nome) => nome.includes('ARTEFACT')),
+      SESSAO,
+    )
+
+    expect(linha.executions).toBe(10)
+    expect(compras(linha)).toEqual({ T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL: 10 })
+  })
+
+  test('meta de saída: o refinado tem desconto do retorno, o artefato não', () => {
+    const linha = calcular(ARMA, {
+      quantityMeans: 'desired_output',
+      quantity: 10,
+      returnRate: '0.367',
+    })
+
+    expect(linha.executions).toBe(10)
+    // 20 × 10 × 0,633 = 126,6 → 127; 12 × 10 × 0,633 = 75,96 → 76.
+    expect(compras(linha)).toEqual({
+      T4_PLANKS: 127,
+      T4_METALBAR: 76,
+      T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL: 10,
+    })
+  })
+})

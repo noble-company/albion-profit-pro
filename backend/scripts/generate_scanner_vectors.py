@@ -111,8 +111,12 @@ def compose_scenarios(recipe: dict, prices: dict, params: dict) -> dict | None:
     order_totals: list[Decimal] = []
     immediate_ok = order_ok = True
     for ingredient in recipe["ingredients"]:
+        # Quem não retorna vem da receita (task 4/26): artefato não tem desconto de retorno.
         requirement = calculate_ingredient_requirement(
-            ingredient["count"], production.executions, return_rate
+            ingredient["count"],
+            production.executions,
+            return_rate,
+            return_eligible=ingredient.get("return_eligible", True),
         )
         immediate = _price(ingredient["item"], "sell", 1, ingredient["enchantment_level"])
         order = _price(ingredient["item"], "buy", 1, ingredient["enchantment_level"])
@@ -236,6 +240,30 @@ _ENCANTADO = {
     "ingredients": [
         {"item": "T6_FIBER", "count": 2, "enchantment_level": 2},
         {"item": "T5_CLOTH", "count": 1, "enchantment_level": 2},
+    ],
+}
+
+
+_ARTEFATO = {
+    "output_item": "T4_2H_ARCANESTAFF_CRYSTAL",
+    "production_kind": "crafting",
+    "enchantment_level": 0,
+    "silver_cost": 0,
+    # Valor ilustrativo: o caso existe para travar o retorno por ingrediente, não a estação.
+    "item_value": "576",
+    "crafting_focus": 1286,
+    "amount_crafted": 1,
+    "output_weight": "5",
+    "ingredients": [
+        {"item": "T4_PLANKS", "count": 20, "enchantment_level": 0},
+        {"item": "T4_METALBAR", "count": 12, "enchantment_level": 0},
+        # `@maxreturnamount="0"` no dump (task 4/26): o artefato não tem desconto de retorno.
+        {
+            "item": "T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL",
+            "count": 1,
+            "enchantment_level": 0,
+            "return_eligible": False,
+        },
     ],
 }
 
@@ -400,6 +428,28 @@ _CASES: list[tuple[dict, dict, dict]] = [
             "use_focus": False,
             "output_quality": 1,
             "quantity": 1,
+            "location": "1002",
+        },
+    ),
+    # 9. Receita com artefato (task 4/26): 10 cajados a 36,7% compram 127 tábuas e 76 barras,
+    #    com desconto, e 10 artefatos — antes o retorno descontava também o artefato (7).
+    (
+        _ARTEFATO,
+        _prices(
+            {
+                "T4_PLANKS:1:0": ("180", "160"),
+                "T4_METALBAR:1:0": ("210", "190"),
+                "T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL:1:0": ("9500", "8700"),
+                "T4_2H_ARCANESTAFF_CRYSTAL:1:0": ("29000", "26500"),
+            }
+        ),
+        {
+            "premium": True,
+            "return_rate": "0.367",
+            "station_fee_per_100_nutrition": "0",
+            "use_focus": False,
+            "output_quality": 1,
+            "quantity": 10,
             "location": "1002",
         },
     ),

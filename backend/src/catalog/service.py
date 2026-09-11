@@ -109,6 +109,7 @@ async def get_recipe_catalog(session: AsyncSession, kind: str | None = None) -> 
                     item=ingredient.ingredient_unique_name,
                     count=ingredient.count,
                     enchantment_level=ingredient.enchantment_level,
+                    return_eligible=ingredient.return_eligible,
                 )
             )
 

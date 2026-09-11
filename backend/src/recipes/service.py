@@ -120,6 +120,8 @@ async def get_recipe_detail(session: AsyncSession, unique_name: str) -> dict:
             "name_en": name_en,
             "count": ingredient.count,
             "enchantment_level": ingredient.enchantment_level,
+            # O `simulate_craft` tira daqui quem não retorna (task 4/26).
+            "return_eligible": ingredient.return_eligible,
             "has_own_recipe": has_own_recipe,
         }
         for ingredient, name_pt, name_en, has_own_recipe in ingredient_rows

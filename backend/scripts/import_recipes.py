@@ -56,6 +56,9 @@ def extract_craft_resources(craftingrequirements: dict) -> list[dict]:
             "unique_name": r["@uniquename"],
             "count": int(r["@count"]),
             "enchantment_level": int(r.get("@enchantmentlevel", 0)),
+            # `@maxreturnamount="0"`: o jogo não devolve no retorno de recurso (task 4/26). O
+            # atributo só aparece com esse valor; sem ele, o ingrediente retorna.
+            "return_eligible": r.get("@maxreturnamount") != "0",
         }
         for r in resources
     ]
@@ -177,6 +180,8 @@ def build_recipe(
                 count=resource["count"],
                 enchantment_level=ingredient_level,
                 position=position,
+                # Explícito: o `default` da coluna só entra no flush, e o plano é lido antes.
+                return_eligible=resource["return_eligible"],
             )
         )
     return recipe

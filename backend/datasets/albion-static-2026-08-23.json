@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "dataset_name": "albion-static",
-  "version": "2026-08-31-5cf2e8e9-production-kind-v1",
-  "transform_revision": "item-search-v1-recipe-order-v1-standard-refining-v1-production-kind-v1",
+  "version": "2026-09-10-5cf2e8e9-return-eligible-v1",
+  "transform_revision": "item-search-v1-recipe-order-v1-standard-refining-v1-production-kind-v1-return-eligible-v1",
   "source": {
     "repository": "https://github.com/ao-data/ao-bin-dumps",
     "revision": "5cf2e8e9b7021f98683181fa5b0e3c64575978e4"

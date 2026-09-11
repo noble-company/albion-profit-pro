@@ -727,6 +727,11 @@ export interface components {
              * @default 0
              */
             enchantment_level: number;
+            /**
+             * Return Eligible
+             * @default true
+             */
+            return_eligible: boolean;
         };
         /**
          * CatalogItemOut
@@ -1184,11 +1189,8 @@ export interface components {
              * @default 1
              */
             quality_level: number;
-            /**
-             * Return Eligible
-             * @default true
-             */
-            return_eligible: boolean;
+            /** Return Eligible */
+            return_eligible?: boolean | null;
         };
         /** IngredientSimulationOut */
         IngredientSimulationOut: {
@@ -1558,6 +1560,8 @@ export interface components {
             count: number;
             /** Enchantment Level */
             enchantment_level: number;
+            /** Return Eligible */
+            return_eligible: boolean;
             /** Has Own Recipe */
             has_own_recipe: boolean;
         };

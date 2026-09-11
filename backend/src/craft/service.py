@@ -154,7 +154,12 @@ async def simulate_craft(
     for ingredient in recipe["ingredients"]:
         override = request.ingredient_overrides.get(ingredient["unique_name"])
         quality_level = override.quality_level if override is not None else 1
-        return_eligible = override.return_eligible if override is not None else True
+        # A receita decide quem retorna (task 4/26); o override só vence quando diz algo.
+        return_eligible = (
+            override.return_eligible
+            if override is not None and override.return_eligible is not None
+            else ingredient["return_eligible"]
+        )
         requirement = calculate_ingredient_requirement(
             ingredient["count"],
             production.executions,

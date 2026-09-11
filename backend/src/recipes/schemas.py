@@ -15,6 +15,7 @@ class RecipeIngredientOut(RecipeItemOut):
     position: int
     count: int
     enchantment_level: int
+    return_eligible: bool
     has_own_recipe: bool
 
 

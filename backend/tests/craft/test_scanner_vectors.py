@@ -81,7 +81,7 @@ def _ordem(item: str, location: str, price: str, side: str, quality: int, ench: 
     )
 
 
-@pytest.mark.parametrize("indice", range(8))
+@pytest.mark.parametrize("indice", range(len(build()["vectors"])))
 async def test_composicao_bate_com_simulate_craft(db_session, indice: int) -> None:
     """O elo que sustenta os vetores: a composição do script tem que ser o `simulate_craft`."""
     dados = build()
@@ -122,6 +122,9 @@ async def test_composicao_bate_com_simulate_craft(db_session, indice: int) -> No
                 count=ingrediente["count"],
                 enchantment_level=ingrediente["enchantment_level"],
                 position=posicao,
+                # O `simulate_craft` tem que tirar a elegibilidade da receita (task 4/26), sem
+                # o pedido dizer nada — é o que o vetor 9, com artefato, prova.
+                return_eligible=ingrediente.get("return_eligible", True),
             )
         )
     db_session.add(receita)

@@ -29,7 +29,8 @@ async def _seed_recipe(
     db_session,
     *,
     output_item: str = "T2_CLOTH",
-    ingredients: list[tuple[str, int]] | None = None,
+    # `(nome, quantidade)` ou `(nome, quantidade, retorna)` — a marca do dump (task 4/26).
+    ingredients: list[tuple] | None = None,
     amount_crafted: int = 1,
     silver_cost: int = 0,
     crafting_focus: int = 18,
@@ -45,9 +46,11 @@ async def _seed_recipe(
         crafting_focus=crafting_focus,
         craft_time=Decimal("0"),
     )
-    for position, (unique_name, count) in enumerate(ingredients):
+    for position, (unique_name, count, *marca) in enumerate(ingredients):
         item_id = 900_001 + position
         db_session.add(_item(unique_name, item_id))
+        # Só passa a marca quando o teste declara: os outros testes continuam no padrão da coluna.
+        extra = {"return_eligible": marca[0]} if marca else {}
         recipe.ingredients.append(
             RecipeIngredient(
                 ingredient_unique_name=unique_name,
@@ -55,6 +58,7 @@ async def _seed_recipe(
                 count=count,
                 enchantment_level=0,
                 position=position,
+                **extra,
             )
         )
     db_session.add(recipe)
@@ -229,6 +233,69 @@ async def test_amount_crafted_return_focus_and_explicit_return_exception(
     assert artefact["return_eligible"] is False
     assert artefact["effective_quantity"] == "6"
     assert artefact["purchase_quantity"] == 6
+
+
+# --- Quem retorna vem da receita (task 4/26) ---
+
+_PRECOS_NA_MAO = {
+    "T2_FIBER": {"offer": "10", "request": "9"},
+    "T2_ARTEFACT": {"offer": "20", "request": "18"},
+    "T2_CLOTH": {"offer": "30", "request": "28"},
+}
+
+
+async def _artefato_da_receita(cliente_autenticado, db_session, **pedido) -> tuple[dict, dict]:
+    # 3 execuções; a fibra consome 9 e o artefato 6. Com 50% de retorno, o artefato elegível
+    # compraria 3 — é a diferença que os testes abaixo olham.
+    await _seed_recipe(
+        db_session,
+        amount_crafted=5,
+        ingredients=[("T2_FIBER", 3), ("T2_ARTEFACT", 2, False)],
+    )
+    response = await cliente_autenticado.post(
+        "/craft/simulate",
+        json=_payload(quantity=11, return_rate="0.5", manual_prices=_PRECOS_NA_MAO, **pedido),
+    )
+    assert response.status_code == 200, response.text
+    fibra, artefato = response.json()["ingredients"]
+    return fibra, artefato
+
+
+async def test_quem_nao_retorna_vem_da_receita_sem_o_pedido_dizer(cliente_autenticado, db_session):
+    """O dump marca o artefato com `@maxreturnamount="0"`. Antes, o `simulate_craft` supunha que
+    tudo retornava e só o override do pedido corrigia — e nenhuma tela manda o override."""
+    fibra, artefato = await _artefato_da_receita(cliente_autenticado, db_session)
+
+    assert fibra["return_eligible"] is True
+    assert fibra["purchase_quantity"] == 5  # 9 × 0,5 = 4,5 → 5
+    assert artefato["return_eligible"] is False
+    assert artefato["purchase_quantity"] == 6
+
+
+async def test_override_so_de_qualidade_nao_devolve_o_retorno_ao_artefato(
+    cliente_autenticado, db_session
+):
+    """`IngredientOverride.return_eligible` tinha padrão `True`: mandar só a qualidade de um
+    ingrediente reescreveria a marca da receita e daria desconto de retorno ao artefato."""
+    _, artefato = await _artefato_da_receita(
+        cliente_autenticado,
+        db_session,
+        ingredient_overrides={"T2_ARTEFACT": {"quality_level": 1}},
+    )
+
+    assert artefato["return_eligible"] is False
+    assert artefato["purchase_quantity"] == 6
+
+
+async def test_override_explicito_continua_vencendo_a_receita(cliente_autenticado, db_session):
+    _, artefato = await _artefato_da_receita(
+        cliente_autenticado,
+        db_session,
+        ingredient_overrides={"T2_ARTEFACT": {"return_eligible": True}},
+    )
+
+    assert artefato["return_eligible"] is True
+    assert artefato["purchase_quantity"] == 3
 
 
 async def test_zero_rate_overrides_are_honored(cliente_autenticado, db_session) -> None:

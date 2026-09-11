@@ -31,7 +31,8 @@ Todo item craftável tem um bloco `craftingrequirements` com:
 | `@time` | Tempo de craft (unidade relativa, não confirmada em segundos/horas exatos) |
 | `@craftingfocus` | Pontos de foco necessários se o jogador optar por usar foco (bônus de retorno de recursos) |
 | `@amountcrafted` | Quantas unidades o craft produz por execução (geralmente `1`, mas pode ser mais — ex: poções em lote de 5) |
-| `craftresource` | **Objeto único** (1 ingrediente) OU **array** (2+ ingredientes) — cada um com `@uniquename`, `@count` e opcionalmente `@enchantmentlevel` |
+| `craftresource` | **Objeto único** (1 ingrediente) OU **array** (2+ ingredientes) — cada um com `@uniquename`, `@count` e opcionalmente `@enchantmentlevel` e `@maxreturnamount` |
+| `craftresource/@maxreturnamount` | Só aparece com valor `"0"`: o jogo **não devolve** esse ingrediente no retorno de recurso — artefato, cristal, token, capa base, livro. Sem o atributo, o ingrediente retorna. São 2.516 de 7.874 ingredientes; nenhum recurso refinado leva a marca, e nenhum ingrediente de refino. Importado como `recipe_ingredient.return_eligible` e aplicado por linha de ingrediente (task 4/26) |
 
 ### Exemplo — refino simples (1 ingrediente)
 ```json

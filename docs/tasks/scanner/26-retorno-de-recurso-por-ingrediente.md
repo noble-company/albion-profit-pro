@@ -121,4 +121,51 @@ Tasks **05** (engine), **06** (vetores dourados), **11.6** (sessão) e **12** (c
 
 ## Estado da implementação
 
-_Não iniciada._
+**Concluída.** Frontend `npm run test` **497/497** · `typecheck` limpo · `lint` 0 erros (7 avisos,
+os mesmos). Backend `pytest tests` **427 passaram**, 1 falha que já existia
+(`test_compare_query_count_does_not_grow_with_city_count`, a contagem de cidades com o mercado duplo
+de Lymhurst, fora desta task) · `ruff` limpo.
+
+### Guards vermelhos primeiro
+
+- Backend, 17: importador (3), catálogo (1), `simulate_craft` (3), comparação (2) e paridade dos
+  vetores (8). Os vetores 0 a 6 falharam só por a coluna ainda não existir; o que prova a regra é o
+  **vetor 9**, com artefato.
+- Frontend, 6: o dourado e 5 do engine. "Receita em que tudo retorna dá o número de hoje" passou
+  contra o código antigo — é a trava de que o número não mudou onde não devia.
+- Uma expectativa minha estava errada e foi corrigida: supus taxa de montagem na compra imediata
+  do artefato. Ela é só da ordem de compra; o custo a mais é 11 × 9.500 = 104.500.
+
+### Medido no banco local, depois de reimportar
+
+- Craft: 2.077 linhas de ingrediente não retornam, em **1.375 receitas** (a análise estimou 1.356
+  cruzando pelo dump; a diferença é o casamento de nomes, que a importação faz direito). Refino: 0.
+- Cajado Arcano de Cristal T4: tábuas e barras retornam, o artefato não. Poção de cura T6: dedaleira,
+  ovo e álcool retornam — é o dump, e foi a decisão 1.
+
+### O que só apareceu implementando
+
+- **O override zerava a marca.** `IngredientOverride.return_eligible` tinha padrão `True`: mandar só
+  a qualidade de um ingrediente reescreveria a marca da receita e daria desconto ao artefato. Virou
+  `bool | None`, com `None` = a receita decide. Travado no `simulate_craft` e na comparação.
+- **O contrato de receita também leva a marca** (`RecipeIngredientOut.return_eligible`): é de lá
+  que o `simulate_craft` lê a receita (`get_recipe_detail`).
+- **Reimportação local sem baixar nada.** O `world.json` da raiz não é o do manifesto (20 MB contra
+  91 KB), e a semeadura baixaria os três arquivos. As receitas foram reimportadas com
+  `scripts.import_recipes`, que usa as mesmas funções da semeadura e os dumps da raiz — que batem em
+  tamanho com o manifesto. O `transform_revision` e a versão do manifesto subiram, então a próxima
+  semeadura de verdade reaplica.
+- **O `ETag` do catálogo mudou pelo formato**, não pela versão do dataset (que só muda na
+  semeadura): o campo novo no `CatalogIngredientOut` basta para o navegador baixar de novo.
+- **Catálogo antigo no cache do navegador** não tem o campo: o engine lê ausente como "retorna", o
+  comportamento de antes, até a revalidação trazer o novo.
+- O tipo gerado marca `return_eligible` como obrigatório na resposta; dois testes de outras tasks
+  montavam ingrediente sem ele e ganharam o campo.
+
+### Pendente pra você testar
+
+1. Em `/craft`, Armas › Cajados arcanos, abrir o Cajado Arcano de Cristal T4 com 10 receitas e
+   retorno 15,2%: Rendimento 11, e na coluna Compra o artefato ×11 e as tábuas ×200.
+2. Mudar para uma receita sem artefato (uma arma comum): o número de execuções continua o de antes.
+3. No jogo, craftar 10 unidades de um item com artefato na taxa base e conferir que sobra material
+   refinado para o 11º.

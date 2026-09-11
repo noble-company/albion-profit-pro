@@ -33,8 +33,8 @@ function catalogoSintetico(): { catalog: ScannerCatalog; snapshot: PriceSnapshot
       crafting_focus: 100,
       amount_crafted: 1,
       ingredients: [
-        { item: ing1, count: 2, enchantment_level: 0 },
-        { item: ing2, count: 1, enchantment_level: 0 },
+        { item: ing1, count: 2, enchantment_level: 0, return_eligible: true },
+        { item: ing2, count: 1, enchantment_level: 0, return_eligible: true },
       ],
       upgrade_resource: null,
     })

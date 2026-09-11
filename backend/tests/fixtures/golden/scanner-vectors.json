@@ -499,6 +499,80 @@
         "location": "1002"
       },
       "expected": null
+    },
+    {
+      "recipe": {
+        "output_item": "T4_2H_ARCANESTAFF_CRYSTAL",
+        "production_kind": "crafting",
+        "enchantment_level": 0,
+        "silver_cost": 0,
+        "item_value": "576",
+        "crafting_focus": 1286,
+        "amount_crafted": 1,
+        "output_weight": "5",
+        "ingredients": [
+          {
+            "item": "T4_PLANKS",
+            "count": 20,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T4_METALBAR",
+            "count": 12,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL",
+            "count": 1,
+            "enchantment_level": 0,
+            "return_eligible": false
+          }
+        ]
+      },
+      "prices": {
+        "T4_PLANKS|1002|1|0": {
+          "sell": "180",
+          "buy": "160"
+        },
+        "T4_METALBAR|1002|1|0": {
+          "sell": "210",
+          "buy": "190"
+        },
+        "T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL|1002|1|0": {
+          "sell": "9500",
+          "buy": "8700"
+        },
+        "T4_2H_ARCANESTAFF_CRYSTAL|1002|1|0": {
+          "sell": "29000",
+          "buy": "26500"
+        }
+      },
+      "params": {
+        "premium": true,
+        "return_rate": "0.367",
+        "station_fee_per_100_nutrition": "0",
+        "use_focus": false,
+        "output_quality": 1,
+        "quantity": 10,
+        "location": "1002"
+      },
+      "expected": {
+        "state": "priced",
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "total_cost": "124804",
+        "gross_revenue": "290000",
+        "sales_tax": "11600",
+        "total_fees": "21894",
+        "net_revenue": "271150",
+        "profit": "146346",
+        "roi": "117.2607",
+        "profit_per_weight": "2926.92",
+        "profit_per_focus": null,
+        "executions": 10,
+        "produced_quantity": 10,
+        "focus_consumed": 0
+      }
     }
   ]
 }

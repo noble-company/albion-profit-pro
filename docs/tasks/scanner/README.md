@@ -170,7 +170,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [ ] 23 — Histórico da API pública
 - [x] 24 — Comprar em, Vender em e escolha por item
 - [x] 25 — Preço de compra e de venda na barra
-- [ ] 26 — Retorno de recurso por ingrediente
+- [x] 26 — Retorno de recurso por ingrediente
 - [ ] 27 — Itens com mais de uma receita
 - [x] 15 — Aposentar o ranking materializado
 - [ ] 16 — Documentos reconciliados

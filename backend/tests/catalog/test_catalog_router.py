@@ -277,3 +277,42 @@ async def test_etag_difere_por_kind(cliente_autenticado, db_session):
 
 async def test_exige_autenticacao(client):
     assert (await client.get("/catalog/recipes")).status_code == 401
+
+
+async def test_ingrediente_diz_se_retorna(cliente_autenticado, db_session):
+    """Task 4/26. O cliente calcula a lista de compras sozinho: sem saber que o artefato não
+    retorna, ele compraria artefato para as receitas iniciais e contaria as execuções que o
+    retorno do recurso refinado paga."""
+    db_session.add_all(
+        [
+            _item("T4_2H_ARCANESTAFF_CRYSTAL", name="Cajado Arcano de Cristal", tier=4),
+            _item("T4_PLANKS", name="Tábuas", tier=4),
+            _item("T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL", name="Artefato", tier=4),
+        ]
+    )
+    receita = Recipe(
+        output_item_unique_name="T4_2H_ARCANESTAFF_CRYSTAL",
+        production_kind="crafting",
+        amount_crafted=1,
+        craft_time=Decimal("0.1"),
+    )
+    receita.ingredients.extend(
+        [
+            RecipeIngredient(
+                ingredient_unique_name="T4_PLANKS", count=20, position=0, return_eligible=True
+            ),
+            RecipeIngredient(
+                ingredient_unique_name="T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL",
+                count=1,
+                position=1,
+                return_eligible=False,
+            ),
+        ]
+    )
+    db_session.add(receita)
+    await db_session.commit()
+
+    payload = (await cliente_autenticado.get("/catalog/recipes?kind=crafting")).json()
+    cajado = next(r for r in payload["recipes"] if r["output_item"] == "T4_2H_ARCANESTAFF_CRYSTAL")
+
+    assert [i["return_eligible"] for i in cajado["ingredients"]] == [True, False]

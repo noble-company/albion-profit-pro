@@ -50,6 +50,9 @@ class CatalogIngredientOut(BaseModel):
     item: str
     count: int
     enchantment_level: int = 0
+    # Falso para o que o jogo não devolve no retorno de recurso — artefato, cristal, token. O
+    # cliente compra esse ingrediente para todas as execuções da sessão (task 4/26).
+    return_eligible: bool = True
 
 
 class CatalogUpgradeResourceOut(BaseModel):

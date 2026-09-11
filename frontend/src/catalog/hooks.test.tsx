@@ -64,7 +64,9 @@ function catalogo(version: string): RecipeCatalog {
         silver_cost: 0,
         crafting_focus: 100,
         amount_crafted: 1,
-        ingredients: [{ item: 'T4_FIBER', count: 2, enchantment_level: 0 }],
+        ingredients: [
+          { item: 'T4_FIBER', count: 2, enchantment_level: 0, return_eligible: true },
+        ],
         upgrade_resource: null,
       },
     ],

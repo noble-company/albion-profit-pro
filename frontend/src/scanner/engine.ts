@@ -257,6 +257,48 @@ function quoteResolvido(side: ResolvedSide | null): Quote | null {
       }
 }
 
+type CatalogIngredient = CatalogRecipe['ingredients'][number]
+
+/** Ausente = retorna: catálogo em cache de antes da task 26, e os vetores antigos. */
+function retorna(ingredient: CatalogIngredient): boolean {
+  return ingredient.return_eligible ?? true
+}
+
+/**
+ * Quanto comprar de cada ingrediente, e com qual desconto (tasks 11.6 e 26).
+ *
+ * Na **sessão**, desconto nenhum: o retorno aparece como execução a mais, não como fibra a menos.
+ * O que **retorna** é comprado para as receitas iniciais — é o que volta dele que paga as execuções
+ * extras. O que **não retorna** (artefato, cristal, token) é comprado para **todas** as execuções:
+ * "se o player for craftar 10 armas, e der pra craftar mais 1, mostrar que precisa comprar 11
+ * artefatos".
+ *
+ * Na **meta de saída** (o modo do servidor) a compra é para as execuções, e o retorno desconta só
+ * o que retorna.
+ */
+interface Compra {
+  sessao: boolean
+  receitasIniciais: number
+  execucoes: number
+  returnRate: string
+}
+
+function quantoComprar(ingredient: CatalogIngredient, compra: Compra) {
+  if (compra.sessao) {
+    return calculateIngredientRequirement(
+      ingredient.count,
+      retorna(ingredient) ? compra.receitasIniciais : compra.execucoes,
+      '0',
+    )
+  }
+  return calculateIngredientRequirement(
+    ingredient.count,
+    compra.execucoes,
+    compra.returnRate,
+    retorna(ingredient),
+  )
+}
+
 /**
  * Uma **sessão** de refino (task 4/11.6): o jogador compra para `receitasIniciais` receitas,
  * refina, e refina de novo o que voltar — até acabar.
@@ -290,22 +332,28 @@ function prepararReceita(
 ) {
   const saida = itemsByName.get(recipe.output_item)
   const sessao = params.quantityMeans === 'initial_recipes'
+  // Só o que retorna paga execução a mais (task 26). Receita em que nada retorna — só artefato,
+  // só token — não tem o que devolver: a sessão fica nas receitas iniciais.
+  const algumRetorna = recipe.ingredients.some(retorna)
   const production = sessao
-    ? producaoDaSessao(params.quantity, recipe.amount_crafted, params.returnRate)
+    ? producaoDaSessao(
+        params.quantity,
+        recipe.amount_crafted,
+        algumRetorna ? params.returnRate : '0',
+      )
     : calculateProduction(params.quantity, recipe.amount_crafted)
+
+  const compra: Compra = {
+    sessao,
+    receitasIniciais: sessao ? params.quantity : production.executions,
+    execucoes: production.executions,
+    returnRate: params.returnRate,
+  }
 
   return {
     production,
-    /**
-     * Quanto comprar, e com qual desconto.
-     *
-     * Na **sessão**, nenhum: a compra é para as receitas iniciais, e o retorno aparece como
-     * execução a mais — não como fibra a menos na lista de compras. No modo do servidor é o
-     * contrário: a meta é a saída, e o retorno desconta a compra.
-     */
-    compra: sessao
-      ? { executions: params.quantity, returnRate: '0' }
-      : { executions: production.executions, returnRate: params.returnRate },
+    /** Quanto comprar de cada ingrediente — ver `quantoComprar`. */
+    compra,
     focusConsumed: calculateFocusConsumed(
       focoPorExecucao(recipe, saida, params),
       production.executions,
@@ -487,7 +535,7 @@ interface EvaluateInput {
   params: ScannerParams
   production: ReturnType<typeof calculateProduction>
   focusConsumed: number
-  compra: { executions: number; returnRate: string }
+  compra: Compra
   recipeSilver: Money
   stationTotal: Money
   salesTaxRate: Decimal
@@ -565,11 +613,7 @@ function emptyRow(
     ingredients: input.recipe.ingredients.map((ingredient) => ({
       item: ingredient.item,
       enchantmentLevel: ingredient.enchantment_level,
-      purchaseQuantity: calculateIngredientRequirement(
-        ingredient.count,
-        input.compra.executions,
-        input.compra.returnRate,
-      ).purchaseQuantity,
+      purchaseQuantity: quantoComprar(ingredient, input.compra).purchaseQuantity,
       unitPrice: null,
       subtotal: null,
       observedAt: null,
@@ -630,11 +674,7 @@ function evaluate(input: EvaluateInput): ScannerRow {
   }> = []
 
   for (const ingredient of recipe.ingredients) {
-    const requirement = calculateIngredientRequirement(
-      ingredient.count,
-      input.compra.executions,
-      input.compra.returnRate,
-    )
+    const requirement = quantoComprar(ingredient, input.compra)
     // O preço do ingrediente vem da POLÍTICA, não da cidade da linha (task 11.3): média das
     // cidades, cidade fixa, preço na mão. A cidade da linha decide onde se **vende**.
     const cotado = resolveIngredientPrice(
