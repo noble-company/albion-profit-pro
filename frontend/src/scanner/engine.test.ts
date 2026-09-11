@@ -946,3 +946,17 @@ describe('preço de compra e de venda na barra (task 25)', () => {
     expect(detalhe.ingredients.map((i) => i.locationId)).toEqual(['1002', '3005'])
   })
 })
+
+describe('só as receitas escolhidas (task 21)', () => {
+  test('lista vazia não calcula nada', () => {
+    expect(rodar(snapshot([]), { recipes: [] })).toEqual([])
+  })
+
+  test('calcula só as receitas da lista', () => {
+    // Sem preço nenhum a receita ainda gera linha (X01) — então a contagem é do recorte, não do
+    // mercado.
+    expect(rodar(snapshot([]), {}).length).toBe(1)
+    expect(rodar(snapshot([]), { recipes: ['T4_CLOTH'] }).length).toBe(1)
+    expect(rodar(snapshot([]), { recipes: ['T5_CLOTH'] })).toEqual([])
+  })
+})

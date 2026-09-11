@@ -754,6 +754,8 @@ export interface components {
             shop_category?: string | null;
             /** Shop Subcategory */
             shop_subcategory?: string | null;
+            /** Shop Subcategory2 */
+            shop_subcategory2?: string | null;
             /** Crafting Category */
             crafting_category?: string | null;
         };

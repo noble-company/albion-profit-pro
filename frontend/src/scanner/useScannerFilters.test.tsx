@@ -312,3 +312,51 @@ describe('preço de compra e de venda na barra (task 25)', () => {
     expect(result.current.pricing.saleByItem.get('T4_CLOTH')).toBe('melhor')
   })
 })
+
+describe('o que analisar (task 21)', () => {
+  test('sem nada na URL, nada está selecionado', () => {
+    expect(render().result.current.selecao).toEqual({
+      categoria: null,
+      subcategoria: null,
+      top: false,
+    })
+  })
+
+  test('categoria, subcategoria e top sobrevivem ao F5', () => {
+    expect(render('/craft?cat=weapons/bow').result.current.selecao).toEqual({
+      categoria: 'weapons',
+      subcategoria: 'bow',
+      top: false,
+    })
+    expect(render('/refino?cat=cloth').result.current.selecao.categoria).toBe('cloth')
+    expect(render('/refino?top=15').result.current.selecao.top).toBe(true)
+  })
+
+  test('escolher categoria desliga o top, e ligar o top desliga a categoria', () => {
+    const { result } = render('/craft?top=15&q=espada')
+
+    act(() => result.current.escolherCategoria('weapons', 'sword'))
+    expect(result.current.selecao).toEqual({
+      categoria: 'weapons',
+      subcategoria: 'sword',
+      top: false,
+    })
+
+    act(() => result.current.alternarTop())
+    expect(result.current.selecao).toEqual({ categoria: null, subcategoria: null, top: true })
+    // A busca não é seleção exclusiva: continua filtrando o que aparece.
+    expect(result.current.filters.search).toBe('espada')
+
+    act(() => result.current.alternarTop())
+    expect(result.current.params.has('top')).toBe(false)
+  })
+
+  test('limpar a categoria volta a não ter nada selecionado', () => {
+    const { result } = render('/craft?cat=weapons/bow')
+
+    act(() => result.current.escolherCategoria(null))
+
+    expect(result.current.params.has('cat')).toBe(false)
+    expect(result.current.selecao.categoria).toBeNull()
+  })
+})

@@ -13,7 +13,14 @@ from src.items.models import Item
 from src.recipes.models import Recipe, RecipeIngredient
 
 
-def _item(unique_name: str, *, name: str, tier: int, weight: str | None = None) -> Item:
+def _item(
+    unique_name: str,
+    *,
+    name: str,
+    tier: int,
+    weight: str | None = None,
+    sub2: str | None = None,
+) -> Item:
     _, separator, suffix = unique_name.rpartition("@")
     return Item(
         unique_name=unique_name,
@@ -24,6 +31,7 @@ def _item(unique_name: str, *, name: str, tier: int, weight: str | None = None) 
         weight=Decimal(weight) if weight is not None else None,
         shop_category="crafting",
         shop_subcategory="refinedresources",
+        shop_subcategory2=sub2,
         busca_normalizada=unique_name.casefold(),
     )
 
@@ -31,7 +39,7 @@ def _item(unique_name: str, *, name: str, tier: int, weight: str | None = None) 
 async def _seed(db_session):
     db_session.add_all(
         [
-            _item("T4_CLOTH", name="Tecido Fino", tier=4, weight="0.51"),
+            _item("T4_CLOTH", name="Tecido Fino", tier=4, weight="0.51", sub2="cloth"),
             _item("T4_FIBER", name="Fibra", tier=4, weight="0.51"),
             _item("T3_CLOTH", name="Tecido Limpo", tier=3, weight="0.38"),
             _item("T5_ORPHAN", name="Item Sem Mercado", tier=5, weight="0.76"),
@@ -158,6 +166,19 @@ async def test_peso_viaja_como_string_decimal(cliente_autenticado, db_session):
     assert itens["T4_CLOTH"]["weight"] == "0.51"
     assert isinstance(itens["T4_CLOTH"]["weight"], str)
     assert itens["T5_ORE"]["weight"] is None  # sem peso no dump não vira zero
+
+
+async def test_terceiro_nivel_de_categoria_viaja_no_item(cliente_autenticado, db_session):
+    """Task 4/21. As famílias do refino (tecido, couro, barras…) só existem no
+    `shop_subcategory2`: todo produto refinado é `crafting/refinedresources` nos dois primeiros
+    níveis. Sem este campo a tela não tem por onde agrupar."""
+    await _seed(db_session)
+
+    payload = (await cliente_autenticado.get("/catalog/recipes?kind=refining")).json()
+    itens = {i["unique_name"]: i for i in payload["items"]}
+
+    assert itens["T4_CLOTH"]["shop_subcategory2"] == "cloth"
+    assert itens["T4_FIBER"]["shop_subcategory2"] is None
 
 
 async def test_upgrade_resource_quando_existe(cliente_autenticado, db_session):

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 
 import { money, percentageToRate } from '@/lib/money'
 
+import { TOP_RECEITAS, type Selecao } from './categorias'
 import { DEFAULT_FILTERS, type ScannerFilters } from './filters'
 import { DEFAULT_STRATEGY, type ScannerStrategy } from './engine'
 import {
@@ -132,7 +133,6 @@ export function useScannerFilters() {
       search: params.get('q') ?? DEFAULT_FILTERS.search,
       tiers: numbers(params.get('tier')),
       enchantments: numbers(params.get('ench')),
-      category: params.get('category'),
       minProfit: params.get('min_profit'),
       minRoi: params.get('min_roi'),
       maxAgeHours: params.get('max_age') ? Number(params.get('max_age')) : null,
@@ -143,6 +143,23 @@ export function useScannerFilters() {
     }),
     [params],
   )
+
+  /**
+   * O que a tela calcula (task 21): uma categoria (`cat=weapons/bow`, ou `cat=cloth` no refino) ou
+   * o Top 15 (`top=15`). As duas são exclusivas — escolher uma apaga a outra. A busca não mora
+   * aqui: ela só seleciona sem nenhuma das duas, e quem decide é `receitasDaSelecao`.
+   */
+  const chaveDaSelecao = chaveDe(params, ['cat', 'top'])
+
+  const selecao = useMemo<Selecao>(() => {
+    const [categoria, subcategoria] = (params.get('cat') ?? '').split('/')
+    return {
+      categoria: categoria || null,
+      subcategoria: subcategoria || null,
+      top: params.has('top'),
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo lido aqui
+  }, [chaveDaSelecao])
 
   const chaveDoCenario = chaveDe(params, [
     'premium',
@@ -322,6 +339,30 @@ export function useScannerFilters() {
     [params, setParams],
   )
 
+  /** Escolhe o que calcular por categoria (task 21); `null` volta à tela vazia. Desliga o Top. */
+  const escolherCategoria = useCallback(
+    (categoria: string | null, subcategoria: string | null = null) => {
+      const next = new URLSearchParams(params)
+      next.delete('top')
+      if (categoria === null) next.delete('cat')
+      else next.set('cat', subcategoria ? `${categoria}/${subcategoria}` : categoria)
+      setParams(next, { replace: true })
+    },
+    [params, setParams],
+  )
+
+  /** Liga ou desliga o Top 15 (task 21). Ligar apaga a categoria: as duas não convivem. */
+  const alternarTop = useCallback(() => {
+    const next = new URLSearchParams(params)
+    if (next.has('top')) {
+      next.delete('top')
+    } else {
+      next.set('top', String(TOP_RECEITAS))
+      next.delete('cat')
+    }
+    setParams(next, { replace: true })
+  }, [params, setParams])
+
   /** Alterna um valor numa multi-seleção (tier, encantamento). */
   const toggleNumber = useCallback(
     (key: string, value: number) => {
@@ -358,6 +399,9 @@ export function useScannerFilters() {
   return {
     params,
     filters,
+    selecao,
+    escolherCategoria,
+    alternarTop,
     scenario,
     pricing,
     sellIn,

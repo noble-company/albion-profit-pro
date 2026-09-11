@@ -161,7 +161,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [x] 18 — Taxa da estação por nutrição consumida
 - [x] 19 — Uma linha por receita, em ordem de tier
 - [x] 20 — Colunas enxutas e painel completo
-- [ ] 21 — Abrir vazio e escolher a categoria
+- [x] 21 — Abrir vazio e escolher a categoria
 - [ ] 22 — Snapshot só da categoria (opcional)
 - [ ] 23 — Histórico da API pública
 - [x] 24 — Comprar em, Vender em e escolha por item

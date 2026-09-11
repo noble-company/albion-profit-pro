@@ -21,7 +21,6 @@ export interface ScannerFilters {
   /** vazio = todos os tiers (não "nenhum") */
   tiers: number[]
   enchantments: number[]
-  category: string | null
   /** string decimal (`F09`), nunca `number` */
   minProfit: string | null
   minRoi: string | null
@@ -39,7 +38,6 @@ export const DEFAULT_FILTERS: ScannerFilters = {
   search: '',
   tiers: [],
   enchantments: [],
-  category: null,
   minProfit: null,
   minRoi: null,
   maxAgeHours: null,
@@ -47,7 +45,12 @@ export const DEFAULT_FILTERS: ScannerFilters = {
   profitableOnly: false,
 }
 
-function matchesSearch(item: CatalogItem | undefined, outputItem: string, termo: string) {
+/**
+ * A busca por texto: o código, o nome em português ou em inglês. `termo` já chega em minúsculas.
+ * Exportada porque a busca também **seleciona** o que é calculado (task 21) — as duas perguntas
+ * precisam casar do mesmo jeito, senão a tela calcularia uma receita e esconderia a mesma.
+ */
+export function casaBusca(item: CatalogItem | undefined, outputItem: string, termo: string) {
   const alvo = [
     outputItem,
     item?.name_pt ?? '',
@@ -76,7 +79,7 @@ export function applyFilters(
     if (semPreco && !filters.showUnpriced) return false
 
     // --- filtros de identidade, valem para linha com ou sem preço ---
-    if (termo && !matchesSearch(item, row.outputItem, termo)) return false
+    if (termo && !casaBusca(item, row.outputItem, termo)) return false
     if (filters.tiers.length > 0 && !filters.tiers.includes(item?.tier ?? -1)) {
       return false
     }
@@ -86,7 +89,6 @@ export function applyFilters(
     ) {
       return false
     }
-    if (filters.category && item?.shop_category !== filters.category) return false
 
     // --- filtros financeiros: só se aplicam a linha COM preço ---
     // Linha sem preço não é "lucro zero" nem "ROI negativo" — é ausência. Excluí-la aqui

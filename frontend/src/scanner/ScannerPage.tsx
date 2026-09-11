@@ -1,3 +1,4 @@
+import { ListFilter } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 
 import { useServer } from '@/app/ServerContext'
@@ -12,7 +13,7 @@ import {
 } from '@/components/filters'
 import { SidebarSection } from '@/components/shell/SidebarSlot'
 import { Button } from '@/components/ui/button'
-import { Carregando, EstadoErro } from '@/components/ui/states'
+import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { useRecipeCatalog } from '@/catalog/hooks'
 import type { CatalogKind } from '@/catalog/service'
 import { formatarNomeCurto } from '@/lib/formatters'
@@ -20,6 +21,13 @@ import { money, percentageToRate } from '@/lib/money'
 import { useDestinyBoard } from '@/destiny/hooks'
 import { useCidades, useLocationName } from '@/lib/locations'
 
+import {
+  arvoreDeCategorias,
+  MIN_LETRAS_DA_BUSCA,
+  receitasDaSelecao,
+  TOP_RECEITAS,
+  topPorLucro,
+} from './categorias'
 import { buildColumns, motivoSemPreco } from './columns'
 import { bestPerRecipe, computeScanner, explainRow, type ScannerRow } from './engine'
 import { applyFilters } from './filters'
@@ -49,6 +57,9 @@ import { DEFAULT_QUANTITY, useScannerFilters } from './useScannerFilters'
 const TIERS = [2, 3, 4, 5, 6, 7, 8]
 const ENCANTAMENTOS = [0, 1, 2, 3, 4]
 
+/** O Top 15 é "as de maior lucro": abre ordenado assim (task 21). */
+const ORDEM_DO_TOP: SortState = { field: 'profit', direction: 'desc' }
+
 export function ScannerPage({
   kind,
   title,
@@ -64,6 +75,9 @@ export function ScannerPage({
   const {
     params,
     filters,
+    selecao,
+    escolherCategoria,
+    alternarTop,
     scenario,
     pricing,
     sellIn,
@@ -76,7 +90,10 @@ export function ScannerPage({
     toggleText,
     reset,
   } = useScannerFilters()
-  const [sort, setSort] = useState<SortState>(DEFAULT_SORT)
+  // Com o Top ligado na URL, o F5 volta ordenado por lucro — senão as 15 abririam em ordem de tier.
+  const [sort, setSort] = useState<SortState>(() =>
+    selecao.top ? ORDEM_DO_TOP : DEFAULT_SORT,
+  )
   /** Uma linha aberta por vez — o painel é grande, e dois abertos viram rolagem sem fim. */
   const [linhaAberta, setLinhaAberta] = useState<string | null>(null)
 
@@ -122,6 +139,37 @@ export function ScannerPage({
     [catalogo.catalog],
   )
 
+  /** A árvore do seletor: a ordem do mercado do jogo, sem o que não se vende (task 21). */
+  const arvore = useMemo(
+    () =>
+      catalogo.catalog ? arvoreDeCategorias(catalogo.catalog.recipes, itemsByName, kind) : [],
+    [catalogo.catalog, itemsByName, kind],
+  )
+
+  /**
+   * **O que é calculado** (task 21). Nada até o jogador escolher uma categoria, o Top 15 ou buscar
+   * pelo nome. É o que tira os 2,7 s do craft: uma subcategoria tem por volta de 100 receitas.
+   */
+  const daSelecao = useMemo(() => {
+    const resultado = receitasDaSelecao(
+      catalogo.catalog?.recipes ?? [],
+      itemsByName,
+      kind,
+      selecao,
+      filters.search,
+    )
+    return { ...resultado, chave: `${resultado.modo}:${resultado.receitas.join(',')}` }
+  }, [catalogo.catalog, itemsByName, kind, selecao, filters.search])
+  const modo = daSelecao.modo
+
+  // A lista entra no engine pelo CONTEÚDO. Com uma categoria escolhida, digitar na busca refaz
+  // `daSelecao` com as mesmas receitas — e uma lista de identidade nova recalcularia tudo à toa.
+  const receitas = useMemo(
+    () => daSelecao.receitas,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo da lista
+    [daSelecao.chave],
+  )
+
   /** O índice fica fora do cálculo das linhas porque o painel de detalhe também consulta ele. */
   const indice = useMemo(
     () => (precos.snapshot ? buildPriceIndex(precos.snapshot, canonico) : null),
@@ -137,11 +185,12 @@ export function ScannerPage({
       // de propósito (task 11.3); o jogador decidiu o contrário — não compra onde não vai, e zona
       // de PvP é o caso típico.
       priceLocations: cidadesDeCompra,
+      recipes: receitas,
       pricing,
       strategy,
       destinyBoard: painelDoDestino,
     }),
-    [scenario, cidadesDeVenda, cidadesDeCompra, pricing, strategy, painelDoDestino],
+    [scenario, cidadesDeVenda, cidadesDeCompra, receitas, pricing, strategy, painelDoDestino],
   )
 
   /**
@@ -195,11 +244,13 @@ export function ScannerPage({
       )
   }, [itemsByName])
 
-  const visiveis = useMemo(
+  const visiveis = useMemo(() => {
+    const filtradas = applyFilters(linhas, filters, itemsByName)
+    // O Top vem DEPOIS dos filtros: marcar T6 pede as 15 melhores de T6, não as T6 entre as 15.
+    const recorte = modo === 'top' ? topPorLucro(filtradas, TOP_RECEITAS) : filtradas
     // O nome desempata a ordem por tier: é o nome que o jogador lê que define "alfabética".
-    () => sortRows(applyFilters(linhas, filters, itemsByName), sort, nomeItem),
-    [linhas, filters, itemsByName, sort, nomeItem],
-  )
+    return sortRows(recorte, sort, nomeItem)
+  }, [linhas, filters, itemsByName, sort, nomeItem, modo])
 
   /** A largura da coluna Compra acompanha a receita com mais ingredientes do catálogo aberto. */
   const maxIngredientes = useMemo(
@@ -342,12 +393,15 @@ export function ScannerPage({
     )
   }
 
+  const dadosCarregando = catalogo.loading || precos.loading
   const estado = estadoDaTela({
-    dadosCarregando: catalogo.loading || precos.loading,
+    dadosCarregando,
     calculando: noWorker && doWorker.calculando,
     temLinhas: linhas.length > 0,
   })
   const erro = catalogo.error ?? precos.error
+  const noDaCategoria = arvore.find((no) => no.codigo === selecao.categoria)
+  const contagem = (n: number) => n.toLocaleString('pt-BR')
 
   const valorDaCompra =
     pricing.base.kind === 'cheapest'
@@ -376,6 +430,48 @@ export function ScannerPage({
             onChange={(v) => setParam('q', v)}
             placeholder="Buscar receita…"
           />
+
+          {/* O que calcular (task 21). Antes disto a tela calculava o catálogo inteiro ao abrir —
+              no craft, 2,7 s antes da primeira linha. */}
+          <FilterGroup legend="O que analisar">
+            <FilterSelectField
+              label={kind === 'refining' ? 'Família' : 'Categoria'}
+              value={selecao.categoria ?? ''}
+              onChange={(v) => escolherCategoria(v || null)}
+              options={arvore.map((no) => ({
+                value: no.codigo,
+                label: `${no.rotulo} (${contagem(no.receitas)})`,
+              }))}
+              allLabel="Escolha…"
+            />
+            {noDaCategoria && noDaCategoria.filhos.length > 0 && (
+              <FilterSelectField
+                label="Subcategoria"
+                value={selecao.subcategoria ?? ''}
+                onChange={(v) => escolherCategoria(noDaCategoria.codigo, v || null)}
+                options={noDaCategoria.filhos.map((no) => ({
+                  value: no.codigo,
+                  label: `${no.rotulo} (${contagem(no.receitas)})`,
+                }))}
+                allLabel={`Todas (${contagem(noDaCategoria.receitas)})`}
+              />
+            )}
+            <Button
+              variant={selecao.top ? 'default' : 'outline'}
+              size="sm"
+              className="w-full"
+              aria-pressed={selecao.top}
+              onClick={() => {
+                if (!selecao.top) setSort(ORDEM_DO_TOP)
+                alternarTop()
+              }}
+            >
+              Top {TOP_RECEITAS} mais lucrativas
+            </Button>
+            <p className="text-xs text-foreground-subtle">
+              Ou busque pelo nome, a partir de {MIN_LETRAS_DA_BUSCA} letras.
+            </p>
+          </FilterGroup>
 
           <FilterGroup legend="Mercado">
             {/* Uma linha por receita, com a melhor cidade escolhida só entre as marcadas. Tirar
@@ -585,8 +681,13 @@ export function ScannerPage({
         <h1 className="text-2xl font-black tracking-tight">{title}</h1>
         <p className="mt-1 text-sm text-foreground-muted">{description}</p>
         <p className="mt-2 text-xs text-foreground-subtle">
-          {estado === 'carregando' ? (
+          {dadosCarregando ? (
             'Carregando catálogo e preços…'
+          ) : modo === 'nada' ? (
+            'Nada calculado ainda.'
+          ) : estado === 'carregando' ? (
+            // Honesto sobre o custo: o Top do craft calcula as 5.523 receitas.
+            `Calculando ${contagem(receitas.length)} receitas…`
           ) : (
             <>
               <strong className="text-foreground">{visiveis.length}</strong> linhas ·{' '}
@@ -608,8 +709,18 @@ export function ScannerPage({
         <EstadoErro title="Não foi possível carregar o scanner">
           O catálogo ou os preços não vieram. A navegação ao lado continua funcionando.
         </EstadoErro>
-      ) : estado === 'carregando' ? (
+      ) : dadosCarregando ? (
         <Carregando />
+      ) : modo === 'nada' ? (
+        <EstadoVazio
+          title="Selecione o que você deseja analisar"
+          icon={<ListFilter className="size-6" />}
+        >
+          {kind === 'refining' ? 'Escolha uma família' : 'Escolha uma categoria'} na barra lateral,
+          peça o Top {TOP_RECEITAS} mais lucrativas ou busque pelo nome.
+        </EstadoVazio>
+      ) : estado === 'carregando' ? (
+        <Carregando label={`Calculando ${contagem(receitas.length)} receitas…`} />
       ) : (
         <div className="min-h-0 flex-1">
           <ScannerTable

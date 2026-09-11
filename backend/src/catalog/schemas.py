@@ -31,6 +31,9 @@ class CatalogItemOut(BaseModel):
     item_value: Decimal | None = None
     shop_category: str | None = None
     shop_subcategory: str | None = None
+    # Terceiro nível do mercado do jogo. É ele que separa as famílias do refino: todo produto
+    # refinado é `crafting/refinedresources` nos dois primeiros níveis (task 4/21).
+    shop_subcategory2: str | None = None
     # Ramo do Painel do Destino — o cliente usa para achar o nó que reduz o foco (task 4/17).
     crafting_category: str | None = None
 

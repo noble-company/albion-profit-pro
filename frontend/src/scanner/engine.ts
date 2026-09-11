@@ -68,6 +68,11 @@ export interface ScannerParams {
    * de propósito: filtrar onde se vende não pode encolher a base de preço da compra.
    */
   priceLocations: string[]
+  /**
+   * As receitas a calcular, por `output_item` (task 4/21). Ausente = o catálogo inteiro — é o que
+   * os vetores dourados usam. Lista vazia calcula nada: é a tela aberta sem escolha.
+   */
+  recipes?: readonly string[]
   /** de onde vem o preço de cada ingrediente (task 11.3) */
   pricing: PricingPolicy
   /**
@@ -366,8 +371,12 @@ export function computeScanner(
   const rows: ScannerRow[] = []
   /** Vive por chamada: um snapshot novo tem médias novas. */
   const cacheDaMedia = new Map<string, ResolvedPrice>()
+  // Um Set por chamada: a lista chega do Worker a cada cálculo, e `includes` numa lista de 430
+  // receitas dentro de um laço de 5.523 seria a lentidão que a task 21 existe para tirar.
+  const escolhidas = params.recipes ? new Set(params.recipes) : null
 
   for (const recipe of catalog.recipes) {
+    if (escolhidas && !escolhidas.has(recipe.output_item)) continue
     const base = prepararReceita(recipe, params, itemsByName)
     for (const locationId of cidadesDeAvaliacao(recipe.output_item, params)) {
       rows.push(evaluate({ ...base, recipe, locationId, prices, params, cacheDaMedia }))

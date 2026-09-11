@@ -40,15 +40,14 @@ entre as duas telas.
 
 - **Refino:** as famílias vêm de `shop_subcategory2` (`cloth`, `leather`, `metalbars`, `planks`,
   `stoneblock`). `CatalogItemOut` **não expõe** esse campo hoje — entra no contrato.
-- **Craft:** `shop_category → shop_subcategory`, com `shop_subcategory2` como terceiro nível onde
-  fizer sentido (conjuntos de armadura, tipos de arma).
+- **Craft:** `shop_category → shop_subcategory`, dois níveis. O terceiro ficou de fora: por
+  subcategoria o maior recorte já é de 430 receitas (Artefatos › Armas).
 - **Ordem:** a oficial do mercado do jogo, do bloco `shopcategories` do dump (`@value`): Armas,
   Armaduras, Capacetes, Sapatos, Mão secundária, Capas, Bolsas, Montarias, Consumíveis, Coleta,
   Crafting, Artefatos, Agricultura, Mobília, Vaidade, Outros.
-- **Rótulos em português não existem no repositório** — nem no dump, nem em `items.json`. O mapa
-  de rótulos é escrito à mão nesta task.
-- **Decidir o que esconder:** categorias cujas saídas não são vendáveis ou não interessam ao
-  jogador (`other/hardcoreexpeditions`, `other/questitems`, `vanity`…). Listar com contagem antes.
+- **Rótulos em português** não existem no dump nem em `items.json`. `i18n/categories.ts` (Fase
+  3.5) cobria só as categorias e parte das armas; esta task completa o mapa por código inteiro.
+- **O que esconder** — decidido pelo **nome**, não pela categoria: ver o estado da implementação.
 
 ## O que implementar
 
@@ -79,4 +78,52 @@ Top 15 e conferir o estado de carregando; recarregar a página e conferir que a 
 
 ## Estado da implementação
 
-_Não iniciada._
+**Concluída.** Frontend `npm run test` **485/485** · `typecheck` limpo · `lint` 0 erros (7 avisos,
+os mesmos de antes). Backend `tests/catalog` **17/17** · `ruff` limpo. Guards vermelhos primeiro:
+6 no frontend, 1 no backend, e o `categorias.test.ts` inteiro falhando por não haver o módulo.
+
+### O que a validação contra o banco mudou na spec
+
+- **Os rótulos já existiam em parte.** A spec dizia que não havia nenhum em português no repositório;
+  havia `i18n/categories.ts`, que monta o rótulo pedaço a pedaço (`cloth_armor` → "Cloth · Armor").
+  O mapa novo, `rotuloDeCategoria`, é por código inteiro e devolve `undefined` quando não sabe —
+  o teste exige rótulo para todo código do bloco `shopcategories` do dump. Os nomes do topo seguem
+  os que o arquivo já usava: Cabeça, Calçados, Fabricação, Cultivo, Cosméticos.
+- **Esconder pelo nome, não pela categoria** (decisão do usuário, 2026-09-10). Contado no banco:
+  `capes/other` tem 54 capas `UNIQUE_` e 9 capas de facção normais; esconder a subcategoria perderia
+  as nove. A regra (`receitaEscondida`) tira o que começa com `UNIQUE_` ou `QUESTITEM_` ou termina em
+  `_NONTRADABLE`, e vale na árvore, no Top e na busca. Os 39 tokens de dungeon sem categoria vão
+  para Outros.
+- **Contagem real por subcategoria:** de 1 (runas) a 430 (Artefatos › Armas); armas e armaduras
+  perto de 100, comida 207, poções 162. Categoria inteira também pode ser escolhida
+  (subcategoria "Todas").
+
+### O que só apareceu implementando
+
+- **A lista de receitas entra no engine pelo conteúdo.** Com uma categoria escolhida, digitar na
+  busca refaz a seleção com as mesmas receitas; uma lista de identidade nova faria o Worker
+  recalcular a cada tecla.
+- **A seleção viaja na mensagem `compute`, não no catálogo.** Mudar a categoria não reenvia as 5.523
+  receitas ao Worker nem reconstrói o índice de preços. Lista vazia calcula nada — o Worker continua
+  vivo na tela vazia, e a primeira escolha não paga a criação da thread.
+- **O Top 15 vem depois dos filtros da barra:** marcar T6 pede as 15 melhores de T6. Abre ordenado
+  por lucro, inclusive depois de um F5.
+- **O filtro `category` antigo saiu.** Ele lia `?category=` da URL, mas nenhum controle escrevia.
+- **`schema.d.ts` regenerado sem subir servidor.** A API local não recarregou o código; o OpenAPI
+  saiu de `app.openapi()` e passou pelo mesmo `openapiTS`/`astToString` de `scripts/api-types.mjs`.
+  O diff é só o campo novo.
+- **Sem teste da página.** A suíte não tem mock de catálogo nem de snapshot; "sem seleção, nada é
+  calculado" está travado em `receitasDaSelecao` (modo `nada`, lista vazia) e no engine (lista vazia,
+  nenhuma linha).
+- Os E2E de `/refino` já descreviam a tela apagada na task 15 e continuam para a reescrita do fim do
+  Bloco 3.
+
+### Pendente pra você testar
+
+1. Abrir `/craft`: a tela mostra "Selecione o que você deseja analisar" e nenhuma linha.
+2. Escolher **Armaduras → Couro**: a tabela aparece rápido, só com armaduras de couro.
+3. Clicar em **Top 15 mais lucrativas**: aparece "Calculando 5.xxx receitas…", e depois 15 linhas
+   ordenadas por lucro. Marcar T6 e conferir que continuam 15, todas T6.
+4. Recarregar a página (F5) e conferir que a escolha ficou.
+5. Sem categoria nem Top, buscar "espada": calcula só as espadas; com "es" não calcula nada.
+6. Em `/refino`, conferir as famílias Tecido, Couro, Barras de metal, Blocos de pedra e Tábuas.
