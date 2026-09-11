@@ -85,6 +85,7 @@ BLOCO 4 — a tela que o jogador pediu (achados do uso real, 2026-09-10)
 25 Preco de compra e de venda na barra      ── depende de 24
 26 Retorno de recurso por ingrediente       ── depende de 05, 06, 11.6, 12
 27 Itens com mais de uma receita            ── depende de 26
+28 Dataset do jogo atualizado               ── depende de 23
 15 Aposentar o ranking materializado       ── depende de 11, 12
 16 Documentos reconciliados                ── depende de 15
 ```
@@ -130,6 +131,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | [25](25-preco-de-compra-e-de-venda-na-barra.md) | Preço de compra e de venda na barra | — | A origem de todos os preços muda de uma vez; o painel fica para a exceção |
 | [26](26-retorno-de-recurso-por-ingrediente.md) | Retorno de recurso por ingrediente | `W6` | Artefato e o que não retorna é comprado para todas as execuções |
 | [27](27-itens-com-mais-de-uma-receita.md) | Itens com mais de uma receita | `W7` | Armas e armaduras de artefato de facção entram no catálogo |
+| [28](28-dataset-do-jogo-atualizado.md) | Dataset do jogo atualizado | `W9` | O histórico do client volta ao item certo; o da API pública acompanha a renumeração |
 | [15](15-aposentar-o-ranking-materializado.md) | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
 | 16 | Documentos reconciliados | — | Specs param de descrever a arquitetura revogada |
 
@@ -172,6 +174,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [x] 25 — Preço de compra e de venda na barra
 - [x] 26 — Retorno de recurso por ingrediente
 - [x] 27 — Itens com mais de uma receita
+- [x] 28 — Dataset do jogo atualizado
 - [x] 15 — Aposentar o ranking materializado
 - [ ] 16 — Documentos reconciliados
 
@@ -222,5 +225,5 @@ A [Fase 3.6](../correcoes/README.md) é substituída por esta. Destino de cada t
 | `W6` | **Retorno de recurso aplicado a ingrediente que não retorna.** O dump marca artefato, cristal, token e afins com `@maxreturnamount="0"`; o importador descarta a marca, e cliente e servidor aplicam o retorno à receita inteira. Numa receita com artefato, 600 receitas a 36,7% compravam 600 artefatos para 947 execuções. 1.356 receitas de craft afetadas. | task 26 |
 | `W7` | **Item com mais de uma receita fica fora do catálogo.** O importador pula `craftingrequirements` em lista fora do refino: 727 itens base e 2.420 níveis encantados, quase todos equipamento de artefato de facção (artefato × token de favor). | task 27 |
 | `W8` | **O rollup diário e mensal parou quando o histórico cresceu.** `_rollup_diario` e `_rollup_mensal` inseriam com `INSERT ... VALUES`, 8 parâmetros por linha agregada; acima de 4.095 linhas passava do limite de 32.767 do asyncpg. O `InterfaceError` era tratado como transitório, então o job tentava de novo e caía de novo, e o `poda` falhava junto. A tabela diária estava parada em 2.194 linhas quando o histórico pedia 11.210. Virou `INSERT ... SELECT ... GROUP BY`, agregado no banco. | correção antes da task 23 (2026-09-11) |
-| `W9` | **O histórico do client está atribuído ao item errado.** O livro chega com o nome do item; o histórico, com o `AlbionId` numérico resolvido pelo `Index` do `items.json` do dataset. Em `market_scan`, de 440 varreduras de histórico com uma de livro a menos de 90 s na mesma cidade, só 43 são do mesmo item; o preço médio do histórico fica 22× o de mercado na mediana. Provável reordenação de índices do jogo depois da revisão `5cf2e8e9`. Com a regra "o client vence" da task 23, o bloco errado segura o certo da API pública. | **aberto** — atualizar o dataset para a revisão do jogo |
+| `W9` | **O histórico do client está atribuído ao item errado.** O livro chega com o nome do item; o histórico, com o `AlbionId` numérico resolvido pelo `Index` do `items.json` do dataset. Em `market_scan`, de 440 varreduras de histórico com uma de livro a menos de 90 s na mesma cidade, só 43 são do mesmo item; o preço médio do histórico fica 22× o de mercado na mediana. Provável reordenação de índices do jogo depois da revisão `5cf2e8e9`. Com a regra "o client vence" da task 23, o bloco errado segura o certo da API pública. | task 28 |
 | `W2` | **Encantamento da saída tem duas fontes.** O servidor usa `recipe["enchantment_level"]` (coluna); o cliente derivava do sufixo `@N` do nome. Coincidem no dado real, mas o modo de falha seria silencioso — combo inexistente virando "sem preço". | task 06 |

@@ -63,7 +63,7 @@ de seed baixa a revisão imutável registrada em `backend/datasets/` e valida ta
 contagens. Para trabalhar offline, obtenha os arquivos antecipadamente:
 
 ```powershell
-$dumpRevision = '5cf2e8e9b7021f98683181fa5b0e3c64575978e4'
+$dumpRevision = '0be6a5e74f30fc1312118be3d017f3832f027cef'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/formatted/items.json" -OutFile 'items.json'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/items.json" -OutFile 'ITEM DUMP.json'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/formatted/world.json" -OutFile 'world.json'

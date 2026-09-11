@@ -7,27 +7,34 @@ dados de referência somente leitura e não devem ser editados manualmente.
 
 Repositório comunitário: <https://github.com/ao-data/ao-bin-dumps>
 
-Revisão validada em 2026-08-23:
+Revisão validada em 2026-09-11 (task 4/28):
 
 ```text
-5cf2e8e9b7021f98683181fa5b0e3c64575978e4
+0be6a5e74f30fc1312118be3d017f3832f027cef
 ```
 
 | Arquivo local | Arquivo na origem | Tamanho | SHA-256 |
 |---|---|---:|---|
-| `items.json` | `formatted/items.json` | 23.954.341 bytes | `226A22BE333C949F47021130EADCE697F921BF55AD3CF740E86E254B0D89163F` |
-| `ITEM DUMP.json` | `items.json` | 17.219.057 bytes | `FC009A9FB60FB9219C9E44391A842FA6032B5A1D218D1B53E0FFDAA28F29C077` |
-| `world.json` | `formatted/world.json` | 91.492 bytes | `30F1D41B9A5215A1A706023BFB25E20A0E69705D98E4F58A67B8CC0DAE5525B9` |
+| `items.json` | `formatted/items.json` | 24.361.810 bytes | `24F9080FD6C1D69CDB2E494A1B6146BC87913D6CF391A515B250DF938EF791DA` |
+| `ITEM DUMP.json` | `items.json` | 17.454.750 bytes | `C031CE7713C617B0E1744992E2FB8EE9531AE69B66B887ACA672616F6DE9A036` |
+| `world.json` | `formatted/world.json` | 91.925 bytes | `9AA8B6743301EDCF010F95AC053D4917CD787E79523B7E33490613E5522FC6A2` |
 
 Os três artefatos fixados foram comparados por tamanho e SHA-256 com essa revisão. `world.json`
 é materializado pelo seed e não precisa permanecer na raiz do projeto.
+
+A revisão anterior, `5cf2e8e9b7021f98683181fa5b0e3c64575978e4` (validada em 2026-08-23), ficou
+para trás porque **o jogo renumera os itens entre patches**: 12.049 dos 12.071 `Index` mudaram, e
+o histórico que o client manda por número passou a cair no item errado (achado `W9`, task 4/28).
+Manter o dataset na revisão do jogo não é só catálogo novo — é o que faz o histórico do client
+apontar para o item certo. A semeadura move junto o histórico da API pública, que foi gravado com
+o número da revisão anterior.
 
 ## Obtenção
 
 Execute na raiz do projeto:
 
 ```powershell
-$dumpRevision = '5cf2e8e9b7021f98683181fa5b0e3c64575978e4'
+$dumpRevision = '0be6a5e74f30fc1312118be3d017f3832f027cef'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/formatted/items.json" -OutFile 'items.json'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/items.json" -OutFile 'ITEM DUMP.json'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/formatted/world.json" -OutFile 'world.json'
@@ -80,15 +87,20 @@ PostgreSQL; assim, execuções concorrentes são serializadas e leitores observa
 ou o novo, nunca uma troca parcial. Se o mesmo manifesto já estiver ativo, o resultado é
 `unchanged` e os dados não são reimportados.
 
-| Resultado esperado | Contagem |
+Na mesma transação, **antes** de trocar os itens, o seed move o histórico da API pública
+(`market_history_entry.source = 'aodp'`) para o `albion_id` que o dataset novo dá a cada nome; o
+histórico do client não é tocado, e no bloco que o client já tem ele continua vencendo. Nome que
+saiu do dataset perde o histórico da API (task 4/28).
+
+| Resultado esperado (revisão `0be6a5e7`) | Contagem |
 |---|---:|
-| Entradas de item na fonte | 12.071 |
-| Itens importados | 12.062 |
+| Entradas de item na fonte | 12.237 |
+| Itens importados | 12.228 |
 | Itens pulados por nome longo | 9 |
-| Receitas importadas | 5.633 |
-| Receitas alternativas puladas | 3.139 |
+| Receitas importadas | 8.548 |
+| Receitas alternativas puladas | 339 |
 | Receitas sem item correspondente | 39 |
-| Localizações curadas | 2 |
+| Localizações curadas | 9 |
 
 A migração do catálogo usa a extensão PostgreSQL `pg_trgm`. O usuário de migration em produção
 precisa ter permissão para executar `CREATE EXTENSION IF NOT EXISTS pg_trgm`; como alternativa, a
