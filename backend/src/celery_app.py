@@ -105,6 +105,13 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/10"),
         "options": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
     },
+    "sync-aodp-history": {
+        "task": "prices.sync_aodp_history",
+        # A cada 10 min, cinco minutos depois do preço: uma fatia de até 20 pedidos. A própria task
+        # decide se há varredura em andamento ou se espera o próximo bloco de 6 h (task 4/23).
+        "schedule": crontab(minute="5-59/10"),
+        "options": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
+    },
     "metricas-das-filas": {
         "task": "operations.log_queue_metrics",
         "schedule": 60.0,

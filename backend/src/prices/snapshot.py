@@ -150,17 +150,13 @@ def itens_da_categoria(kind: str, category: str, subcategory: str | None = None)
     # Alias de propósito: as três consultas de fora também leem `recipe`, e um `IN (subquery)`
     # sobre a mesma tabela seria correlacionado sozinho — o filtro viraria "a própria linha".
     receita = aliased(Recipe)
-    receitas = (
-        select(receita.id)
-        .outerjoin(Item, Item.unique_name == receita.output_item_unique_name)
-        .where(receita.production_kind == kind)
+    receitas = _na_categoria(
+        select(receita.id).outerjoin(Item, Item.unique_name == receita.output_item_unique_name),
+        receita,
+        kind,
+        category,
+        subcategory,
     )
-    if kind == "refining":
-        receitas = receitas.where(func.coalesce(Item.shop_subcategory2, OUTROS) == category)
-    else:
-        receitas = receitas.where(func.coalesce(Item.shop_category, OUTROS) == category)
-        if subcategory:
-            receitas = receitas.where(func.coalesce(Item.shop_subcategory, OUTROS) == subcategory)
 
     return union(
         select(Recipe.output_item_unique_name).where(Recipe.id.in_(receitas)),
@@ -170,6 +166,33 @@ def itens_da_categoria(kind: str, category: str, subcategory: str | None = None)
         select(Recipe.upgrade_resource_unique_name).where(
             Recipe.id.in_(receitas), Recipe.upgrade_resource_unique_name.is_not(None)
         ),
+    )
+
+
+def _na_categoria(stmt, receita, kind: str, category: str, subcategory: str | None):
+    """A regra da categoria de uma receita, sobre uma consulta que já junta `receita` e `Item`
+    pela saída. Uma cópia só, para o snapshot (task 22) e as vendas (task 23) não divergirem."""
+    stmt = stmt.where(receita.production_kind == kind)
+    if kind == "refining":
+        return stmt.where(func.coalesce(Item.shop_subcategory2, OUTROS) == category)
+    stmt = stmt.where(func.coalesce(Item.shop_category, OUTROS) == category)
+    if subcategory:
+        stmt = stmt.where(func.coalesce(Item.shop_subcategory, OUTROS) == subcategory)
+    return stmt
+
+
+def saidas_da_categoria(kind: str, category: str, subcategory: str | None = None):
+    """Só as saídas das receitas da categoria — o que se **vende** (task 4/23). O volume de venda
+    da barra que entra na espada não é assunto da tela de espadas."""
+    receita = aliased(Recipe)
+    return _na_categoria(
+        select(receita.output_item_unique_name).outerjoin(
+            Item, Item.unique_name == receita.output_item_unique_name
+        ),
+        receita,
+        kind,
+        category,
+        subcategory,
     )
 
 

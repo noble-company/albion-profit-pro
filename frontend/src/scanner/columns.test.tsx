@@ -210,6 +210,25 @@ describe('venda', () => {
       renderCell('venda', row({ saleObservedAt: Number.POSITIVE_INFINITY })),
     ).not.toThrow()
   })
+
+  function renderVendaComVolume(volume: ReturnType<typeof money> | null) {
+    const venda = buildColumns(locationName, nomeItem, {
+      agora: AGORA,
+      volume: () => volume,
+    }).find((c) => c.key === 'venda')!
+    render(<>{venda.cell(row(), item)}</>)
+  }
+
+  test('diz quantas unidades vendem por dia (task 23)', () => {
+    // Um lucro de +44 mil num item que vende 7 por dia não é lucro.
+    renderVendaComVolume(money('12400'))
+    expect(screen.getByText('12,4 mil/dia')).toBeInTheDocument()
+  })
+
+  test('sem histórico de venda, traço — nunca zero (task 23)', () => {
+    renderVendaComVolume(null)
+    expect(screen.getByText('—/dia')).toBeInTheDocument()
+  })
 })
 
 describe('compra', () => {

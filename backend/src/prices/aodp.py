@@ -10,7 +10,7 @@ só 38% das linhas estão abaixo de 6 h. É por isso que a regra de precedência
 minutos atrás que o nosso client acabou de trazer.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from urllib.parse import quote
 
@@ -168,3 +168,87 @@ async def fetch_prices(
     )
     response.raise_for_status()
     return response.json()
+
+
+# --- Histórico (task 4/23) ---
+
+HISTORY_PATH = "/api/v2/stats/history/"
+# Blocos de 6 h, alinhados às 00/06/12/18 UTC — os mesmos do nosso client. A série diária
+# (`time-scale=24`) fecha o dia às 06:00 UTC e desalinharia o rollup, que fecha à meia-noite:
+# ela nunca é pedida.
+HISTORY_TIME_SCALE = "6"
+HISTORY_BUCKET_SECONDS = 21600
+
+
+async def fetch_history(
+    client: httpx.AsyncClient,
+    base_url: str,
+    items: list[str],
+    since: date | None,
+    cities: tuple[str, ...] = DEFAULT_CITIES,
+) -> list[dict]:
+    """Um lote de histórico, desde `since`. Todas as qualidades: a tela vende a qualidade que o
+    jogador escolhe. Levanta `httpx.HTTPError` — quem chama decide se isola a falha.
+
+    Medido em 2026-09-10: `date` corta a resposta de 38,8 KB (30 dias) para 3,9 KB (3 dias) no
+    mesmo lote — é o que torna as varreduras seguintes baratas.
+    """
+    params = {"locations": ",".join(cities), "time-scale": HISTORY_TIME_SCALE}
+    if since is not None:
+        params["date"] = since.isoformat()
+    response = await client.get(
+        f"{base_url}{HISTORY_PATH}{','.join(items)}.json", params=params, timeout=60.0
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def to_history_rows(raw: list[dict], albion_ids: dict[str, int]) -> list[dict]:
+    """Converte a resposta para linhas de `market_history_entry`, com `source='aodp'`.
+
+    - A tabela é chaveada pelo `albion_id`; item sem ele fica de fora (39 no catálogo atual).
+    - A API dá o preço médio **arredondado**. O total do bloco é `unidades × média`, com erro de
+      até meia prata por unidade — é por isso que, no mesmo bloco, o client vence.
+    - Ponto repetido na resposta: fica o último. O Postgres recusa `ON CONFLICT` batendo na mesma
+      linha duas vezes no mesmo INSERT.
+    - Bloco sem unidade não acrescenta nada e não vira linha.
+    """
+    linhas: dict[tuple, dict] = {}
+    cidades_ignoradas: set[str] = set()
+    sem_albion_id: set[str] = set()
+
+    for serie in raw:
+        location_id = CITY_TO_LOCATION_ID.get(serie.get("location", ""))
+        if location_id is None:
+            cidades_ignoradas.add(serie.get("location", ""))
+            continue
+        albion_id = albion_ids.get(serie.get("item_id", ""))
+        if albion_id is None:
+            sem_albion_id.add(serie.get("item_id", ""))
+            continue
+        quality = int(serie.get("quality") or 1)
+
+        for ponto in serie.get("data") or []:
+            inicio = _observed_at(ponto.get("timestamp"))
+            unidades = int(ponto.get("item_count") or 0)
+            if inicio is None or unidades <= 0:
+                continue
+            preco = Decimal(str(ponto.get("avg_price") or 0))
+            linhas[(albion_id, location_id, quality, inicio)] = {
+                "item_id": albion_id,
+                "location_id": location_id,
+                "quality_level": quality,
+                "bucket_seconds": HISTORY_BUCKET_SECONDS,
+                "bucket_start": inicio,
+                "item_amount": unidades,
+                "silver_amount": preco * unidades,
+                "source": SOURCE_AODP,
+            }
+
+    if cidades_ignoradas or sem_albion_id:
+        log.info(
+            "aodp.historico_ignorado",
+            cidades=sorted(cidades_ignoradas),
+            itens_sem_albion_id=len(sem_albion_id),
+        )
+    return list(linhas.values())

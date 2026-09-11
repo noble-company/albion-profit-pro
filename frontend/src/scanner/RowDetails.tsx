@@ -8,6 +8,7 @@ import { formatQuantity, formatSilver, type Money } from '@/lib/money'
 
 import type { ScannerDetail } from './engine'
 import type { Origem } from './pricing'
+import { formatarVolume } from './vendas'
 
 /**
  * O que a linha esconde (task 4/11.4, reorganizado na 4/20, origem por item na 4/24).
@@ -86,6 +87,8 @@ export interface PrecoDaCidade {
   locationId: string
   sell: Money | null
   buy: Money | null
+  /** unidades vendidas por dia, média de 7 dias (task 23); ausente ou nulo = sem histórico */
+  unitsPerDay?: Money | null
 }
 
 export function RowDetails({
@@ -281,6 +284,7 @@ export function RowDetails({
                 <th className="py-1 text-left font-medium">Cidade</th>
                 <th className="py-1 text-right font-medium">Ordem de venda</th>
                 <th className="py-1 text-right font-medium">Venda imediata</th>
+                <th className="py-1 text-right font-medium">Vende/dia</th>
               </tr>
             </thead>
             <tbody>
@@ -298,6 +302,10 @@ export function RowDetails({
                   <td className="py-0.5 pr-2">{locationName(preco.locationId)}</td>
                   <td className="py-0.5 text-right tabular-nums">{numero(preco.sell)}</td>
                   <td className="py-0.5 text-right tabular-nums">{numero(preco.buy)}</td>
+                  {/* O preço alto de uma cidade que vende 3 por dia não escoa o lote (task 23). */}
+                  <td className="py-0.5 text-right tabular-nums">
+                    {preco.unitsPerDay ? formatarVolume(preco.unitsPerDay) : TRACO}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -40,6 +40,8 @@ import { ScannerTable } from './ScannerTable'
 import { cidadesFiltradas, estadoDaTela, podeAnalisar, precosNaMaoPara } from './tela'
 import { DEFAULT_SORT, sortRows, type SortState } from './sorting'
 import { usePriceSnapshot, type RecorteDoSnapshot } from './usePriceSnapshot'
+import { useSalesVolume } from './useSalesVolume'
+import { buildSalesIndex, chaveDeVenda, volumeDaVenda } from './vendas'
 import { useScannerWorker } from './useScannerWorker'
 import { RETORNOS_PADRAO, rendimentoPorCemRecursos } from './return-rates'
 import { DEFAULT_QUANTITY, useScannerFilters } from './useScannerFilters'
@@ -184,6 +186,13 @@ export function ScannerPage({
   )
   const precos = usePriceSnapshot(realm, mercadosPedidos, recorte, modo !== 'nada')
 
+  /** Unidades vendidas por dia (task 23), no mesmo recorte do preço. Muda a cada 6 h, não a 30 s. */
+  const vendas = useSalesVolume(realm, recorte, modo !== 'nada')
+  const indiceDeVendas = useMemo(
+    () => (vendas.vendas ? buildSalesIndex(vendas.vendas, canonico) : null),
+    [vendas.vendas, canonico],
+  )
+
   /** O índice fica fora do cálculo das linhas porque o painel de detalhe também consulta ele. */
   const indice = useMemo(
     () => (precos.snapshot ? buildPriceIndex(precos.snapshot, canonico) : null),
@@ -277,8 +286,23 @@ export function ScannerPage({
   )
 
   const columns = useMemo(
-    () => buildColumns(locationName, nomeItem, { maxIngredientes }),
-    [locationName, nomeItem, maxIngredientes],
+    () =>
+      buildColumns(locationName, nomeItem, {
+        maxIngredientes,
+        // Sem o dado ainda, a célula não mostra a linha; com ele, item sem histórico é traço.
+        volume: indiceDeVendas
+          ? (row) =>
+              volumeDaVenda(row, indiceDeVendas, cidadesDeVenda, scenario.outputQuality)
+          : undefined,
+      }),
+    [
+      locationName,
+      nomeItem,
+      maxIngredientes,
+      indiceDeVendas,
+      cidadesDeVenda,
+      scenario.outputQuality,
+    ],
   )
 
   /**
@@ -325,6 +349,10 @@ export function ScannerPage({
               locationId: cidade.id,
               sell: entrada?.sell ? money(entrada.sell.price) : null,
               buy: entrada?.buy ? money(entrada.buy.price) : null,
+              unitsPerDay:
+                indiceDeVendas?.get(
+                  chaveDeVenda(row.outputItem, cidade.id, scenario.outputQuality),
+                ) ?? null,
             }
           })}
           cidades={cidades}
@@ -374,6 +402,7 @@ export function ScannerPage({
       realm,
       scenario,
       definirOrigem,
+      indiceDeVendas,
     ],
   )
 

@@ -84,4 +84,70 @@ dia com o da tela.
 
 ## Estado da implementação
 
-_Não iniciada._
+**Concluída.** Frontend `npm run test` **507/507** · `typecheck` limpo · `lint` 0 erros (7 avisos, os
+mesmos). Backend `pytest tests` **446 passaram**, 1 falha que já existia
+(`test_compare_query_count_does_not_grow_with_city_count`) · `ruff` limpo.
+
+Guards vermelhos primeiro: rota de vendas (6, com 404), histórico e varredura (o arquivo inteiro,
+sem `src.prices.history`), e no frontend `vendas.test.ts` inteiro mais 3 testes de coluna e painel.
+
+### Decisões confirmadas com o usuário (2026-09-11)
+
+Média de **7 dias completos**; na venda pela média ou com preço fixo, **soma das cidades de Vender
+em**; varredura **a cada 6 h**, a primeira com 30 dias e as seguintes com 3; **todas as qualidades**.
+
+### O que a validação mudou
+
+- **`date` na API pública** corta a resposta de 38,8 KB para 3,9 KB no mesmo lote (medido).
+- **8.644 itens** no catálogo depois da 27, não 5.844; 39 sem `albion_id` ficam fora.
+- **`avg_price` vem arredondado**: a prata do bloco é `unidades × média`. O client grava a exata.
+- **O `poda`/rollup precisava aguentar o volume** — corrigido antes (achado `W8`).
+
+### Medido na primeira varredura real
+
+- Uma fatia (20 pedidos de 50 itens): **137 s**, nenhuma falha, **303 mil blocos** de 810 itens em
+  8 cidades, de 12/08 a 11/09. A varredura inteira são 173 lotes, ~9 fatias. O beat segue sozinho.
+- O rollup diário passou de 0,6 s para **4 s** depois da primeira fatia e **20 s** depois de três.
+  Ele reconstrói a janela de 90 dias a cada hora; com a varredura completa (~2,6 milhões de blocos)
+  pode passar de 1 min. Cabe, mas é o próximo gargalo — um rollup incremental resolveria.
+- `market_history_entry` com 452 mil linhas: 163 MB com índices.
+- `GET /prices/sales`: o realm (3.574 linhas) em 145 ms e **35,8 KB com gzip**; Refino › Tecido em
+  25 ms e 0,8 KB; Craft › Armas › Arcos em 203 ms e 2,0 KB.
+- T4_CLOTH, depois do rollup: Lymhurst **220,7 mil/dia** a 293, Thetford 76,3 mil a 312, Bridgewatch
+  39,6 mil, Martlock 37,4 mil, Caerleon 19,5 mil, Brecilien 1,6 mil (2 dias).
+
+### Achado: o histórico do client está atribuído ao item errado (`W9`)
+
+Conferindo o volume contra a API pública, o client aparece com T4_CLOTH em Fort Sterling vendendo
+30 a 87 unidades por bloco a **~105 mil** cada; a API pública, 25 a 45 mil unidades a ~330. Não é
+caso isolado:
+
+- De 118 pares item × cidade com histórico do client e preço atual no snapshot, **só 9** têm o preço
+  médio do histórico entre metade e o dobro do preço atual; a razão mediana é **22×**.
+- Em `market_scan`, de **440** varreduras de histórico com uma varredura de livro a menos de 90 s na
+  mesma cidade, **só 43** são do mesmo item. A menos de 1 s: histórico `T5_CLOTH_LEVEL3@3`, livro
+  `T4_LEATHER_LEVEL2@2`; histórico `T4_ARTEFACT_2H_BOW_KEEPER`, livro `T5_LEATHER_LEVEL4@4`.
+
+O livro chega com o nome do item (`ItemTypeId`); o histórico, com o `AlbionId` numérico, resolvido
+pelo `Index` do `items.json` do dataset (revisão `5cf2e8e9`). A explicação mais provável é o jogo
+ter reordenado os índices depois dessa revisão. **Não é desta task**, mas atinge ela: a regra "no
+mesmo bloco o client vence" hoje segura o bloco errado do client por cima do certo da API — é o que
+deixa Fort Sterling com preço médio de 624. Os blocos guardam o `AlbionId` cru, então atualizar o
+dataset para a revisão do jogo corrige a atribuição retroativamente.
+
+### O que só apareceu implementando
+
+- **O caractere inseparável do ICU.** `Intl.NumberFormat('pt-BR', { notation: 'compact' })` escreve
+  "12,4 mil" com espaço inseparável; o formatador troca por espaço comum, com escape explícito.
+- **A célula de Venda ficou mais larga** (8,5 → 10 rem): o volume divide a primeira linha com a
+  cidade, porque uma terceira linha não cabe na altura fixa da tabela virtualizada.
+- **`_na_categoria`** virou uma cópia só da regra de categoria, usada pelo snapshot (22) e pelas
+  vendas (23), que pedem só as saídas.
+
+### Pendente pra você testar
+
+1. Com o frontend no ar, abrir `/refino` → **Tecido**: a célula de Venda mostra "…mil/dia" ao lado da
+   cidade, e o painel de uma linha tem a coluna **Vende/dia** por cidade.
+2. Um item sem histórico mostra "—/dia", nunca zero.
+3. No jogo, abrir o histórico de um item e comparar o volume do dia com o da tela — de preferência
+   num item que o client ainda não varreu, por causa do `W9`.

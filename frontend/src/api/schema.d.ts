@@ -440,6 +440,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/prices/sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Sales Volume
+         * @description Units sold per day, averaged over the last 7 complete UTC days, per item, market and quality. Built from the daily rollup, which merges our client's history with the public Albion Data Project history. Pass `kind` + `category` (and optionally `subcategory`) to narrow the rows to the outputs of that shop category. An item without history is absent, never zero.
+         */
+        get: operations["read_sales_volume_prices_sales_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{item_id}/prices": {
         parameters: {
             query?: never;
@@ -1639,6 +1659,45 @@ export interface components {
          * @enum {string}
          */
         SaleMode: "immediate" | "sell_order";
+        /**
+         * SalesColumnsOut
+         * @description Arrays paralelos, como o snapshot: o índice `i` de cada array descreve a mesma linha.
+         *
+         *     ``units_per_day`` é a média de unidades vendidas por dia na janela, e ``average_price`` o preço
+         *     médio ponderado pelo volume — os dois como string decimal (`F09`). ``days_with_data`` diz em
+         *     quantos dias da janela houve venda: a média é sobre a janela inteira, não sobre esses dias.
+         */
+        SalesColumnsOut: {
+            /** Item */
+            item: number[];
+            /** Location */
+            location: number[];
+            /** Quality */
+            quality: number[];
+            /** Units Per Day */
+            units_per_day: string[];
+            /** Average Price */
+            average_price: (string | null)[];
+            /** Days With Data */
+            days_with_data: number[];
+        };
+        /**
+         * SalesOut
+         * @description Unidades vendidas por dia (task 4/23). Item sem histórico **fica ausente** — nunca zero,
+         *     que afirmaria que ninguém compra.
+         */
+        SalesOut: {
+            server: components["schemas"]["AlbionServer"];
+            /** Days */
+            days: number;
+            /** Row Count */
+            row_count: number;
+            /** Items */
+            items: string[];
+            /** Locations */
+            locations: string[];
+            columns: components["schemas"]["SalesColumnsOut"];
+        };
         /** Series6hPoint */
         Series6hPoint: {
             /**
@@ -2662,6 +2721,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PriceSnapshotOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_sales_volume_prices_sales_get: {
+        parameters: {
+            query: {
+                server: components["schemas"]["AlbionServer"];
+                kind?: ("refining" | "crafting") | null;
+                category?: string | null;
+                subcategory?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOut"];
                 };
             };
             /** @description Validation Error */

@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import current_active_user
 from src.database import get_session
 from src.prices.constants import AlbionServer
-from src.prices.schemas import DemandOut, ItemPricesOut, PriceSnapshotOut
+from src.prices.sales import read_sales
+from src.prices.schemas import DemandOut, ItemPricesOut, PriceSnapshotOut, SalesOut
 from src.prices.service import get_item_demand, get_item_prices
 from src.prices.snapshot import read_snapshot, to_columnar
 
@@ -105,13 +106,7 @@ async def read_price_snapshot(
     subcategory: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
 ):
-    # A mesma `category` significa coisas diferentes no refino (família) e no craft. Sem `kind`
-    # não há como resolver os itens — e devolver o realm inteiro esconderia o erro do cliente
-    # atrás de uma resposta que funciona, só que 50 vezes maior.
-    if subcategory is not None and category is None:
-        raise HTTPException(status_code=422, detail="subcategory requires category")
-    if category is not None and kind is None:
-        raise HTTPException(status_code=422, detail="category requires kind")
+    _validar_recorte(kind, category, subcategory)
 
     rows = await read_snapshot(
         session,
@@ -122,3 +117,38 @@ async def read_price_snapshot(
         subcategory=subcategory,
     )
     return PriceSnapshotOut(server=server, generated_at=datetime.now(UTC), **to_columnar(rows))
+
+
+def _validar_recorte(kind: str | None, category: str | None, subcategory: str | None) -> None:
+    """A mesma `category` significa coisas diferentes no refino (família) e no craft. Sem `kind`
+    não há como resolver os itens — e devolver o realm inteiro esconderia o erro do cliente atrás
+    de uma resposta que funciona, só que muitas vezes maior (tasks 4/22 e 4/23)."""
+    if subcategory is not None and category is None:
+        raise HTTPException(status_code=422, detail="subcategory requires category")
+    if category is not None and kind is None:
+        raise HTTPException(status_code=422, detail="category requires kind")
+
+
+@snapshot_router.get(
+    "/sales",
+    response_model=SalesOut,
+    description=(
+        "Units sold per day, averaged over the last 7 complete UTC days, per item, market and "
+        "quality. Built from the daily rollup, which merges our client's history with the public "
+        "Albion Data Project history. Pass `kind` + `category` (and optionally `subcategory`) to "
+        "narrow the rows to the outputs of that shop category. An item without history is "
+        "absent, never zero."
+    ),
+)
+async def read_sales_volume(
+    server: AlbionServer = Query(...),
+    kind: Literal["refining", "crafting"] | None = Query(None),
+    category: str | None = Query(None),
+    subcategory: str | None = Query(None),
+    session: AsyncSession = Depends(get_session),
+):
+    _validar_recorte(kind, category, subcategory)
+    vendas = await read_sales(
+        session, server.value, kind=kind, category=category, subcategory=subcategory
+    )
+    return SalesOut(server=server, **vendas)

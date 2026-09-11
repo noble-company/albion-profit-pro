@@ -1,11 +1,12 @@
 import { ItemImage } from '@/components/ItemImage'
 import { formatarNomeCurto } from '@/lib/formatters'
-import { formatPercent, formatQuantity, formatSilver } from '@/lib/money'
+import { formatPercent, formatQuantity, formatSilver, type Money } from '@/lib/money'
 
 import { CardDeCompra } from './CardDeCompra'
 import type { ScannerRow } from './engine'
 import type { ScannerColumn } from './ScannerTable'
 import { idadeDaCotacao, TRACO } from './tela'
+import { formatarVolume } from './vendas'
 
 /**
  * Colunas do scanner (task 4/11, enxugadas na 4/20).
@@ -45,12 +46,17 @@ export interface OpcoesDeColuna {
    * 2 no refino, até 4 no craft.
    */
   maxIngredientes?: number
+  /**
+   * Quantas unidades a venda da linha escoa por dia (task 4/23). Ausente = a tela ainda não tem o
+   * dado, e a célula não mostra nada; `null` = sem histórico, e ela mostra traço — nunca zero.
+   */
+  volume?: (row: ScannerRow) => Money | null
 }
 
 export function buildColumns(
   locationName: (id: string) => string,
   nomeItem: NomeItem,
-  { agora = new Date(), maxIngredientes = 2 }: OpcoesDeColuna = {},
+  { agora = new Date(), maxIngredientes = 2, volume }: OpcoesDeColuna = {},
 ): ScannerColumn[] {
   return [
     {
@@ -117,7 +123,9 @@ export function buildColumns(
     {
       key: 'venda',
       header: 'Venda',
-      width: '8.5rem',
+      // Mais larga desde a task 23: a cidade divide a primeira linha com o volume por dia. Uma
+      // terceira linha não cabe na altura fixa da tabela virtualizada.
+      width: '10rem',
       // Onde e por quanto. Com a cidade fora da linha (task 19), "Venda bruta" sozinha não
       // diria nenhum dos dois — é o card "MARTLOCK · P. VENDA 72" do app de referência.
       cell: (row) => {
@@ -125,16 +133,29 @@ export function buildColumns(
           return <span className="text-foreground-subtle">{TRACO}</span>
         }
         const idade = idadeDaCotacao(row.saleObservedAt, agora)
+        const unidades = volume ? volume(row) : undefined
         return (
           <span className="flex min-w-0 flex-col leading-tight">
-            {/* Média e preço fixo não têm cidade: a venda empata em todas e a linha foi
-                avaliada numa qualquer — mostrar o nome dela afirmaria um mercado (task 24). */}
-            <span className="truncate text-xs text-buy-side">
-              {row.saleBasis === 'city'
-                ? locationName(row.locationId)
-                : row.saleBasis === 'average'
-                  ? (row.saleSource ?? 'média')
-                  : 'preço fixo'}
+            <span className="flex min-w-0 items-baseline justify-between gap-1 text-xs">
+              {/* Média e preço fixo não têm cidade: a venda empata em todas e a linha foi
+                  avaliada numa qualquer — mostrar o nome dela afirmaria um mercado (task 24). */}
+              <span className="truncate text-buy-side">
+                {row.saleBasis === 'city'
+                  ? locationName(row.locationId)
+                  : row.saleBasis === 'average'
+                    ? (row.saleSource ?? 'média')
+                    : 'preço fixo'}
+              </span>
+              {/* "UND/D" do app de referência: um lucro de +44 mil num item que vende 7 por dia
+                  não é lucro (task 23). */}
+              {unidades !== undefined && (
+                <span
+                  className="shrink-0 tabular-nums text-foreground-muted"
+                  title="Unidades vendidas por dia — média dos últimos 7 dias completos"
+                >
+                  {unidades ? formatarVolume(unidades) : TRACO}/dia
+                </span>
+              )}
             </span>
             <span className="flex min-w-0 items-baseline gap-1 text-xs">
               <span className="tabular-nums text-foreground">

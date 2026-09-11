@@ -16,7 +16,7 @@ from src.prices.constants import MarketScanSource
 from src.prices.models import MarketHistoryEntry, MarketOrder
 from src.prices.policy import get_market_book_policy
 from src.prices.service import recompute_and_cache_book, record_scans
-from src.prices.snapshot import refresh_snapshot_from_orders
+from src.prices.snapshot import SOURCE_CLIENT, refresh_snapshot_from_orders
 
 
 async def save_market_orders(
@@ -118,6 +118,7 @@ async def save_market_history(
             # SilverAmount vem do wire multiplicado por 10.000 (é o total do bucket, não o
             # unitário) — convertido uma única vez na borda do ingest.
             "silver_amount": silver_from_wire(h["silver_amount"]),
+            "source": SOURCE_CLIENT,
         }
     rows = list(rows_by_bucket.values())
     if not rows:
@@ -133,6 +134,8 @@ async def save_market_history(
             set_={
                 "item_amount": stmt.excluded.item_amount,
                 "silver_amount": stmt.excluded.silver_amount,
+                # O client sempre sobrescreve, inclusive bloco que veio da API pública (task 4/23).
+                "source": stmt.excluded.source,
                 "last_seen_at": func.now(),
             },
         )

@@ -140,3 +140,31 @@ class PriceSnapshotOut(BaseModel):
     sources: list[str]
 
     columns: PriceSnapshotColumnsOut
+
+
+class SalesColumnsOut(BaseModel):
+    """Arrays paralelos, como o snapshot: o índice `i` de cada array descreve a mesma linha.
+
+    ``units_per_day`` é a média de unidades vendidas por dia na janela, e ``average_price`` o preço
+    médio ponderado pelo volume — os dois como string decimal (`F09`). ``days_with_data`` diz em
+    quantos dias da janela houve venda: a média é sobre a janela inteira, não sobre esses dias.
+    """
+
+    item: list[int]
+    location: list[int]
+    quality: list[int]
+    units_per_day: list[str]
+    average_price: list[str | None]
+    days_with_data: list[int]
+
+
+class SalesOut(BaseModel):
+    """Unidades vendidas por dia (task 4/23). Item sem histórico **fica ausente** — nunca zero,
+    que afirmaria que ninguém compra."""
+
+    server: AlbionServer
+    days: int
+    row_count: int
+    items: list[str]
+    locations: list[str]
+    columns: SalesColumnsOut

@@ -162,6 +162,7 @@ class MarketHistoryEntry(Base):
         ),
         CheckConstraint("item_amount >= 0", name="ck_market_history_entry_amount_nonnegative"),
         CheckConstraint("silver_amount >= 0", name="ck_market_history_entry_silver_nonnegative"),
+        CheckConstraint("source IN ('client', 'aodp')", name="ck_market_history_entry_source"),
         UniqueConstraint(
             "server_id",
             "item_id",
@@ -200,6 +201,9 @@ class MarketHistoryEntry(Base):
     item_amount: Mapped[int] = mapped_column(BigInteger)  # ItemAmount
     # SilverAmount — já convertido do wire (x10.000) pro total real em silver do bucket
     silver_amount: Mapped[Decimal] = mapped_column(Numeric(20, 4))
+    # `client` ou `aodp` (task 4/23). No mesmo bloco o client vence: ele vem direto do servidor do
+    # jogo, com a prata exata; a API pública é agregada e arredonda o preço médio.
+    source: Mapped[str] = mapped_column(String(16), default="client", server_default="client")
 
     first_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

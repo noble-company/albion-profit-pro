@@ -109,8 +109,8 @@ function montar(
       nomeItem={(u) => u}
       locationName={(id) => ({ '1002': 'Lymhurst', '3005': 'Caerleon' })[id] ?? id}
       precoPorCidade={[
-        { locationId: '1002', sell: money('1100'), buy: money('1000') },
-        { locationId: '3005', sell: money('1500'), buy: money('1400') },
+        { locationId: '1002', sell: money('1100'), buy: money('1000'), unitsPerDay: money('12400') },
+        { locationId: '3005', sell: money('1500'), buy: money('1400'), unitsPerDay: null },
       ]}
       cidades={CIDADES}
       origemDe={(lado, item) => origens[`${lado}:${item}`] ?? { tipo: 'padrao' }}
@@ -208,6 +208,17 @@ describe('comparação entre cidades', () => {
 
     expect(secao('Venda').getByRole('cell', { name: 'Caerleon' })).toBeInTheDocument()
     expect(secao('Venda').getByText('1.500')).toBeInTheDocument()
+  })
+
+  test('diz quanto cada cidade vende por dia, e traço onde não há histórico (task 23)', () => {
+    montar()
+    const venda = secao('Venda')
+
+    expect(venda.getByRole('columnheader', { name: 'Vende/dia' })).toBeInTheDocument()
+    const lymhurst = venda.getByRole('cell', { name: 'Lymhurst' }).closest('tr')!
+    const caerleon = venda.getByRole('cell', { name: 'Caerleon' }).closest('tr')!
+    expect(within(lymhurst).getAllByRole('cell').at(-1)).toHaveTextContent('12,4 mil')
+    expect(within(caerleon).getAllByRole('cell').at(-1)).toHaveTextContent('—')
   })
 })
 
