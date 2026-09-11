@@ -83,6 +83,8 @@ BLOCO 4 — a tela que o jogador pediu (achados do uso real, 2026-09-10)
 23 Historico da API publica (volume/dia)    ── depende de 04, 20
 24 Comprar em, Vender em e escolha por item ── depende de 11.3, 19, 20
 25 Preco de compra e de venda na barra      ── depende de 24
+26 Retorno de recurso por ingrediente       ── depende de 05, 06, 11.6, 12
+27 Itens com mais de uma receita            ── depende de 26
 15 Aposentar o ranking materializado       ── depende de 11, 12
 16 Documentos reconciliados                ── depende de 15
 ```
@@ -126,6 +128,8 @@ estado real e recebe confirmação explícita antes de alterar código.
 | [23](23-historico-da-api-publica.md) | Histórico da API pública | — | Unidades por dia ao lado do preço de venda, com 30 dias desde o primeiro dia |
 | [24](24-comprar-em-vender-em-e-escolha-por-item.md) | Comprar em, Vender em e escolha por item | — | Nenhum preço vem de cidade que o jogador não frequenta; cada preço escolhe sua origem no painel |
 | [25](25-preco-de-compra-e-de-venda-na-barra.md) | Preço de compra e de venda na barra | — | A origem de todos os preços muda de uma vez; o painel fica para a exceção |
+| [26](26-retorno-de-recurso-por-ingrediente.md) | Retorno de recurso por ingrediente | `W6` | Artefato e o que não retorna é comprado para todas as execuções |
+| [27](27-itens-com-mais-de-uma-receita.md) | Itens com mais de uma receita | `W7` | Armas e armaduras de artefato de facção entram no catálogo |
 | [15](15-aposentar-o-ranking-materializado.md) | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
 | 16 | Documentos reconciliados | — | Specs param de descrever a arquitetura revogada |
 
@@ -166,6 +170,8 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [ ] 23 — Histórico da API pública
 - [x] 24 — Comprar em, Vender em e escolha por item
 - [x] 25 — Preço de compra e de venda na barra
+- [ ] 26 — Retorno de recurso por ingrediente
+- [ ] 27 — Itens com mais de uma receita
 - [x] 15 — Aposentar o ranking materializado
 - [ ] 16 — Documentos reconciliados
 
@@ -213,4 +219,6 @@ A [Fase 3.6](../correcoes/README.md) é substituída por esta. Destino de cada t
 | `W4` | **Virtualização não é testável em jsdom.** `@tanstack/react-virtual` depende de layout real; nem stub de `getBoundingClientRect`, nem polyfill de `ResizeObserver`, nem `initialRect` fazem o virtualizador renderizar em jsdom. Teste removido em favor de guard textual + verificação no navegador. | task 10 |
 | `W3` | **Guard textual verde testando nada.** O `` de uma regex virou byte backspace (`0x08`) ao passar por heredoc de shell; o teste passava sem casar nada. Só apareceu porque o guard *deveria* nascer vermelho. Escrever regex de guard pelo editor, não por script. | task 09 |
 | `W5` | **A taxa da estação não é prata por execução.** O jogo cobra por **nutrição consumida**, e a nutrição sai do valor do item (`itemvalue × 0,1125`). Prata fixa cobrava 56× demais num recurso T4 e 44× de menos numa arma T8 Avalon — o erro **troca de sinal**, então nenhum valor digitado ficava certo em duas linhas ao mesmo tempo. `@itemvalue` nunca tinha sido importado, e o dump não o publica para arma nem equipamento. | task 18 |
+| `W6` | **Retorno de recurso aplicado a ingrediente que não retorna.** O dump marca artefato, cristal, token e afins com `@maxreturnamount="0"`; o importador descarta a marca, e cliente e servidor aplicam o retorno à receita inteira. Numa receita com artefato, 600 receitas a 36,7% compravam 600 artefatos para 947 execuções. 1.356 receitas de craft afetadas. | task 26 |
+| `W7` | **Item com mais de uma receita fica fora do catálogo.** O importador pula `craftingrequirements` em lista fora do refino: 727 itens base e 2.420 níveis encantados, quase todos equipamento de artefato de facção (artefato × token de favor). | task 27 |
 | `W2` | **Encantamento da saída tem duas fontes.** O servidor usa `recipe["enchantment_level"]` (coluna); o cliente derivava do sufixo `@N` do nome. Coincidem no dado real, mas o modo de falha seria silencioso — combo inexistente virando "sem preço". | task 06 |
