@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "dataset_name": "albion-static",
-  "version": "2026-09-10-5cf2e8e9-return-eligible-v1",
-  "transform_revision": "item-search-v1-recipe-order-v1-standard-refining-v1-production-kind-v1-return-eligible-v1",
+  "version": "2026-09-10-5cf2e8e9-artifact-route-v1",
+  "transform_revision": "item-search-v1-recipe-order-v1-standard-refining-v1-production-kind-v1-return-eligible-v1-artifact-route-v1",
   "source": {
     "repository": "https://github.com/ao-data/ao-bin-dumps",
     "revision": "5cf2e8e9b7021f98683181fa5b0e3c64575978e4"
@@ -35,8 +35,8 @@
     "source_items": 12071,
     "imported_items": 12062,
     "skipped_long_item_names": 9,
-    "recipes": 5633,
-    "skipped_multiple_recipes": 3139,
+    "recipes": 8433,
+    "skipped_multiple_recipes": 339,
     "recipes_without_item_id": 39,
     "curated_locations": 9
   }

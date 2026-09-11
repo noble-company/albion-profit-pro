@@ -64,4 +64,57 @@ mesma quantidade do Rendimento.
 
 ## Estado da implementação
 
-_Não iniciada._
+**Concluída.** Backend `pytest tests` **430 passaram**, 1 falha que já existia
+(`test_compare_query_count_does_not_grow_with_city_count`, fora desta task) · `ruff` limpo. O
+frontend não mudou: os itens aparecem nas categorias pelo catálogo.
+
+Guards vermelhos primeiro: as duas do artefato (base e encantado) falharam; "peça Royal continua
+fora" passou contra o código antigo — é a trava de que a mudança não pegou o que não devia.
+
+### A decisão (usuário, 2026-09-10)
+
+**Opção (a): a receita do artefato.** `select_artifact_route` só age quando alguma receita da lista
+usa `_ARTEFACT_TOKEN_FAVOR_`, e escolhe a única receita sem o token que tem um `_ARTEFACT_`. Contado
+com as funções do próprio importador: **2.800 saídas** (560 base + 2.240 encantadas) — armas 1.600,
+e 300 cada em mão secundária, cabeça, armadura e calçados —, **todas com exatamente uma receita de
+artefato**. Nenhuma ambígua.
+
+Os outros casos ficaram fora, por decisão junto com o usuário:
+
+| Caso | As receitas | Por que fora |
+|---|---|---|
+| Peças Royal (225) | Trocar SET1, SET2 ou SET3 + selos Royal | O custo depende de qual peça o jogador tem |
+| Peixe picado | 38 receitas, uma por peixe, cada uma rende diferente | Uma receita por item não representa |
+| Recurso bruto encantado | Subir o encantamento do nível anterior ou do base, pagando prata | Transmutação, não craft |
+| Almas e relíquias | Runa → alma, ou token de GvG | Conversão |
+| Tokens de facção, blocos de pedra | Troca de token; 5 receitas de bloco | Os blocos já estavam fora |
+
+### Medido
+
+- Import: **8.433 receitas** (antes 5.633), **339 puladas** (antes 3.139), 39 sem `item_id` (igual).
+  3.520 receitas com artefato marcado como não retornável (task 26).
+- `T6_2H_BOW_KEEPER@3`: tábuas encantadas ×32 retornam, `T6_ARTEFACT_2H_BOW_KEEPER` ×1 não.
+- **Catálogo de craft: 8.323 receitas, 197,3 KB com gzip** (5.692 KB cru), leitura em 886 ms. O teto
+  da task 02 era 200 KB — cabe, mas sem folga. Refino: 110 receitas, 5,2 KB.
+- **Semeadura de verdade no banco local** (`seed_static_data --dataset-dir`), com os dumps da raiz e
+  o `world.json` do manifesto que sobrou da task 01 em `%TEMP%` — sem baixar nada, e com o SHA-256
+  de cada arquivo conferido. Versão `2026-09-10-5cf2e8e9-artifact-route-v1` aplicada.
+
+### O que só apareceu implementando
+
+- **Reimportar pelo script não bastaria para a tela.** Na task 26 o catálogo mudou de formato, e o
+  `ETag` muda com o formato. Aqui só o conteúdo muda, e a versão do catálogo vem do dataset ativo —
+  que só a semeadura troca. Com `scripts.import_recipes` sozinho o servidor responderia `304` e o
+  navegador ficaria com as 5.523 receitas antigas. Com a semeadura, o `ETag` do craft passou de
+  `b6e558d1…` para `1b228698…`.
+- **"Todas" e o Top 15 do craft ficam mais pesados**: 8.323 receitas contra 5.523. Os 2,7 s medidos
+  na task 12 devem ir para perto de 4 s — estimativa proporcional, não medida. Escolher uma categoria
+  continua rápido (task 21).
+
+### Pendente pra você testar
+
+1. Dar F5 em `/craft` e escolher **Armas → Arcos**: o Arco do Guardião aparece, do T4 ao T8, com os
+   encantamentos.
+2. Abrir a linha do Arco do Guardião T6 com 10 receitas e retorno 15,2%: Rendimento 11, e na coluna
+   Compra o artefato ×11 e as tábuas ×320.
+3. Clicar em **Top 15** no craft e conferir que o "Calculando…" termina em poucos segundos.
