@@ -429,7 +429,7 @@ export interface paths {
         };
         /**
          * Read Price Snapshot
-         * @description Top of book for a whole realm, optionally narrowed to specific markets. Returns **every** combination it has, with no freshness cut-off: each side carries its own `observed_at` and `source` so the client can decide what to trust and what to hide. Sides are `sell` (game offers, the ask) and `buy` (game requests, the bid); `null` means no price, never zero.
+         * @description Top of book for a whole realm, optionally narrowed to specific markets. Returns **every** combination it has, with no freshness cut-off: each side carries its own `observed_at` and `source` so the client can decide what to trust and what to hide. Sides are `sell` (game offers, the ask) and `buy` (game requests, the bid); `null` means no price, never zero. Pass `kind` + `category` (and optionally `subcategory`) to narrow the rows to the items the recipes of that shop category need: outputs, ingredients and upgrade resources. For `refining` the category is the family (`shop_subcategory2`); a recipe whose output has no category lives under `other`.
          */
         get: operations["read_price_snapshot_prices_snapshot_get"];
         put?: never;
@@ -2641,6 +2641,9 @@ export interface operations {
             query: {
                 server: components["schemas"]["AlbionServer"];
                 location_id?: string[] | null;
+                kind?: ("refining" | "crafting") | null;
+                category?: string | null;
+                subcategory?: string | null;
             };
             header?: never;
             path?: never;

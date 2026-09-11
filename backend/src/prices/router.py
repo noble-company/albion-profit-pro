@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import current_active_user
@@ -91,13 +91,34 @@ snapshot_router = APIRouter(
         "**every** combination it has, with no freshness cut-off: each side carries its own "
         "`observed_at` and `source` so the client can decide what to trust and what to hide. "
         "Sides are `sell` (game offers, the ask) and `buy` (game requests, the bid); `null` "
-        "means no price, never zero."
+        "means no price, never zero. Pass `kind` + `category` (and optionally `subcategory`) to "
+        "narrow the rows to the items the recipes of that shop category need: outputs, "
+        "ingredients and upgrade resources. For `refining` the category is the family "
+        "(`shop_subcategory2`); a recipe whose output has no category lives under `other`."
     ),
 )
 async def read_price_snapshot(
     server: AlbionServer = Query(...),
     location_id: list[str] | None = Query(None),
+    kind: Literal["refining", "crafting"] | None = Query(None),
+    category: str | None = Query(None),
+    subcategory: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
 ):
-    rows = await read_snapshot(session, server.value, location_id)
+    # A mesma `category` significa coisas diferentes no refino (família) e no craft. Sem `kind`
+    # não há como resolver os itens — e devolver o realm inteiro esconderia o erro do cliente
+    # atrás de uma resposta que funciona, só que 50 vezes maior.
+    if subcategory is not None and category is None:
+        raise HTTPException(status_code=422, detail="subcategory requires category")
+    if category is not None and kind is None:
+        raise HTTPException(status_code=422, detail="category requires kind")
+
+    rows = await read_snapshot(
+        session,
+        server.value,
+        location_id,
+        kind=kind,
+        category=category,
+        subcategory=subcategory,
+    )
     return PriceSnapshotOut(server=server, generated_at=datetime.now(UTC), **to_columnar(rows))

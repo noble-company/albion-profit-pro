@@ -10,6 +10,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
+from src.items.models import Item
 from src.prices.models import MarketOrder, PriceSnapshot
 from src.prices.snapshot import (
     SOURCE_AODP,
@@ -17,6 +18,7 @@ from src.prices.snapshot import (
     refresh_snapshot_from_orders,
     upsert_snapshot,
 )
+from src.recipes.models import Recipe, RecipeIngredient
 
 AGORA = datetime.now(UTC)
 
@@ -369,3 +371,153 @@ async def test_dicionarios_nao_repetem_valor(cliente_autenticado, db_session):
 
 async def test_endpoint_exige_autenticacao(client):
     assert (await client.get("/prices/snapshot?server=west")).status_code == 401
+
+
+# --- Recorte por categoria (task 4/22) ---
+
+
+def _item(unique_name: str, *, cat=None, sub=None, sub2=None) -> Item:
+    return Item(
+        unique_name=unique_name,
+        enchantment_level=0,
+        shop_category=cat,
+        shop_subcategory=sub,
+        shop_subcategory2=sub2,
+        busca_normalizada=unique_name.casefold(),
+    )
+
+
+def _receita(saida: str, kind: str, ingredientes: list[str], upgrade: str | None = None) -> Recipe:
+    receita = Recipe(
+        output_item_unique_name=saida,
+        production_kind=kind,
+        amount_crafted=1,
+        craft_time=Decimal("0.1"),
+        upgrade_resource_unique_name=upgrade,
+        upgrade_resource_count=1 if upgrade else None,
+    )
+    receita.ingredients.extend(
+        RecipeIngredient(ingredient_unique_name=nome, count=1, position=i)
+        for i, nome in enumerate(ingredientes)
+    )
+    return receita
+
+
+async def _seed_categorias(db_session):
+    """Uma espada e um arco (Armas), um tecido (refino, família `cloth`), um token sem categoria
+    nenhuma no dump, e um item que não é de receita nenhuma — todos com preço no snapshot."""
+    db_session.add_all(
+        [
+            _item("T4_MAIN_SWORD", cat="weapons", sub="sword"),
+            _item("T4_2H_BOW", cat="weapons", sub="bow"),
+            _item("T4_METALBAR", cat="crafting", sub="refinedresources", sub2="metalbars"),
+            _item("T4_PLANKS", cat="crafting", sub="refinedresources", sub2="planks"),
+            _item("T4_RUNE", cat="artefacts", sub="fragments"),
+            _item("T4_CLOTH", cat="crafting", sub="refinedresources", sub2="cloth"),
+            _item("T4_FIBER", cat="gathering", sub="fiber"),
+            _item("T3_CLOTH", cat="crafting", sub="refinedresources", sub2="cloth"),
+            _item("T4_RANDOM_DUNGEON_TOKEN_2"),
+            _item("T4_SOUL"),
+            _item("T8_FORA_DE_RECEITA", cat="other", sub="other"),
+        ]
+    )
+    db_session.add_all(
+        [
+            _receita("T4_MAIN_SWORD", "crafting", ["T4_METALBAR"], upgrade="T4_RUNE"),
+            _receita("T4_2H_BOW", "crafting", ["T4_PLANKS"]),
+            _receita("T4_CLOTH", "refining", ["T4_FIBER", "T3_CLOTH"]),
+            _receita("T4_RANDOM_DUNGEON_TOKEN_2", "crafting", ["T4_SOUL"]),
+        ]
+    )
+    await db_session.commit()
+
+    await upsert_snapshot(
+        db_session,
+        "west",
+        [
+            {
+                "item_id": nome,
+                "location_id": "1002",
+                "quality_level": 1,
+                "enchantment_level": 0,
+                "sell_min": Decimal("100"),
+                "sell_observed_at": AGORA,
+                "sell_source": SOURCE_CLIENT,
+            }
+            for nome in (
+                "T4_MAIN_SWORD",
+                "T4_2H_BOW",
+                "T4_METALBAR",
+                "T4_PLANKS",
+                "T4_RUNE",
+                "T4_CLOTH",
+                "T4_FIBER",
+                "T3_CLOTH",
+                "T4_RANDOM_DUNGEON_TOKEN_2",
+                "T4_SOUL",
+                "T8_FORA_DE_RECEITA",
+            )
+        ],
+    )
+    await db_session.commit()
+
+
+async def _itens(cliente, query: str) -> set[str]:
+    resposta = await cliente.get(f"/prices/snapshot?server=west&{query}")
+    assert resposta.status_code == 200, resposta.text
+    return {linha["item_id"] for linha in _linhas(resposta.json())}
+
+
+async def test_subcategoria_traz_saidas_ingredientes_e_upgrade(cliente_autenticado, db_session):
+    """Task 4/22. A tela calcula uma subcategoria por vez (task 21); o snapshot traz só o que
+    essas receitas precisam cotar — e nada da vizinha. O realm inteiro são 187 KB com gzip; uma
+    subcategoria, de 4 a 15 KB."""
+    await _seed_categorias(db_session)
+
+    itens = await _itens(cliente_autenticado, "kind=crafting&category=weapons&subcategory=sword")
+
+    assert itens == {"T4_MAIN_SWORD", "T4_METALBAR", "T4_RUNE"}
+
+
+async def test_categoria_inteira_junta_as_subcategorias(cliente_autenticado, db_session):
+    await _seed_categorias(db_session)
+
+    itens = await _itens(cliente_autenticado, "kind=crafting&category=weapons")
+
+    assert itens == {"T4_MAIN_SWORD", "T4_METALBAR", "T4_RUNE", "T4_2H_BOW", "T4_PLANKS"}
+
+
+async def test_no_refino_a_categoria_e_a_familia(cliente_autenticado, db_session):
+    """Todo refinado é `crafting/refinedresources` nos dois primeiros níveis; a família mora no
+    `shop_subcategory2` — a mesma regra de `lugarDaReceita` no frontend."""
+    await _seed_categorias(db_session)
+
+    itens = await _itens(cliente_autenticado, "kind=refining&category=cloth")
+
+    assert itens == {"T4_CLOTH", "T4_FIBER", "T3_CLOTH"}
+
+
+async def test_saida_sem_categoria_mora_em_outros(cliente_autenticado, db_session):
+    """No frontend, item sem categoria no dump vai para Outros (task 21). Se o servidor não
+    seguisse a mesma regra, a tela escolheria Outros e receberia um snapshot sem os tokens."""
+    await _seed_categorias(db_session)
+
+    itens = await _itens(cliente_autenticado, "kind=crafting&category=other&subcategory=other")
+
+    assert itens == {"T4_RANDOM_DUNGEON_TOKEN_2", "T4_SOUL"}
+
+
+async def test_sem_categoria_o_snapshot_e_o_realm_inteiro(cliente_autenticado, db_session):
+    """Todas, Top 15 e busca continuam pedindo tudo — inclusive item fora de receita."""
+    await _seed_categorias(db_session)
+
+    itens = await _itens(cliente_autenticado, "")
+
+    assert len(itens) == 11
+    assert "T8_FORA_DE_RECEITA" in itens
+
+
+async def test_categoria_sem_kind_e_rejeitada(cliente_autenticado):
+    """A mesma `category` significa coisas diferentes no refino (família) e no craft."""
+    resposta = await cliente_autenticado.get("/prices/snapshot?server=west&category=cloth")
+    assert resposta.status_code == 422

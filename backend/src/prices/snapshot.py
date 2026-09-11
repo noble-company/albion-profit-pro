@@ -9,15 +9,21 @@ observação que existe, com a idade dela; esconder linha velha é decisão de t
 armazenamento. Foi exatamente o contrário disso (`X02`) que fazia receita sumir do produto.
 """
 
-from sqlalchemy import and_, case, func, or_, select, tuple_
+from sqlalchemy import and_, case, func, or_, select, tuple_, union
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
+from src.items.models import Item
 from src.prices.models import MarketOrder, PriceSnapshot
 from src.prices.service import latest_order_observation_filter
+from src.recipes.models import Recipe, RecipeIngredient
 
 SOURCE_CLIENT = "client"
 SOURCE_AODP = "aodp"
+
+# A categoria de quem não tem categoria no dump — a mesma de `frontend/src/scanner/categorias.ts`.
+OUTROS = "other"
 
 Combo = tuple[str, str, int, int]  # item_id, location_id, quality_level, enchantment_level
 
@@ -129,14 +135,65 @@ async def refresh_snapshot_from_orders(
     return await upsert_snapshot(session, server_id, rows)
 
 
+def itens_da_categoria(kind: str, category: str, subcategory: str | None = None):
+    """Os itens que as receitas de uma categoria precisam cotar: saídas, ingredientes e recurso
+    de upgrade (task 4/22).
+
+    **Espelho de `lugarDaReceita`** (`frontend/src/scanner/categorias.ts`). No refino a categoria
+    é a família (`shop_subcategory2`); no craft, `shop_category` e `shop_subcategory`. Item sem
+    categoria no dump — ou saída sem linha em `item` — mora em Outros. Se as duas regras
+    divergirem, a tela escolhe uma categoria e recebe o preço de outra.
+
+    A regra que esconde o que não se vende (`UNIQUE_`, `QUESTITEM_`…) fica só na tela: aqui ela
+    custaria uma segunda cópia, e o pior caso de não aplicá-la é mandar algumas linhas a mais.
+    """
+    # Alias de propósito: as três consultas de fora também leem `recipe`, e um `IN (subquery)`
+    # sobre a mesma tabela seria correlacionado sozinho — o filtro viraria "a própria linha".
+    receita = aliased(Recipe)
+    receitas = (
+        select(receita.id)
+        .outerjoin(Item, Item.unique_name == receita.output_item_unique_name)
+        .where(receita.production_kind == kind)
+    )
+    if kind == "refining":
+        receitas = receitas.where(func.coalesce(Item.shop_subcategory2, OUTROS) == category)
+    else:
+        receitas = receitas.where(func.coalesce(Item.shop_category, OUTROS) == category)
+        if subcategory:
+            receitas = receitas.where(func.coalesce(Item.shop_subcategory, OUTROS) == subcategory)
+
+    return union(
+        select(Recipe.output_item_unique_name).where(Recipe.id.in_(receitas)),
+        select(RecipeIngredient.ingredient_unique_name).where(
+            RecipeIngredient.recipe_id.in_(receitas)
+        ),
+        select(Recipe.upgrade_resource_unique_name).where(
+            Recipe.id.in_(receitas), Recipe.upgrade_resource_unique_name.is_not(None)
+        ),
+    )
+
+
 async def read_snapshot(
-    session: AsyncSession, server_id: str, location_ids: list[str] | None = None
+    session: AsyncSession,
+    server_id: str,
+    location_ids: list[str] | None = None,
+    *,
+    kind: str | None = None,
+    category: str | None = None,
+    subcategory: str | None = None,
 ) -> list[PriceSnapshot]:
     """Lê o snapshot do realm. **Sem filtro de frescor** — a idade viaja em `observed_at` e
-    quem decide o que esconder é a tela."""
+    quem decide o que esconder é a tela.
+
+    Com `kind` + `category`, só os itens das receitas daquela categoria (task 4/22): o realm West
+    são 20.364 linhas e 187 KB com gzip a cada 30 s; uma subcategoria, de 4 a 15 KB."""
     stmt = select(PriceSnapshot).where(PriceSnapshot.server_id == server_id)
     if location_ids:
         stmt = stmt.where(PriceSnapshot.location_id.in_(location_ids))
+    if kind is not None and category is not None:
+        stmt = stmt.where(
+            PriceSnapshot.item_id.in_(itens_da_categoria(kind, category, subcategory))
+        )
     stmt = stmt.order_by(PriceSnapshot.location_id, PriceSnapshot.item_id)
     return list((await session.scalars(stmt)).all())
 

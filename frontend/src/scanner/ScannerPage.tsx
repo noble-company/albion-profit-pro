@@ -39,7 +39,7 @@ import { RowDetails } from './RowDetails'
 import { ScannerTable } from './ScannerTable'
 import { cidadesFiltradas, estadoDaTela, podeAnalisar, precosNaMaoPara } from './tela'
 import { DEFAULT_SORT, sortRows, type SortState } from './sorting'
-import { usePriceSnapshot } from './usePriceSnapshot'
+import { usePriceSnapshot, type RecorteDoSnapshot } from './usePriceSnapshot'
 import { useScannerWorker } from './useScannerWorker'
 import { RETORNOS_PADRAO, rendimentoPorCemRecursos } from './return-rates'
 import { DEFAULT_QUANTITY, useScannerFilters } from './useScannerFilters'
@@ -111,7 +111,6 @@ export function ScannerPage({
     () => cidades.flatMap((c) => c.ids),
     [cidades],
   )
-  const precos = usePriceSnapshot(realm, mercadosPedidos)
 
   /**
    * Onde se **vende**: as cidades marcadas, ou todas. O engine avalia cada uma e `bestPerRecipe`
@@ -170,6 +169,20 @@ export function ScannerPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave É o conteúdo da lista
     [daSelecao.chave],
   )
+
+  /**
+   * Preço só do que a tela calcula (task 22). Com uma categoria, o servidor devolve os itens das
+   * receitas dela: de 187 KB para 4 a 15 KB a cada 30 s. Todas, Top e busca podem precisar de
+   * qualquer item e pedem o realm. Sem nada escolhido, não pede nada.
+   */
+  const recorte = useMemo<RecorteDoSnapshot | null>(
+    () =>
+      modo === 'categoria' && kind !== null && selecao.categoria
+        ? { kind, category: selecao.categoria, subcategory: selecao.subcategoria }
+        : null,
+    [modo, kind, selecao.categoria, selecao.subcategoria],
+  )
+  const precos = usePriceSnapshot(realm, mercadosPedidos, recorte, modo !== 'nada')
 
   /** O índice fica fora do cálculo das linhas porque o painel de detalhe também consulta ele. */
   const indice = useMemo(

@@ -59,16 +59,42 @@ export function mesmosPrecos(
 }
 
 /**
- * Snapshot de preço do realm (task 4/03).
+ * O recorte de uma categoria (task 4/22). A lista de itens **não** viaja na URL — uma categoria
+ * de ~100 receitas com ingredientes passa dos 4.096 caracteres —: o servidor resolve os itens das
+ * receitas dela, pela mesma regra de `lugarDaReceita`.
+ */
+export interface RecorteDoSnapshot {
+  kind: 'refining' | 'crafting'
+  category: string
+  subcategory: string | null
+}
+
+/**
+ * Snapshot de preço do realm (task 4/03), ou só de uma categoria (task 4/22).
  *
  * Política `market` (`staleTime` 30 s) — e **nada de IndexedDB**, ao contrário do catálogo: o
  * preço muda o tempo todo, e cachear em disco só serviria para mostrar dado velho mais rápido.
+ *
+ * Medido na task 22: o realm West são 20.364 linhas, 187 KB com gzip a cada 30 s; uma
+ * subcategoria, de 4 a 15 KB. `habilitado = false` não pede nada — é a tela aberta sem escolha.
  */
-export function usePriceSnapshot(realm: Realm | null, locations: string[]) {
+export function usePriceSnapshot(
+  realm: Realm | null,
+  locations: string[],
+  recorte: RecorteDoSnapshot | null = null,
+  habilitado = true,
+) {
   const query = useQuery({
     // As cidades entram na chave: pedir menos cidades é um payload diferente, não um recorte
-    // do mesmo. (8 cidades de uma vez dão ~333 KB — ver o limite conhecido na task 03.)
-    queryKey: ['prices', 'snapshot', realm, [...locations].sort()] as const,
+    // do mesmo. A categoria também (task 22) — trocar de categoria é uma ação explícita, não uma
+    // tecla, e os preços da anterior não têm os itens da nova.
+    queryKey: [
+      'prices',
+      'snapshot',
+      realm,
+      [...locations].sort(),
+      recorte ? [recorte.kind, recorte.category, recorte.subcategory] : null,
+    ] as const,
     queryFn: async ({ signal }) => {
       const response = await safeApiCall(() =>
         apiClient.GET('/prices/snapshot', {
@@ -76,6 +102,9 @@ export function usePriceSnapshot(realm: Realm | null, locations: string[]) {
             query: {
               server: realm as Realm,
               location_id: locations.length ? locations : undefined,
+              kind: recorte?.kind,
+              category: recorte?.category,
+              subcategory: recorte?.subcategory ?? undefined,
             },
           },
           signal,
@@ -83,7 +112,7 @@ export function usePriceSnapshot(realm: Realm | null, locations: string[]) {
       )
       return response.data as PriceSnapshot
     },
-    enabled: realm !== null,
+    enabled: realm !== null && habilitado,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     ...queryPolicies.market,

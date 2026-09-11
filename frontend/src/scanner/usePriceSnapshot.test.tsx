@@ -142,3 +142,87 @@ describe('usePriceSnapshot', () => {
     expect(result.current.snapshot?.columns.sell_min[1]).toBe('1250')
   })
 })
+
+describe('snapshot só da categoria (task 22)', () => {
+  /** Guarda a query string de cada pedido, para o teste olhar o que foi pedido de fato. */
+  function registrarPedidos() {
+    const pedidos: URLSearchParams[] = []
+    server.use(
+      http.get('http://localhost:8000/prices/snapshot', ({ request }) => {
+        pedidos.push(new URL(request.url).searchParams)
+        return HttpResponse.json(snapshot())
+      }),
+    )
+    return pedidos
+  }
+
+  test('com categoria, o pedido leva o recorte — e o servidor resolve os itens', async () => {
+    const pedidos = registrarPedidos()
+    const { result } = renderHook(
+      () =>
+        usePriceSnapshot('west', ['1002'], {
+          kind: 'crafting',
+          category: 'weapons',
+          subcategory: 'sword',
+        }),
+      { wrapper: wrapperWithQueryClient(createTestQueryClient()) },
+    )
+    await waitFor(() => expect(result.current.snapshot).not.toBeNull())
+
+    const ultimo = pedidos.at(-1)!
+    expect(ultimo.get('kind')).toBe('crafting')
+    expect(ultimo.get('category')).toBe('weapons')
+    expect(ultimo.get('subcategory')).toBe('sword')
+  })
+
+  test('sem recorte, o pedido é o de hoje: o realm inteiro', async () => {
+    const pedidos = registrarPedidos()
+    const { result } = renderHook(() => usePriceSnapshot('west', ['1002'], null), {
+      wrapper: wrapperWithQueryClient(createTestQueryClient()),
+    })
+    await waitFor(() => expect(result.current.snapshot).not.toBeNull())
+
+    const ultimo = pedidos.at(-1)!
+    expect(ultimo.has('kind')).toBe(false)
+    expect(ultimo.has('category')).toBe(false)
+  })
+
+  test('trocar de categoria pede de novo, com a categoria nova', async () => {
+    // A categoria entra na chave: sem isso a tela da família nova ficaria com os preços da
+    // anterior, que não têm os itens dela.
+    const pedidos = registrarPedidos()
+    const { result, rerender } = renderHook(
+      ({ categoria }: { categoria: string }) =>
+        usePriceSnapshot('west', ['1002'], {
+          kind: 'refining',
+          category: categoria,
+          subcategory: null,
+        }),
+      {
+        wrapper: wrapperWithQueryClient(createTestQueryClient()),
+        initialProps: { categoria: 'cloth' },
+      },
+    )
+    await waitFor(() => expect(result.current.snapshot).not.toBeNull())
+
+    rerender({ categoria: 'planks' })
+
+    await waitFor(() => expect(pedidos.at(-1)?.get('category')).toBe('planks'))
+    expect(pedidos.at(-1)?.has('subcategory')).toBe(false)
+  })
+
+  test('desligado — a tela vazia —, não pede nada', async () => {
+    // A tela abre sem nada escolhido (task 21) e não calcula nada. Baixar os 187 KB do realm
+    // para não usar era desperdício.
+    const pedidos = registrarPedidos()
+    const { result } = renderHook(() => usePriceSnapshot('west', ['1002'], null, false), {
+      wrapper: wrapperWithQueryClient(createTestQueryClient()),
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(pedidos).toHaveLength(0)
+    expect(result.current.loading).toBe(false)
+    expect(result.current.snapshot).toBeNull()
+  })
+})
