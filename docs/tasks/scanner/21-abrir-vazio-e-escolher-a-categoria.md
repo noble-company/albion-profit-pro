@@ -118,6 +118,19 @@ os mesmos de antes). Backend `tests/catalog` **17/17** · `ruff` limpo. Guards v
 - Os E2E de `/refino` já descreviam a tela apagada na task 15 e continuam para a reescrita do fim do
   Bloco 3.
 
+### Achado no uso: o campo novo não chegava
+
+Reportado com print: depois de reiniciar a API e dar F5, o seletor do refino continuava em
+"Outros (110)". O serviço já devolvia as famílias (conferido direto: 27 de tecido, couro, barras e
+tábuas, 2 de blocos), e o `ETag` já muda quando o formato muda (task 4/17). O que segurava era o
+**cache HTTP do navegador**: a rota manda `Cache-Control: private, max-age=300`, e dentro desses 5
+minutos o navegador devolve o corpo guardado sem perguntar ao servidor — o `ETag` novo nunca era
+comparado. A task 4/17 tinha fechado o caso do `304`, não o da janela do `max-age`.
+
+Correção: `getRecipeCatalog` pede `cache: 'no-cache'`. Toda revalidação vira condicional (304 barato
+quando nada mudou), e o primeiro paint continua vindo do IndexedDB. Guard em
+`catalog/service.test.ts`, vermelho antes (`default`) e verde depois.
+
 ### Pendente pra você testar
 
 1. Abrir `/craft`: a tela mostra "Selecione o que você deseja analisar" e nenhuma linha.
