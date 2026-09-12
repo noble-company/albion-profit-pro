@@ -34,6 +34,8 @@ export interface ScannerFilters {
   profitableOnly: boolean
   /** Vende/dia mínimo, string decimal — aplicado por `filtrarPorVolume`, não por `applyFilters` */
   minVolume: string | null
+  /** Nasce **ligado**, como `showUnpriced`: item sem histórico de venda aparece por padrão */
+  showWithoutSales: boolean
 }
 
 export const DEFAULT_FILTERS: ScannerFilters = {
@@ -46,6 +48,7 @@ export const DEFAULT_FILTERS: ScannerFilters = {
   showUnpriced: true,
   profitableOnly: false,
   minVolume: null,
+  showWithoutSales: true,
 }
 
 /** Unidades vendidas por dia de uma linha; `null` = sem histórico. Ver `volumeDaVenda`. */
@@ -57,21 +60,23 @@ export type VolumeDaLinha = (row: ScannerRow) => Money | null
  * Fora de `applyFilters` porque o volume não está na linha: vem do histórico de vendas
  * (`GET /prices/sales`) e depende das cidades de Vender em — é o mesmo número da coluna.
  *
- * Item **sem histórico continua aparecendo** — decisão do jogador: ausência de histórico não é
- * zero vendido, e ele prefere olhar a linha a perdê-la. Vale com ou sem preço, porque volume é
- * fato do mercado, não do cálculo. Enquanto as vendas não chegam (`volumeDe` nulo), nada é
- * filtrado: esconder tudo faria a tabela piscar vazia.
+ * Item **sem histórico continua aparecendo** por padrão — decisão do jogador: ausência de
+ * histórico não é zero vendido, e ele prefere olhar a linha a perdê-la. Esconder é a caixa
+ * "Mostrar sem volume de vendas", no mesmo formato de "Mostrar sem preço". Vale com ou sem preço,
+ * porque volume é fato do mercado, não do cálculo. Enquanto as vendas não chegam (`volumeDe`
+ * nulo), nada é filtrado: sem o índice toda linha pareceria sem histórico, e a tabela piscaria vazia.
  */
 export function filtrarPorVolume(
   rows: ScannerRow[],
-  minVolume: string | null,
+  { minVolume, showWithoutSales }: Pick<ScannerFilters, 'minVolume' | 'showWithoutSales'>,
   volumeDe: VolumeDaLinha | null,
 ): ScannerRow[] {
-  if (minVolume === null || volumeDe === null) return rows
-  const minimo = money(minVolume)
+  if (volumeDe === null || (minVolume === null && showWithoutSales)) return rows
+  const minimo = minVolume === null ? null : money(minVolume)
   return rows.filter((row) => {
     const volume = volumeDe(row)
-    return volume === null || compare(volume, minimo) >= 0
+    if (volume === null) return showWithoutSales
+    return minimo === null || compare(volume, minimo) >= 0
   })
 }
 

@@ -285,7 +285,7 @@ export function ScannerPage({
   const visiveis = useMemo(() => {
     const filtradas = filtrarPorVolume(
       applyFilters(linhas, filters, itemsByName),
-      filters.minVolume,
+      filters,
       volumeDaLinha,
     )
     // O Top vem DEPOIS dos filtros: marcar T6 pede as 15 melhores de T6, não as T6 entre as 15.
@@ -624,8 +624,8 @@ export function ScannerPage({
               suffix="un."
             />
             <p className="text-xs text-foreground-subtle">
-              O mesmo número da coluna Vende/dia. Item sem histórico de venda continua na lista,
-              com traço.
+              O mesmo número da coluna Vende/dia. Item sem histórico de venda segue a caixa{' '}
+              <strong>Mostrar sem volume de vendas</strong>, abaixo.
             </p>
             <FilterNumberField
               label="Idade máxima do dado"
@@ -639,6 +639,13 @@ export function ScannerPage({
               description="Receita que ainda não tem cotação aparece com o motivo"
               checked={filters.showUnpriced}
               onChange={(c) => setParam('unpriced', c ? null : 'false')}
+            />
+            {/* Mesmo formato do de cima: marcado mostra, desmarcar esconde (pedido no uso). */}
+            <FilterCheckbox
+              label="Mostrar sem volume de vendas"
+              description="Item sem histórico de venda aparece com traço em Vende/dia"
+              checked={filters.showWithoutSales}
+              onChange={(c) => setParam('no_volume', c ? null : 'false')}
             />
             <FilterCheckbox
               label="Apenas com lucro"

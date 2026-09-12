@@ -150,6 +150,8 @@ export function useScannerFilters() {
       showUnpriced: params.get('unpriced') !== 'false',
       profitableOnly: params.get('profit_only') === 'true',
       minVolume: decimalOuNulo(params.get('min_volume')),
+      // Mesma regra de `unpriced`: ausente = ligado, só a desmarcação explícita esconde.
+      showWithoutSales: params.get('no_volume') !== 'false',
     }),
     [params],
   )

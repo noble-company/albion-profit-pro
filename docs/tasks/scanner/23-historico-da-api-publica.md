@@ -162,6 +162,13 @@ grupo Resultado, na URL como `min_volume`.
 
 Guards vermelhos primeiro: 6 em `filters.test.ts`, 2 em `useScannerFilters.test.tsx`.
 
+**E a caixa "Mostrar sem volume de vendas"**, pedida logo depois do uso: nasce marcada, e desmarcar
+(`no_volume=false`) esconde o item sem histórico de venda — com ou sem preço, junto do mínimo ou
+sozinha. Mesmo formato de "Mostrar sem preço": mostrar é o padrão, esconder é escolha. Antes das
+vendas chegarem não esconde nada, porque sem o índice toda linha pareceria sem histórico. Guards
+vermelhos primeiro: 9 — os 4 novos e os 5 do mínimo, que mudaram de assinatura; o de "antes das
+vendas chegarem" passava de véspera, porque sem índice a função já devolvia tudo.
+
 ### Pendente pra você testar
 
 1. Com o frontend no ar, abrir `/refino` → **Tecido**: a célula de Venda mostra "…mil/dia" ao lado da

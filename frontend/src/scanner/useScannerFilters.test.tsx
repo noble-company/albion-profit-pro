@@ -320,6 +320,11 @@ describe('vende/dia mínimo (pedido no uso, 2026-09-12)', () => {
     expect(render('/craft?min_volume=1,5').result.current.filters.minVolume).toBe('1.5')
   })
 
+  test('"Mostrar sem volume de vendas": ausente na URL é marcado; só `no_volume=false` esconde', () => {
+    expect(render().result.current.filters.showWithoutSales).toBe(true)
+    expect(render('/craft?no_volume=false').result.current.filters.showWithoutSales).toBe(false)
+  })
+
   test('o que não é número vira sem filtro, nunca erro na tela', () => {
     // O valor alimenta `money()` durante o render; texto cru ali derrubaria a tela.
     expect(render('/craft?min_volume=abc').result.current.filters.minVolume).toBeNull()

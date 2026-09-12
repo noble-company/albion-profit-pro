@@ -214,43 +214,80 @@ describe('vende/dia mínimo (pedido no uso, 2026-09-12)', () => {
     return valor === undefined || valor === null ? null : money(valor)
   }
   const nomes = (linhas: ScannerRow[]) => linhas.map((r) => r.outputItem)
+  const com = (minVolume: string | null, showWithoutSales = true) => ({
+    minVolume,
+    showWithoutSales,
+  })
 
   test('esconde o que vende menos que o mínimo; o limite exato fica', () => {
     const linhas = [row('POUCO'), row('NO_LIMITE'), row('MUITO')]
 
-    expect(nomes(filtrarPorVolume(linhas, '100', volumeDe))).toEqual(['NO_LIMITE', 'MUITO'])
+    expect(nomes(filtrarPorVolume(linhas, com('100'), volumeDe))).toEqual(['NO_LIMITE', 'MUITO'])
   })
 
   test('item sem histórico de venda CONTINUA aparecendo — o jogador olha a linha', () => {
     // Ausência de histórico não é zero vendido. Decisão do usuário: prefere ver e decidir.
     const linhas = [row('POUCO'), row('SEM_HISTORICO')]
 
-    expect(nomes(filtrarPorVolume(linhas, '100', volumeDe))).toEqual(['SEM_HISTORICO'])
+    expect(nomes(filtrarPorVolume(linhas, com('100'), volumeDe))).toEqual(['SEM_HISTORICO'])
   })
 
   test('vale para linha sem preço também: volume é fato do mercado, não do cálculo', () => {
     const linhas = [semPreco('POUCO'), semPreco('MUITO')]
 
-    expect(nomes(filtrarPorVolume(linhas, '100', volumeDe))).toEqual(['MUITO'])
+    expect(nomes(filtrarPorVolume(linhas, com('100'), volumeDe))).toEqual(['MUITO'])
   })
 
   test('sem mínimo, ou antes das vendas chegarem, nada é filtrado', () => {
     const linhas = [row('POUCO'), row('SEM_HISTORICO')]
 
-    expect(filtrarPorVolume(linhas, null, volumeDe)).toEqual(linhas)
+    expect(filtrarPorVolume(linhas, com(null), volumeDe)).toEqual(linhas)
     // Esconder tudo enquanto o histórico carrega faria a tabela piscar vazia.
-    expect(filtrarPorVolume(linhas, '100', null)).toEqual(linhas)
+    expect(filtrarPorVolume(linhas, com('100'), null)).toEqual(linhas)
   })
 
   test('compara por decimal, não por Number', () => {
     const linhas = [row('POUCO')]
 
-    expect(filtrarPorVolume(linhas, '7', volumeDe)).toHaveLength(1)
-    expect(filtrarPorVolume(linhas, '7.0000000001', volumeDe)).toHaveLength(0)
+    expect(filtrarPorVolume(linhas, com('7'), volumeDe)).toHaveLength(1)
+    expect(filtrarPorVolume(linhas, com('7.0000000001'), volumeDe)).toHaveLength(0)
   })
 
   test('nasce desligado', () => {
     expect(DEFAULT_FILTERS.minVolume).toBeNull()
+  })
+})
+
+describe('mostrar sem volume de vendas (pedido no uso, 2026-09-12)', () => {
+  const volumeDe: VolumeDaLinha = (r) =>
+    r.outputItem === 'SEM_HISTORICO' ? null : money(r.outputItem === 'POUCO' ? '7' : '500')
+  const nomes = (linhas: ScannerRow[]) => linhas.map((r) => r.outputItem)
+  const linhas = [row('POUCO'), row('MUITO'), row('SEM_HISTORICO'), semPreco('SEM_HISTORICO')]
+
+  test('nasce marcado: mostrar é o padrão, esconder é escolha — como "Mostrar sem preço"', () => {
+    expect(DEFAULT_FILTERS.showWithoutSales).toBe(true)
+    expect(
+      filtrarPorVolume(linhas, { minVolume: null, showWithoutSales: true }, volumeDe),
+    ).toEqual(linhas)
+  })
+
+  test('desmarcado, esconde quem não tem histórico — com ou sem preço — e só quem', () => {
+    expect(
+      nomes(filtrarPorVolume(linhas, { minVolume: null, showWithoutSales: false }, volumeDe)),
+    ).toEqual(['POUCO', 'MUITO'])
+  })
+
+  test('junto do mínimo, some o sem histórico e o que vende pouco', () => {
+    expect(
+      nomes(filtrarPorVolume(linhas, { minVolume: '100', showWithoutSales: false }, volumeDe)),
+    ).toEqual(['MUITO'])
+  })
+
+  test('antes das vendas chegarem, desmarcar não esconde nada', () => {
+    // Sem o índice, TODA linha pareceria sem histórico — a tabela piscaria vazia.
+    expect(
+      filtrarPorVolume(linhas, { minVolume: null, showWithoutSales: false }, null),
+    ).toEqual(linhas)
   })
 })
 
