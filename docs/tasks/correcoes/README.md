@@ -1,5 +1,12 @@
 # Tasks — Fase 3.6: correções da revisão da Fase 3.5
 
+> **Substituída pela [Fase 4](../scanner/README.md) em 2026-09-07.** O uso real mostrou que Refino
+> e Craft precisavam de outra arquitetura, e as telas que esta fase corrigiria foram reescritas. O
+> destino de cada task está na [herança da 3.6](../scanner/README.md#herança-da-fase-36).
+> **Seguem valendo:** 05, 06, 08, 09, 10, 13, 14, 15 e 17 — com **13 e 14 primeiro**, porque o
+> gate 19 depende das duas. O checklist abaixo continua sendo o status delas; o resto do texto é o
+> registro da fase como foi planejada.
+
 Derivada da [revisão da Fase 3.5](../../14-revisao-fase-3-5.md). É uma fase transversal curta:
 há trabalho em frontend, backend, client Go, CI e documentação.
 

@@ -11,9 +11,9 @@ This is a monorepo with four parts, at different stages of completion:
 | Path | Status | What it is |
 |---|---|---|
 | `albiondata-client/` | **Fase 2 complete; Fase 2.5 client stabilized** | Authenticated fork validated with the real game. Bounded queues, safe retry and boot-time `/client/me` validation are implemented; releases without a destination fail closed. Windows systray UX remains a manual check. Keep `PATCH LOCAL`, public channel `-i`, and never run `gofmt -w` because upstream is CRLF. |
-| `backend/` | **Fases 1, 1.5, 2.5 and the Fase 3.5 backend block complete** | FastAPI/Celery/PostgreSQL/Redis, 350 tests, live-client validation. Flip engine and production ranking rewritten in SQL (`B01`/`B02`), single quote frontier (`src/craft/quotes.py`), English-only HTTP contract, no price pub/sub. |
-| `frontend/` | **Fase 3.5 complete; Fase 3.6 open** | 200 unit tests (46 files) + Playwright E2E against the real stack. Market Flip, Refino, Craft, Calculadora, Preços, Tokens on shadcn/ui + tokens + TanStack Query. The Fase 3.5 audit found live user-facing defects here — see `docs/14-revisao-fase-3-5.md` (`E01`-`E05`) before touching the "e se" layer or the filter inputs. |
-| `docs/` | **Fase 2.5 complete, 14/14 tasks; Fase 3.6 open, 0/17** | Integrated Windows/game/Swarm validation (task 19) is deferred to the phase gate — and per `docs/14-revisao-fase-3-5.md` it also contains unwritten implementation, moved to task 3.6/13. |
+| `backend/` | **Fases 1, 1.5, 2.5, the Fase 3.5 backend block and the Fase 4 backend complete** | FastAPI/Celery/PostgreSQL/Redis, 462 tests, live-client validation. Serves *data* to the browser-side scanner: whole static catalog (`GET /catalog/recipes`), top-of-book snapshot fed by our client **and** the public Albion Data Project API (`GET /prices/snapshot`), sales volume (`GET /prices/sales`); the exact order-book analysis stays in `POST /craft/simulate`. The materialized ranking was retired (4/15). English-only HTTP contract, no price pub/sub. |
+| `frontend/` | **Fase 4 (scanner) complete, 38/38** | 565 unit tests (77 files) + Playwright E2E. Refino, Craft, Comida & Poções and Calculadora compute in the browser (`src/scanner/engine.ts`, Web Worker for Craft) over the whole catalog; plus Market Flip, Preços, Painel do Destino, Tokens. Architecture in `docs/15-arquitetura-do-scanner.md`. |
+| `docs/` | **Fase 2.5 complete, 14/14 tasks; Fase 4 complete, 38/38; Fase 3.6 superseded** | Next are the Fase 3.6 tasks that still apply — 13 (frontend serving/deploy) and 14 (systray) first — then the task 19 integrated Windows/game/Swarm gate. |
 
 Root also has two large reference data files: `items.json` (official Albion item name/ID localization dump) and `ITEM DUMP.json` (official `items.xml` dump — crafting/refining recipes). Both are read-only reference data, not something to edit.
 
@@ -25,8 +25,8 @@ Root also has two large reference data files: `items.json` (official Albion item
 2. Read `docs/00-plano-macro.md` — the macro plan: architecture, phases, tech stack decisions, and their rationale. This supersedes any assumption you might otherwise make about stack/structure.
 3. If touching the Go client or its protocol: read `docs/01-mapeamento-albiondata-client.md` first — it documents the client's internals (packet capture, Photon protocol decode, upload pipeline) and an in-progress investigation into real-time craft/refine event capture. Don't re-derive this by re-reading the Go source from scratch; it's already been mapped in detail, with file:line references.
 4. If touching recipes/crafting data: read `docs/02-dados-de-receita.md` — documents the exact format of `ITEM DUMP.json` and how it joins with `items.json` (by `UniqueName` text, **not** by numeric ID — this trips people up).
-5. Read `docs/05-revisao-fases-0-a-2.md` (audit of Fases 0–2), `docs/12-revisao-fase-3.md` (audit of Fase 3 + the outcome of every finding) and `docs/14-revisao-fase-3-5.md` (audit of Fase 3.5, run from real gate execution) before touching current code. The doc-14 findings are the open ones.
-6. Implementation specs live in `docs/tasks/{backend,client,estabilizacao,frontend,refatoracao,correcoes}/`. Fase 3.5 (`tasks/refatoracao/`) is 28/29, only task 10 (market anti-fraud) left. **Current phase is 3.6 (`tasks/correcoes/`), 0/17** — tasks 01-04 are user-facing defects and come before everything else. The task 19 in-game gate follows it. Implement one task at a time in dependency order.
+5. Read `docs/05-revisao-fases-0-a-2.md` (audit of Fases 0–2), `docs/12-revisao-fase-3.md` (audit of Fase 3 + the outcome of every finding) and `docs/14-revisao-fase-3-5.md` (audit of Fase 3.5, run from real gate execution) before touching current code. Most doc-14 findings were fixed or absorbed by Fase 4 — the destination of each is in the "Herança da Fase 3.6" table of `docs/tasks/scanner/README.md`. Before touching Refino/Craft/Comida & Poções/Calculadora, read `docs/15-arquitetura-do-scanner.md`.
+6. Implementation specs live in `docs/tasks/{backend,client,estabilizacao,frontend,refatoracao,correcoes,scanner}/`. Fase 3.5 (`tasks/refatoracao/`) is 28/29, only task 10 (market anti-fraud) left. Fase 4 (`tasks/scanner/`) is complete, 38/38, and superseded Fase 3.6. **Next:** the Fase 3.6 tasks that still apply (`tasks/correcoes/`) — 13 (frontend serving/deploy) and 14 (systray "Abrir Calculadora") first, because the task 19 in-game gate depends on both; then 05, 06, 08, 09, 10, 15 and 17; then the gate. Implement one task at a time in dependency order.
 
 Use the `/implementar-task` skill (`.claude/skills/implementar-task/`) to implement any task from `docs/tasks/<phase>/NN-slug.md` — it enforces the required flow: validate the spec against real project state → summarize for approval → wait for explicit confirmation → implement → run automated tests for real → distinguish what you can verify yourself from what only a human can (browser/visual/in-game) → structured final report → update the status checklist.
 
@@ -51,7 +51,8 @@ When you make an architecture decision, discover something non-obvious about the
 | Task queue | Celery/RabbitMQ with durable `ingest`, `maintenance` and `quarantine` queues. Redis backend stays configured, but fire-and-forget results are ignored. |
 | Auth | `fastapi-users` (SQLAlchemy adapter) — JWT backend for the web frontend, separate opaque-token (`ApiToken`) backend for the Go client. Library is in maintenance mode; auth code is isolated in `src/auth/`/`src/api_tokens/` to ease a future swap. |
 | DB / ORM | PostgreSQL 16 (+ pgvector available, unused for now) via SQLAlchemy 2.0 async + `asyncpg>=0.31.0` (older asyncpg has no 3.13/3.14 wheels) + Alembic |
-| Cache | Redis — "latest price" cache with short TTL. **No real-time price pub/sub** (removed in Fase 3.5/08, `B10`); the frontend polls every 30 s with cache + tab visibility. |
+| Cache | Redis — "latest price" cache with short TTL. **No real-time price pub/sub** (removed in Fase 3.5/08, `B10`); the scanner polls `GET /prices/snapshot` every 30 s with tab visibility, and sales volume refetches on focus. |
+| Scanner (Fase 4) | **The server serves data; the browser computes the answer** (`docs/15-arquitetura-do-scanner.md`). `price_snapshot` keeps the newest side per combo between our client and the public AODP poller (Celery, every 10 min). Whole catalog with ETag + IndexedDB cache; snapshot cut by category; craft engine ported to TypeScript with `decimal.js`, locked to `simulate_craft` by golden vectors. No row disappears for lack of price. |
 | Project layout | Domain-driven (`src/auth/`, `src/ingest/`, `src/prices/`, `src/recipes/`, `src/api_tokens/`, `src/cache/`, each with its own `router.py`/`schemas.py`/`models.py`/`service.py`), not grouped by file type |
 | Tooling | `uv` (deps + Python version pin), `ruff` (lint/format) |
 | Testing | `testcontainers-python` (real Postgres/Redis/RabbitMQ containers) + `pytest-asyncio` + `httpx.AsyncClient` — no mocking the datastore |
@@ -101,8 +102,8 @@ go test ./...                                 # run existing tests
 
 ## Phase gate
 
-`python scripts/verify_repository.py` checks doc links/anchors, phase-status consistency across
-the status docs, and that `git status --porcelain` lists no untracked source. Combined with the
+`python scripts/verify_repository.py` checks doc links/anchors, phase-status consistency (Fases 2.5,
+3.5 and 4) across the status docs, and that `git status --porcelain` lists no untracked source. Combined with the
 `backend-ci`, `frontend-ci` and `frontend-e2e` workflows, that is the automated gate for the
 phase; only the task 19 in-game validation is left for a human.
 

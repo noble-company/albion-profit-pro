@@ -130,7 +130,7 @@ um segundo ícone pro mesmo conceito em telas diferentes:
 
 ---
 
-## 6. Layout do shell — **revisado na Fase 4 (task 08)**
+## 6. Layout do shell — **revisado na Fase 4 (tasks 08 e 11.1, Tamanho do conteúdo)**
 
 > A decisão original desta seção era **header no topo**. Ela foi revogada em 2026-09-08, depois
 > do uso real do produto: `X05` da [Fase 4](tasks/scanner/README.md). O que segue é a decisão
@@ -143,20 +143,28 @@ colunas: em monitor largo sobrava faixa vazia dos dois lados enquanto a tabela r
 horizontalmente. A §1 desta mesma página já dizia que "a tabela **é** a tela"; o layout nunca
 honrou isso.
 
-**Estrutura vigente** — duas colunas, sem largura máxima:
+**Estrutura vigente** — três colunas, sem largura máxima:
 
-- **Coluna esquerda fixa** (`w-72`), com rolagem própria, na ordem: marca → navegação (ícone +
-  rótulo por tela) → **filtros da tela ativa** → rodapé com servidor, tema e conta.
-- **Conteúdo à direita** ocupando toda a largura restante, com rolagem própria.
+- **Navegação à esquerda** (`w-52`, recolhível para `w-14` só com ícones): marca, navegação (ícone
+  + rótulo por tela) e, no rodapé, servidor, tema, **Tamanho** e conta. Recolhida, o Tamanho
+  continua ao alcance por um ícone de zoom.
+- **Conteúdo no centro**, ocupando toda a largura restante, com rolagem própria.
+- **Filtros à direita** (`w-80`, recolhível), desde a task 11.1: navegação se usa uma vez por
+  sessão, filtro se mexe o tempo todo, e cada pixel que a navegação não gasta é largura para a
+  tabela. A coluna some da largura quando a tela não publica filtro.
+- **Tamanho do conteúdo** (2026-09-12, 100–220%): escala **só o `main`** — `escala-do-conteudo`
+  (`index.css`) multiplica `--spacing` e `--text-*` por `--escala`, e as barras laterais ficam
+  como estão. Por isso nenhuma medida do centro é rem fixo (ver §1).
 - O contêiner é `h-dvh overflow-hidden` e cada coluna rola por si. Isso não é detalhe de
   implementação: sem ele o flex estica a sidebar até a altura da página e ela sobe junto com a
   tabela. Como efeito desejado, a tabela ganha região de rolagem própria — o que o cabeçalho
   fixo da §1 precisa.
-- **Filtros chegam à sidebar por portal** (`SidebarSection`), não por estado em contexto: um
+- **Filtros chegam à barra por portal** (`SidebarSection`), não por estado em contexto: um
   `ReactNode` em `useState` obrigaria a tela a chamar `setState` durante o render do filho.
-- **Mobile** (`< md`): a coluna inteira — navegação **e** filtros — colapsa no `Sheet`.
-  Servidor e tema ficam numa barra superior fina, **sempre visíveis**: servidor errado é erro de
-  leitura, não deveria exigir abrir menu para corrigir. Esta regra sobreviveu à revisão.
+- **Mobile** (`< md`): a navegação colapsa no `Sheet`. Servidor e tema ficam numa barra superior
+  fina, **sempre visíveis**: servidor errado é erro de leitura, não deveria exigir abrir menu para
+  corrigir. Esta regra sobreviveu à revisão. A coluna de filtros só existe a partir de `md` —
+  dívida conhecida, que o produto (de desktop, ao lado do jogo) ainda não cobrou.
 - **`ErrorBoundary` dentro do shell**, envolvendo só o conteúdo: uma tela que quebra não apaga a
   navegação (achado `E04`; antes disso, virava tela branca).
 

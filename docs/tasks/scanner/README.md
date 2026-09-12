@@ -107,7 +107,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | [07](07-cache-local-do-catalogo.md) | Cache local do catálogo | — | Primeiro paint sem esperar rede |
 | [08](08-shell-com-sidebar.md) | Shell com sidebar | `X05` | Navegação e filtros à esquerda, tabela ocupa a tela |
 | [09](09-filtros-na-sidebar.md) | Filtros na sidebar | `X04` | Filtro por peso, foco, faixa, categoria, "mostrar tudo" |
-| [10](10-tabela-do-scanner.md) | Tabela do scanner | `X01` `X02` | Virtualizada, ordena/filtra sobre o conjunto inteiro, **com a arte dos itens** ([fonte](../../06-fontes-de-dados-estaticos.md#arte-dos-itens--serviço-de-render-oficial)) |
+| [10](10-tabela-do-scanner.md) | Tabela do scanner | `X01` `X02` | Virtualizada, ordena/filtra sobre o conjunto inteiro, **com a arte dos itens** ([fonte](../../06-fontes-de-dados-estaticos.md#arte-dos-itens-serviço-de-render-oficial)) |
 | [11](11-tela-de-refino.md) | Tela de Refino | — | 110 receitas × cidades, filtro instantâneo |
 | [11.1](11.1-layout-colapsavel-e-filtros-a-direita.md) | Navegação colapsável, filtros à direita | — | Esquerda só navega; filtros vão para a direita |
 | [11.2](11.2-quantidade-e-ingredientes.md) | Quantidade, ingredientes e investimento | — | Colunas por ingrediente com quantidade e subtotal |
@@ -135,7 +135,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | [28](28-dataset-do-jogo-atualizado.md) | Dataset do jogo atualizado | `W9` | O histórico do client volta ao item certo; o da API pública acompanha a renumeração |
 | [29](29-volume-por-dia-na-hora-do-upload.md) | Volume por dia na hora do upload | `W11` | O histórico aberto no jogo aparece na tela em segundos, não em até 2 h |
 | [15](15-aposentar-o-ranking-materializado.md) | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
-| 16 | Documentos reconciliados | — | Specs param de descrever a arquitetura revogada |
+| [16](16-documentos-reconciliados.md) | Documentos reconciliados | — | Status e arquitetura descrevem o produto que existe; o gate passa a conferir a Fase 4 |
 
 > As specs de 05-16 são escritas ao chegar no bloco, para não congelar decisão de UI antes da
 > arquitetura de dados estar provada em jogo. O índice acima é o contrato da fase.
@@ -179,7 +179,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [x] 28 — Dataset do jogo atualizado
 - [x] 29 — Volume por dia na hora do upload
 - [x] 15 — Aposentar o ranking materializado
-- [ ] 16 — Documentos reconciliados
+- [x] 16 — Documentos reconciliados
 
 ## Herança da Fase 3.6
 

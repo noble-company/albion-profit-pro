@@ -110,7 +110,7 @@ O endpoint `/ready` permanece indisponível enquanto não existir uma versão at
 produção, a ordem obrigatória é `migrate → seed → API/worker/beat`; a materialização dos processos
 e filas no stack é escopo da task 11 da Fase 2.5.
 
-## Arte dos itens — serviço de render oficial
+## Arte dos itens: serviço de render oficial
 
 > Investigado em 2026-09-07, durante a Fase 4. Consumido pela task 4/10 (tabela do scanner).
 

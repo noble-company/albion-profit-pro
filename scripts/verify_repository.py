@@ -1,7 +1,7 @@
 """Verifica invariantes documentais e estruturais do monorepo (só stdlib + `git`).
 
 Roda no job `repository` do `backend-ci` e como gate manual da fase: links/âncoras de
-Markdown, consistência do status das fases 2.5 e 3.5 entre os documentos de status, arquivos
+Markdown, consistência do status das fases 2.5, 3.5 e 4 entre os documentos de status, arquivos
 obrigatórios e ausência de fonte não rastreada (regressão de `A01`).
 """
 
@@ -16,6 +16,7 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[1]
 STABILIZATION_README = ROOT / "docs" / "tasks" / "estabilizacao" / "README.md"
 REFACTOR_README = ROOT / "docs" / "tasks" / "refatoracao" / "README.md"
+SCANNER_README = ROOT / "docs" / "tasks" / "scanner" / "README.md"
 STATUS_DOCUMENTS = (
     ROOT / "README.md",
     ROOT / "AGENTS.md",
@@ -38,6 +39,9 @@ MARKDOWN_LINK = re.compile(r"(?<!!)\[[^]]+\]\(([^)]+)\)")
 CHECKLIST_ITEM = re.compile(r"^- \[([ xX])] (\d{2}) —", re.MULTILINE)
 PHASE_STATUS = re.compile(r"Fase 2\.5[^\n]*?\b(\d{1,2})/14\b", re.IGNORECASE)
 REFACTOR_STATUS = re.compile(r"Fase 3\.5[^\n]*?\b(\d{1,2})/29\b", re.IGNORECASE)
+# A Fase 4 numera tasks com subníveis (`11.2.3`) e fecha fora de ordem (15 e 16 no fim): a
+# contagem sai do checklist, não de uma sequência 01..N.
+SCANNER_ITEM = re.compile(r"^- \[([ xX])] (\d{2}(?:\.\d+)*) —", re.MULTILINE)
 
 
 def github_anchor(value: str) -> str:
@@ -99,6 +103,12 @@ def _verify_checklist_status(
         errors.append(f"checklist da {label} deve conter as tasks 01 a {total:02d} em ordem")
         return
     completed = sum(marker.casefold() == "x" for marker, _ in items)
+    _verify_status_documents(errors, label=label, completed=completed, total=total, pattern=pattern)
+
+
+def _verify_status_documents(
+    errors: list[str], *, label: str, completed: int, total: int, pattern: re.Pattern[str]
+) -> None:
     expected = f"{completed}/{total}"
     for document in STATUS_DOCUMENTS:
         matches = pattern.findall(document.read_text(encoding="utf-8"))
@@ -117,6 +127,26 @@ def verify_phase_status(errors: list[str]) -> None:
     )
     _verify_checklist_status(
         errors, label="Fase 3.5", readme=REFACTOR_README, total=29, pattern=REFACTOR_STATUS
+    )
+    verify_scanner_status(errors)
+
+
+def verify_scanner_status(errors: list[str]) -> None:
+    """Fase 4 (task 4/16). Sem esta checagem a fase inteira aconteceu com `CLAUDE.md`, `README.md`
+    e o plano macro dizendo "Fase 3.6, 0/17" — o gate só conferia as fases 2.5 e 3.5."""
+    items = SCANNER_ITEM.findall(SCANNER_README.read_text(encoding="utf-8"))
+    numbers = [number for _, number in items]
+    if not items:
+        errors.append("checklist da Fase 4 ausente em docs/tasks/scanner/README.md")
+        return
+    if len(set(numbers)) != len(numbers):
+        errors.append("checklist da Fase 4 repete task")
+        return
+    total = len(items)
+    completed = sum(marker.casefold() == "x" for marker, _ in items)
+    pattern = re.compile(rf"Fase 4\b[^\n]*?\b(\d{{1,2}})/{total}\b", re.IGNORECASE)
+    _verify_status_documents(
+        errors, label="Fase 4", completed=completed, total=total, pattern=pattern
     )
 
 
