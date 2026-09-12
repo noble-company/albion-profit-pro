@@ -88,7 +88,7 @@ export function ExactAnalysis({
             <WarningBadges warnings={cenario.warnings} />
           )}
 
-          <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+          <p className="text-2xs leading-snug text-foreground-subtle">
             O exato anda a profundidade do livro. Quando ele fica abaixo da estimativa, a
             diferença é o preço de comprar (ou vender) mais unidades do que a melhor oferta
             aguenta.

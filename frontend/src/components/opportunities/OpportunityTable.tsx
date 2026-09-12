@@ -57,7 +57,7 @@ function cellClasses(column: OpportunityColumn, isHeader: boolean): string {
   return [
     'h-11 px-3 whitespace-nowrap',
     isHeader
-      ? 'text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-foreground-subtle'
+      ? 'text-2xs font-semibold uppercase tracking-[0.12em] text-foreground-subtle'
       : 'py-2 align-middle',
     column.numeric ? 'text-right tabular-nums' : 'text-left',
     !isHeader && column.weight ? WEIGHT_CLASS[column.weight] : '',

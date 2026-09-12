@@ -135,7 +135,7 @@ export function DestinyBoardPage() {
                           className={`${filterControl} mt-0 w-20 tabular-nums`}
                         />
                         {/* O efeito, ao lado da causa: é isso que mostra por que subir o nó. */}
-                        <span className="mt-1 block text-[0.6875rem] tabular-nums text-foreground-subtle">
+                        <span className="mt-1 block text-2xs tabular-nums text-foreground-subtle">
                           {restante < 100 ? `${restante.toFixed(1)}% do foco` : 'foco cheio'}
                         </span>
                       </td>

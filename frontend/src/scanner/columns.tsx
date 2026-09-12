@@ -1,5 +1,7 @@
 import { ItemImage } from '@/components/ItemImage'
 import { partesDoNomeCurto } from '@/lib/formatters'
+
+import { emEscala } from './altura'
 import { formatPercent, formatQuantity, formatSilver, type Money } from '@/lib/money'
 
 import { CardDeCompra } from './CardDeCompra'
@@ -63,7 +65,8 @@ export function buildColumns(
       key: 'item',
       header: 'Item',
       sortField: 'tier',
-      width: 'minmax(12rem, 1.2fr)',
+      // Larguras via `emEscala`: com rem fixo, o texto cresceria com o Tamanho e a coluna não.
+      width: `minmax(${emEscala(12)}, 1.2fr)`,
       cell: (row, item) => {
         const { nome, grau } = partesDoNomeCurto(item?.name_pt ?? item?.name_en, row.outputItem)
         return (
@@ -89,21 +92,21 @@ export function buildColumns(
       header: 'Investimento',
       sortField: 'totalCost',
       numeric: true,
-      width: '7.5rem',
+      width: emEscala(7.5),
       cell: (row) => (row.totalCost ? formatSilver(row.totalCost) : TRACO),
     },
     {
       key: 'vendaBruta',
       header: 'Venda bruta',
       numeric: true,
-      width: '7.5rem',
+      width: emEscala(7.5),
       cell: (row) => (row.grossRevenue ? formatSilver(row.grossRevenue) : TRACO),
     },
     {
       key: 'lucro',
       header: 'Lucro',
       numeric: true,
-      width: '7.5rem',
+      width: emEscala(7.5),
       weight: 'primary',
       // Prata e ROI dividem a célula, e cada um ordena por si. Duas colunas para dois números
       // que se leem juntos custariam largura que a tabela não tem.
@@ -122,7 +125,7 @@ export function buildColumns(
         return (
           <span className="flex flex-col items-end leading-tight">
             <span className={cor}>{formatSilver(row.profit)}</span>
-            <span className={`text-[0.6875rem] font-normal ${cor}`}>
+            <span className={`text-2xs font-normal ${cor}`}>
               {row.roi ? formatPercent(row.roi) : TRACO}
             </span>
           </span>
@@ -134,7 +137,7 @@ export function buildColumns(
       header: 'Venda',
       // Mais larga desde a task 23: a cidade divide a primeira linha com o volume por dia. Uma
       // terceira linha não cabe na altura fixa da tabela virtualizada.
-      width: '10rem',
+      width: emEscala(10),
       // Onde e por quanto. Com a cidade fora da linha (task 19), "Venda bruta" sozinha não
       // diria nenhum dos dois — é o card "MARTLOCK · P. VENDA 72" do app de referência.
       cell: (row) => {
@@ -181,7 +184,7 @@ export function buildColumns(
     {
       key: 'compra',
       header: 'Compra',
-      width: `${Math.max(1, maxIngredientes) * LARGURA_CARD_REM}rem`,
+      width: emEscala(Math.max(1, maxIngredientes) * LARGURA_CARD_REM),
       cell: (row) =>
         row.ingredients.length === 0 ? (
           TRACO
@@ -193,7 +196,7 @@ export function buildColumns(
                 ingrediente={ingrediente}
                 nomeItem={nomeItem}
                 agora={agora}
-                largura={`${LARGURA_CARD_REM - 0.25}rem`}
+                largura={emEscala(LARGURA_CARD_REM - 0.25)}
               />
             ))}
           </ul>
@@ -203,7 +206,7 @@ export function buildColumns(
       key: 'foco',
       header: 'Foco',
       numeric: true,
-      width: '4.5rem',
+      width: emEscala(4.5),
       weight: 'tertiary',
       // Zero não é "0 de foco" — é não usar foco.
       cell: (row) =>
@@ -213,7 +216,7 @@ export function buildColumns(
       key: 'rendimento',
       header: 'Rendimento',
       numeric: true,
-      width: '5.5rem',
+      width: emEscala(5.5),
       // Quantos itens saem no fim da sessão — as receitas compradas mais as que o retorno
       // paga. A pergunta é "vou terminar com quanto?", e ela não é a quantidade que se compra.
       cell: (row) => row.producedQuantity.toLocaleString('pt-BR'),

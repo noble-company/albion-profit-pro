@@ -37,7 +37,7 @@ export function CardDeCompra({
       style={{ width: largura }}
     >
       <ItemImage uniqueName={ingrediente.item} size={64} className="size-5 shrink-0" />
-      <span className="flex min-w-0 flex-col text-[0.6875rem] leading-tight">
+      <span className="flex min-w-0 flex-col text-2xs leading-tight">
         <span className="tabular-nums text-foreground">
           {ingrediente.unitPrice ? formatQuantity(ingrediente.unitPrice, 0) : TRACO}
         </span>

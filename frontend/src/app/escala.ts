@@ -1,11 +1,12 @@
 import { createContext, useContext } from 'react'
 
 /**
- * Tamanho da interface (pedido no uso, 2026-09-12: "deixar tudo uns 70% maior").
+ * Tamanho do conteúdo central (pedidos no uso, 2026-09-12).
  *
- * A escala é o `font-size` da raiz. Quase tudo no Tailwind é `rem` — texto, espaçamento, ícones,
- * largura de coluna —, então a tela inteira cresce junto sem reescrever componente. O que é px de
- * propósito (bordas de 1 px) fica igual, como deve.
+ * Primeiro "deixar tudo uns 70% maior", aplicado no `font-size` da raiz. Depois de ver: "aumenta
+ * só o conteúdo da tabela, não de tudo" — as barras laterais ficam como estão. Agora o `main` do
+ * shell recebe `--escala`, e `.escala-do-conteudo` (`index.css`) multiplica por ela as variáveis
+ * que o Tailwind usa para espaçamento e texto. Tudo dentro do centro cresce junto; nada fora dele.
  *
  * Opções em vez de um valor fixo: a 170% a tabela pede rolagem lateral numa tela de laptop, e quem
  * joga em monitor grande pode querer mais que quem joga no notebook. 200% e 220% entraram depois

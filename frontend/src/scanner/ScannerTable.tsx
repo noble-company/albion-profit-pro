@@ -6,7 +6,7 @@ import type { components } from '@/api/schema'
 import { useEscalaAtual } from '@/app/escala'
 import { EstadoVazio } from '@/components/ui/states'
 
-import { ALTURA_DA_LINHA_REM, remEmPx } from './altura'
+import { ALTURA_DA_LINHA_REM, alturaDaLinhaPx, emEscala } from './altura'
 import type { ScannerRow } from './engine'
 import { CAMPOS_ESTRUTURAIS, type SortField, type SortState } from './sorting'
 
@@ -110,10 +110,13 @@ export function ScannerTable({
     [rows],
   )
 
+  /** O Tamanho do conteúdo: o virtualizador fala em px e não lê o `--escala` do CSS. */
+  const escala = useEscalaAtual()
+
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => remEmPx(ALTURA_DA_LINHA_REM),
+    estimateSize: () => alturaDaLinhaPx(escala),
     getItemKey,
     overscan: OVERSCAN,
     // Retângulo de partida, antes da primeira medição real: sem ele o primeiro frame sai com
@@ -124,7 +127,6 @@ export function ScannerTable({
 
   // Trocar o Tamanho muda a altura de toda linha, inclusive das que o virtualizador ainda não
   // mediu e guardou pela estimativa antiga.
-  const escala = useEscalaAtual()
   useEffect(() => {
     virtualizer.measure()
   }, [escala, virtualizer])
@@ -170,7 +172,7 @@ export function ScannerTable({
           <div
             role="row"
             className="sticky top-0 z-20 grid items-center gap-2 border-b border-border bg-surface-raised px-3 text-xs font-semibold uppercase tracking-wide text-foreground-subtle"
-            style={{ gridTemplateColumns: gridTemplate, height: `${ALTURA_DO_CABECALHO_REM}rem` }}
+            style={{ gridTemplateColumns: gridTemplate, height: emEscala(ALTURA_DO_CABECALHO_REM) }}
           >
             {columns.map((column, index) => {
               const alvos =
@@ -255,7 +257,7 @@ export function ScannerTable({
                     } ${aberta ? 'bg-surface-raised' : ''}`}
                     style={{
                       gridTemplateColumns: gridTemplate,
-                      height: `${ALTURA_DA_LINHA_REM}rem`,
+                      height: emEscala(ALTURA_DA_LINHA_REM),
                     }}
                   >
                     {columns.map((column, index) => (

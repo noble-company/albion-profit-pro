@@ -186,7 +186,7 @@ export function RowDetails({
               detail.breakEvenUnitPrice ? formatSilver(detail.breakEvenUnitPrice) : TRACO
             }
           />
-          <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+          <p className="text-2xs leading-snug text-foreground-subtle">
             Abaixo disso a venda não paga o custo mais as taxas. Aproximado: no jogo cada cobrança
             arredonda para cima.
           </p>
@@ -223,7 +223,7 @@ export function RowDetails({
                       {ingrediente.unitPrice ? formatSilver(ingrediente.unitPrice) : TRACO}
                     </span>
                   </div>
-                  <div className="flex items-baseline justify-between gap-2 text-[0.6875rem] text-foreground-subtle">
+                  <div className="flex items-baseline justify-between gap-2 text-2xs text-foreground-subtle">
                     <span className="min-w-0 truncate">
                       {/* A cidade, quando o preço veio de uma só: o menor preço sem dizer onde
                           não serve para ir buscar (task 25). */}
@@ -259,7 +259,7 @@ export function RowDetails({
           <div className="space-y-0.5">
             <Linha rotulo={rotuloDaVenda} valor={valorDaVenda} />
             {row.saleUnitPrice && (
-              <p className="text-right text-[0.6875rem] text-foreground-subtle">
+              <p className="text-right text-2xs text-foreground-subtle">
                 {row.saleSource ?? 'sem cotação'} ·{' '}
                 {row.saleObservedAt === null ? 'preço fixo' : idade(row.saleObservedAt, agora)}
               </p>
@@ -279,7 +279,7 @@ export function RowDetails({
           />
 
           <table className="w-full whitespace-nowrap text-xs">
-            <thead className="text-[0.6875rem] uppercase tracking-wide text-foreground-subtle">
+            <thead className="text-2xs uppercase tracking-wide text-foreground-subtle">
               <tr>
                 <th className="py-1 text-left font-medium">Cidade</th>
                 <th className="py-1 text-right font-medium">Ordem de venda</th>
@@ -314,7 +314,7 @@ export function RowDetails({
 
         <Secao titulo="Cenários">
           <table className="w-full whitespace-nowrap text-xs">
-            <thead className="text-[0.6875rem] uppercase tracking-wide text-foreground-subtle">
+            <thead className="text-2xs uppercase tracking-wide text-foreground-subtle">
               <tr>
                 <th className="py-1 text-left font-medium">Compra</th>
                 <th className="py-1 text-left font-medium">Venda</th>
@@ -357,7 +357,7 @@ export function RowDetails({
               ))}
             </tbody>
           </table>
-          <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+          <p className="text-2xs leading-snug text-foreground-subtle">
             Valores em silver. Ordem de compra e de venda rendem mais, mas dependem de alguém
             aceitar — o número supõe que a fila anda.
           </p>

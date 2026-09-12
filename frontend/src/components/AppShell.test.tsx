@@ -58,6 +58,31 @@ test('servidor e tema são alcançáveis nos dois breakpoints', () => {
   expect(screen.getAllByRole('combobox', { name: 'Tema' })).toHaveLength(2)
 })
 
+test('o Tamanho escala só o conteúdo do centro, não as barras laterais', () => {
+  // Pedido no uso (2026-09-12): "aumenta o tamanho só do conteúdo da tabela, não de tudo".
+  localStorage.setItem('albion-profit-pro:escala', '170')
+  renderShell()
+
+  const centro = document.getElementById('conteudo')!
+  expect(centro).toHaveClass('escala-do-conteudo')
+  expect(centro.style.getPropertyValue('--escala')).toBe('1.7')
+
+  for (const barra of document.querySelectorAll('aside')) {
+    expect(barra.style.getPropertyValue('--escala')).toBe('')
+  }
+  expect(document.documentElement.style.fontSize).toBe('')
+})
+
+test('com a navegação recolhida, o Tamanho continua ao alcance', () => {
+  // A primeira versão só mostrava o seletor com a barra aberta — e quem usa a barra recolhida
+  // nunca o encontrou.
+  localStorage.setItem('albion-profit-pro:nav-collapsed', 'true')
+  renderShell()
+
+  const sidebar = document.querySelector('aside')!
+  expect(within(sidebar).getByRole('combobox', { name: 'Tamanho' })).toBeInTheDocument()
+})
+
 test('no mobile a navegação abre num Sheet lateral', async () => {
   const user = userEvent.setup()
   renderShell()

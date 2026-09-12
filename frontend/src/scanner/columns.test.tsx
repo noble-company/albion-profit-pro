@@ -145,6 +145,13 @@ describe('as 8 colunas (task 20)', () => {
   test('a coluna Item ordena por tier (task 19)', () => {
     expect(coluna('item').sortField).toBe('tier')
   })
+
+  test('toda largura acompanha o Tamanho do conteúdo (pedido no uso, 2026-09-12)', () => {
+    // Com rem fixo, o texto cresceria e a coluna não: tudo cortado com reticências.
+    for (const c of colunas(4)) {
+      expect(c.width, c.key).toContain('var(--escala, 1)')
+    }
+  })
 })
 
 describe('item (pedido no uso, 2026-09-12)', () => {

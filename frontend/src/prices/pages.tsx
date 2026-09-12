@@ -159,7 +159,7 @@ export function ItemPricesPage() {
 
       <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-background">
         <table className="w-full min-w-[36rem] border-separate border-spacing-0 text-sm">
-          <thead className="bg-surface text-[0.68rem] uppercase tracking-[0.12em] text-foreground-subtle">
+          <thead className="bg-surface text-2xs uppercase tracking-[0.12em] text-foreground-subtle">
             <tr>
               <th className="h-11 border-b border-border px-3 text-left">
                 Cidade

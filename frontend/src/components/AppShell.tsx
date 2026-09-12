@@ -13,9 +13,10 @@ import {
   Recycle,
   Search,
   Sparkles,
+  ZoomIn,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { ESCALAS, useEscala, type Escala } from '@/app/escala'
@@ -154,13 +155,24 @@ function ThemeSelect({ className }: { className?: string }) {
   )
 }
 
-/** Tamanho da interface inteira — ver `EscalaContext` (pedido no uso, 2026-09-12). */
-function EscalaSelect({ className }: { className?: string }) {
+/**
+ * Tamanho do conteúdo do centro — as barras laterais ficam de fora (ver `escala.ts`).
+ *
+ * `compacto`: com a navegação recolhida só cabe um ícone. A primeira versão escondia o seletor
+ * nesse modo, e quem usa a barra recolhida nunca o encontrou.
+ */
+function EscalaSelect({ compacto = false }: { compacto?: boolean }) {
   const { escala, setEscala } = useEscala()
   return (
     <Select value={String(escala)} onValueChange={(value) => setEscala(Number(value) as Escala)}>
-      <SelectTrigger aria-label="Tamanho" className={className ?? 'h-9 w-full'}>
-        <SelectValue />
+      <SelectTrigger
+        aria-label="Tamanho"
+        title={compacto ? `Tamanho do conteúdo: ${escala}%` : undefined}
+        className={
+          compacto ? 'h-9 w-full justify-center px-0 [&>svg:last-child]:hidden' : 'h-9 w-full'
+        }
+      >
+        {compacto ? <ZoomIn className="size-4" aria-hidden="true" /> : <SelectValue />}
       </SelectTrigger>
       <SelectContent>
         {ESCALAS.map((opcao) => (
@@ -195,7 +207,9 @@ function NavColumn({
       </nav>
 
       <div className="space-y-2 border-t border-border px-2 py-3">
-        {!collapsed && (
+        {collapsed ? (
+          <EscalaSelect compacto />
+        ) : (
           <>
             <RealmSelect />
             <ThemeSelect />
@@ -223,6 +237,7 @@ export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const { escala } = useEscala()
   const [slot, setSlot] = useSidebarSlotContainer()
   const [hasFilters, setHasFilters] = useState(false)
   const [collapsed, setCollapsed] = useState(
@@ -323,7 +338,14 @@ export function AppShell() {
             <ThemeSelect className="h-9 w-28" />
           </div>
 
-          <main id="conteudo" className="min-w-0 flex-1 overflow-y-auto px-4 py-4">
+          {/* O Tamanho escala só daqui para dentro: `.escala-do-conteudo` multiplica por
+              `--escala` as variáveis de espaçamento e texto do Tailwind. As barras laterais,
+              fora do `main`, ficam como estão (pedido no uso, 2026-09-12). */}
+          <main
+            id="conteudo"
+            className="escala-do-conteudo min-w-0 flex-1 overflow-y-auto px-4 py-4"
+            style={{ '--escala': escala / 100 } as CSSProperties}
+          >
             {/* Dentro do shell de propósito: uma tela que quebra não pode apagar a navegação
                 (achado E04 — antes disso, virava tela branca). */}
             {/* `search` junto do `pathname`: quando o que derruba a tela é um filtro (e é o
