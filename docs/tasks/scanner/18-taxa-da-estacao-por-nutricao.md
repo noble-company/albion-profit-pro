@@ -98,6 +98,13 @@ que não têm valor em nenhum ponto da cadeia. São `QUESTITEM` — não vendáv
 aparecem como "sem preço de venda" no scanner e a taxa nunca entra na conta. Valor nulo vira
 nutrição zero, e isso está registrado aqui de propósito, não escondido no código.
 
+> **Revisto na task 13 (2026-09-12, achado `W10`).** "Ausente é ausente" deixava 153 das 172
+> poções sem valor — o extrato arcano e as partes de animal raro não têm — e a taxa entrava como
+> zero justamente nas poções caras. Medido na estação do alquimista: o jogo **soma o que tem valor
+> e conta o resto como zero** (Poção de Cura T4.1 = 432 a 320 por 100 de nutrição). A derivação
+> agora faz o mesmo; a receita que resolve inteira continua vencendo. Ver
+> [a task 13](13-comida-e-pocoes.md#a-taxa-da-estação-achado-w10).
+
 ## O que implementar
 
 1. **`item.item_value`** — coluna nova, migração e importação do `@itemvalue`.

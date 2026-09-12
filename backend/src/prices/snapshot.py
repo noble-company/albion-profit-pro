@@ -25,6 +25,16 @@ SOURCE_AODP = "aodp"
 # A categoria de quem não tem categoria no dump — a mesma de `frontend/src/scanner/categorias.ts`.
 OUTROS = "other"
 
+# A aba de Comida & Poções (task 4/13): tudo de `consumables`, mais os insumos da cozinha. O código
+# do insumo é da aba, não do dump — `fish` já é "Pesca" na Coleta. Espelho de `INSUMOS` em
+# `frontend/src/scanner/categorias.ts`.
+CONSUMIVEIS = "consumables"
+CATEGORIA_DOS_INSUMOS = "insumos"
+INSUMOS = {
+    "fishsauce": ("crafting", "fish"),
+    "farmingproducts": ("farming", "farmingproducts"),
+}
+
 Combo = tuple[str, str, int, int]  # item_id, location_id, quality_level, enchantment_level
 
 
@@ -172,6 +182,24 @@ def itens_da_categoria(kind: str, category: str, subcategory: str | None = None)
 def _na_categoria(stmt, receita, kind: str, category: str, subcategory: str | None):
     """A regra da categoria de uma receita, sobre uma consulta que já junta `receita` e `Item`
     pela saída. Uma cópia só, para o snapshot (task 22) e as vendas (task 23) não divergirem."""
+    if kind == CONSUMIVEIS:
+        # A aba lê o catálogo de craft; a categoria é Comida/Poções e a subcategoria, a família.
+        stmt = stmt.where(receita.production_kind == "crafting")
+        if category == CATEGORIA_DOS_INSUMOS:
+            pares = (
+                [INSUMOS[subcategory]]
+                if subcategory in INSUMOS
+                else ([] if subcategory else list(INSUMOS.values()))
+            )
+            return stmt.where(tuple_(Item.shop_category, Item.shop_subcategory).in_(pares))
+        stmt = stmt.where(
+            Item.shop_category == CONSUMIVEIS,
+            func.coalesce(Item.shop_subcategory, OUTROS) == category,
+        )
+        if subcategory:
+            stmt = stmt.where(func.coalesce(Item.shop_subcategory2, OUTROS) == subcategory)
+        return stmt
+
     stmt = stmt.where(receita.production_kind == kind)
     if kind == "refining":
         return stmt.where(func.coalesce(Item.shop_subcategory2, OUTROS) == category)

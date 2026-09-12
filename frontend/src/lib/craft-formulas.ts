@@ -145,9 +145,9 @@ export function calculateFocusConsumed(
  * sai do valor do item (`nutrição = itemValue × 0,1125`). Um recurso T4 e uma arma T8 diferem
  * por três ordens de grandeza, então nenhum número fixo por execução pode estar certo nos dois.
  *
- * `itemValue` nulo são os trade packs de facção, cujos ingredientes são tokens sem valor em
- * ponto nenhum da cadeia. Eles não são vendáveis, então a linha também não tem preço de venda —
- * cobrar uma taxa inventada ali acrescentaria custo a algo que ninguém consegue vender.
+ * Ingrediente sem valor já chega somado como zero (task 4/13, medido na estação), então
+ * `itemValue` nulo sobra só para item sem valor publicado **e** sem receita — os fogos de
+ * artifício, que não têm ingrediente. Cobrar uma taxa inventada ali seria pior que não cobrar.
  */
 export function calculateStationFee(
   itemValue: MoneyInput | null,

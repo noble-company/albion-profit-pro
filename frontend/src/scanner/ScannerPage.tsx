@@ -15,7 +15,6 @@ import { SidebarSection } from '@/components/shell/SidebarSlot'
 import { Button } from '@/components/ui/button'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { useRecipeCatalog } from '@/catalog/hooks'
-import type { CatalogKind } from '@/catalog/service'
 import { formatarNomeCurto } from '@/lib/formatters'
 import { money, percentageToRate } from '@/lib/money'
 import { useDestinyBoard } from '@/destiny/hooks'
@@ -23,11 +22,13 @@ import { useCidades, useLocationName } from '@/lib/locations'
 
 import {
   arvoreDeCategorias,
+  catalogoDaTela,
   MIN_LETRAS_DA_BUSCA,
   receitasDaSelecao,
   TODAS_AS_CATEGORIAS,
   TOP_RECEITAS,
   topPorLucro,
+  type TelaDoScanner,
 } from './categorias'
 import { buildColumns, motivoSemPreco } from './columns'
 import { bestPerRecipe, computeScanner, explainRow, type ScannerRow } from './engine'
@@ -64,14 +65,16 @@ const ENCANTAMENTOS = [0, 1, 2, 3, 4]
 const ORDEM_DO_TOP: SortState = { field: 'profit', direction: 'desc' }
 
 export function ScannerPage({
-  kind,
+  tela,
   title,
   description,
 }: {
-  kind: CatalogKind
+  tela: TelaDoScanner
   title: string
   description: string
 }) {
+  /** O catálogo que a tela lê — Comida & Poções usa o de craft (task 13). */
+  const kind = catalogoDaTela(tela)
   const { realm } = useServer()
   const locationName = useLocationName()
   const cidades = useCidades()
@@ -144,8 +147,8 @@ export function ScannerPage({
   /** A árvore do seletor: a ordem do mercado do jogo, sem o que não se vende (task 21). */
   const arvore = useMemo(
     () =>
-      catalogo.catalog ? arvoreDeCategorias(catalogo.catalog.recipes, itemsByName, kind) : [],
-    [catalogo.catalog, itemsByName, kind],
+      catalogo.catalog ? arvoreDeCategorias(catalogo.catalog.recipes, itemsByName, tela) : [],
+    [catalogo.catalog, itemsByName, tela],
   )
 
   /**
@@ -156,12 +159,12 @@ export function ScannerPage({
     const resultado = receitasDaSelecao(
       catalogo.catalog?.recipes ?? [],
       itemsByName,
-      kind,
+      tela,
       selecao,
       filters.search,
     )
     return { ...resultado, chave: `${resultado.modo}:${resultado.receitas.join(',')}` }
-  }, [catalogo.catalog, itemsByName, kind, selecao, filters.search])
+  }, [catalogo.catalog, itemsByName, tela, selecao, filters.search])
   const modo = daSelecao.modo
 
   // A lista entra no engine pelo CONTEÚDO. Com uma categoria escolhida, digitar na busca refaz
@@ -179,10 +182,10 @@ export function ScannerPage({
    */
   const recorte = useMemo<RecorteDoSnapshot | null>(
     () =>
-      modo === 'categoria' && kind !== null && selecao.categoria
-        ? { kind, category: selecao.categoria, subcategory: selecao.subcategoria }
+      modo === 'categoria' && selecao.categoria
+        ? { kind: tela, category: selecao.categoria, subcategory: selecao.subcategoria }
         : null,
-    [modo, kind, selecao.categoria, selecao.subcategoria],
+    [modo, tela, selecao.categoria, selecao.subcategoria],
   )
   const precos = usePriceSnapshot(realm, mercadosPedidos, recorte, modo !== 'nada')
 
@@ -478,7 +481,7 @@ export function ScannerPage({
               no craft, 2,7 s antes da primeira linha. */}
           <FilterGroup legend="O que analisar">
             <FilterSelectField
-              label={kind === 'refining' ? 'Família' : 'Categoria'}
+              label={tela === 'refining' ? 'Família' : 'Categoria'}
               value={selecao.categoria ?? ''}
               onChange={(v) => escolherCategoria(v || null)}
               options={[
@@ -497,7 +500,7 @@ export function ScannerPage({
             />
             {noDaCategoria && noDaCategoria.filhos.length > 0 && (
               <FilterSelectField
-                label="Subcategoria"
+                label={tela === 'consumables' ? 'Família' : 'Subcategoria'}
                 value={selecao.subcategoria ?? ''}
                 onChange={(v) => escolherCategoria(noDaCategoria.codigo, v || null)}
                 options={noDaCategoria.filhos.map((no) => ({
@@ -767,7 +770,7 @@ export function ScannerPage({
           title="Selecione o que você deseja analisar"
           icon={<ListFilter className="size-6" />}
         >
-          {kind === 'refining' ? 'Escolha uma família' : 'Escolha uma categoria'} na barra lateral,
+          {tela === 'refining' ? 'Escolha uma família' : 'Escolha uma categoria'} na barra lateral,
           peça o Top {TOP_RECEITAS} mais lucrativas ou busque pelo nome.
         </EstadoVazio>
       ) : estado === 'carregando' ? (
@@ -795,7 +798,7 @@ export function ScannerPage({
 export function RefiningScannerPage() {
   return (
     <ScannerPage
-      kind="refining"
+      tela="refining"
       title="O que vale a pena refinar"
       description="Todas as receitas de refino, em todas as cidades — inclusive as que ainda não têm preço."
     />
@@ -829,9 +832,20 @@ function PrecoProprio({ quantidade, onLimpar }: { quantidade: number; onLimpar: 
 export function CraftingScannerPage() {
   return (
     <ScannerPage
-      kind="crafting"
+      tela="crafting"
       title="O que vale a pena craftar"
-      description="As 5.523 receitas de craft, em todas as cidades — inclusive as que ainda não têm preço."
+      description="As receitas de craft, em todas as cidades — inclusive as que ainda não têm preço. Comida e poção ficam na aba própria."
+    />
+  )
+}
+
+/** Comida, poção e os insumos da cozinha (task 13), sobre o catálogo de craft. */
+export function ConsumablesScannerPage() {
+  return (
+    <ScannerPage
+      tela="consumables"
+      title="O que vale a pena cozinhar e preparar"
+      description="Comida, poção e os insumos da cozinha, em todas as cidades — inclusive as que ainda não têm preço."
     />
   )
 }

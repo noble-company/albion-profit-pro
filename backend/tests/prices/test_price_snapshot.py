@@ -517,6 +517,84 @@ async def test_sem_categoria_o_snapshot_e_o_realm_inteiro(cliente_autenticado, d
     assert "T8_FORA_DE_RECEITA" in itens
 
 
+async def _seed_consumiveis(db_session):
+    """Uma poção e uma sopa, e os dois insumos que a aba de Comida & Poções junta (task 4/13):
+    molho de peixe (`crafting/fish`) e manteiga (`farming/farmingproducts`)."""
+    db_session.add_all(
+        [
+            _item("T4_POTION_HEAL", cat="consumables", sub="potions", sub2="heal"),
+            _item("T4_BURDOCK", cat="farming", sub="farm"),
+            _item("T4_MEAL_SOUP", cat="consumables", sub="food", sub2="soups"),
+            _item("T4_CARROT", cat="farming", sub="farm"),
+            _item("T1_FISHSAUCE_LEVEL1", cat="crafting", sub="fish", sub2="other"),
+            _item("T1_FISHCHOPS", cat="gathering", sub="fish"),
+            _item("T4_BUTTER", cat="farming", sub="farmingproducts", sub2="butter"),
+            _item("T4_MILK", cat="farming", sub="farm"),
+        ]
+    )
+    db_session.add_all(
+        [
+            _receita("T4_POTION_HEAL", "crafting", ["T4_BURDOCK"]),
+            _receita("T4_MEAL_SOUP", "crafting", ["T4_CARROT"]),
+            _receita("T1_FISHSAUCE_LEVEL1", "crafting", ["T1_FISHCHOPS"]),
+            _receita("T4_BUTTER", "crafting", ["T4_MILK"]),
+        ]
+    )
+    await db_session.commit()
+
+    await upsert_snapshot(
+        db_session,
+        "west",
+        [
+            {
+                "item_id": nome,
+                "location_id": "1002",
+                "quality_level": 1,
+                "enchantment_level": 0,
+                "sell_min": Decimal("100"),
+                "sell_observed_at": AGORA,
+                "sell_source": SOURCE_CLIENT,
+            }
+            for nome in (
+                "T4_POTION_HEAL",
+                "T4_BURDOCK",
+                "T4_MEAL_SOUP",
+                "T4_CARROT",
+                "T1_FISHSAUCE_LEVEL1",
+                "T1_FISHCHOPS",
+                "T4_BUTTER",
+                "T4_MILK",
+            )
+        ],
+    )
+    await db_session.commit()
+
+
+async def test_consumiveis_a_familia_e_o_segundo_nivel(cliente_autenticado, db_session):
+    """Na aba de Comida & Poções a categoria é Comida/Poções e a subcategoria é a família
+    (`shop_subcategory2`) — a mesma regra de `lugarDaReceita` no frontend."""
+    await _seed_consumiveis(db_session)
+
+    itens = await _itens(cliente_autenticado, "kind=consumables&category=potions&subcategory=heal")
+
+    assert itens == {"T4_POTION_HEAL", "T4_BURDOCK"}
+
+
+async def test_consumiveis_insumos_juntam_molho_de_peixe_e_produtos_de_fazenda(
+    cliente_autenticado, db_session
+):
+    """`fishsauce` e não `fish`: o mapa de rótulos é plano, e `fish` já é "Pesca" na Coleta."""
+    await _seed_consumiveis(db_session)
+
+    molho = await _itens(
+        cliente_autenticado, "kind=consumables&category=insumos&subcategory=fishsauce"
+    )
+    todos = await _itens(cliente_autenticado, "kind=consumables&category=insumos")
+
+    assert molho == {"T1_FISHSAUCE_LEVEL1", "T1_FISHCHOPS"}
+    assert todos == {"T1_FISHSAUCE_LEVEL1", "T1_FISHCHOPS", "T4_BUTTER", "T4_MILK"}
+
+
 async def test_categoria_sem_kind_e_rejeitada(cliente_autenticado):
     """A mesma `category` significa coisas diferentes no refino (família) e no craft."""
     resposta = await cliente_autenticado.get("/prices/snapshot?server=west&category=cloth")

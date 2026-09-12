@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "dataset_name": "albion-static",
-  "version": "2026-09-11-0be6a5e7-artifact-route-v1",
-  "transform_revision": "item-search-v1-recipe-order-v1-standard-refining-v1-production-kind-v1-return-eligible-v1-artifact-route-v1",
+  "version": "2026-09-12-0be6a5e7-valueless-zero-v1",
+  "transform_revision": "item-search-v1-recipe-order-v1-standard-refining-v1-production-kind-v1-return-eligible-v1-artifact-route-v1-valueless-zero-v1",
   "source": {
     "repository": "https://github.com/ao-data/ao-bin-dumps",
     "revision": "0be6a5e74f30fc1312118be3d017f3832f027cef"

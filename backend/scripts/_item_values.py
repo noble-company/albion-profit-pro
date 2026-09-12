@@ -89,8 +89,11 @@ def resolve_item_values(dump_items: dict, names: set[str] | None = None) -> dict
     autoritativa. Sem ele, o conjunto sai do próprio dump, o que serve para inspeção mas depende
     de a entrada declarar `@enchantmentlevel` (três extratos de alquimia não declaram).
 
-    Item cuja cadeia não resolve **fica de fora do dicionário** — ausente é ausente (`X02`).
-    Somar ingrediente sem valor como se valesse zero produziria uma taxa de estação inventada.
+    **Ingrediente sem valor conta zero** — medido na estação do alquimista (task 4/13, `W10`): a
+    Poção de Cura T4.1 custou 432 a 320 por 100 de nutrição, exatamente as bardanas e os ovos, sem
+    o extrato arcano. A regra anterior ("ausente é ausente") deixava 153 das 172 poções sem valor,
+    e a taxa entrava como zero. Receita que resolve **inteira** continua vencendo a que precisou do
+    zero; item sem valor publicado e sem receita fica de fora do dicionário.
     """
     index = _index(dump_items)
     resolved: dict[str, Decimal | None] = {}
@@ -118,6 +121,7 @@ def resolve_item_values(dump_items: dict, names: set[str] | None = None) -> dict
         try:
             # Receitas alternativas: vale a **primeira que resolve inteira**. Somar a mais barata
             # faria o valor depender de uma rota, e valor de item não depende de rota.
+            primeira: Decimal | None = None
             for requirement in _requirements(entry, level):
                 resources = [
                     r for r in as_list(requirement.get("craftresource")) if isinstance(r, dict)
@@ -129,17 +133,22 @@ def resolve_item_values(dump_items: dict, names: set[str] | None = None) -> dict
                 for resource in resources:
                     ingredient = value_of(_resource_name(resource))
                     if ingredient is None:
+                        # Conta zero, como a estação cobra — mas a receita deixa de ser inteira,
+                        # e outra rota que resolva vence esta.
                         complete = False
-                        break
+                        continue
                     total += ingredient * int(resource["@count"])
                 if complete:
                     resolved[unique_name] = total
                     return total
+                if primeira is None:
+                    primeira = total
         finally:
             visiting.discard(unique_name)
 
-        resolved[unique_name] = None
-        return None
+        # Nenhuma rota resolve inteira: a primeira, com o que não tem valor contando zero.
+        resolved[unique_name] = primeira
+        return primeira
 
     if names is None:
         names = set()

@@ -28,6 +28,8 @@ test('a navegação principal tem ícone + rótulo por tela', () => {
     'Market Flip',
     'Refino',
     'Craft',
+    // Task 4/13: comida, poção e os insumos da cozinha saíram do Craft para uma aba própria.
+    'Comida & Poções',
     'Itens',
     'Calculadora',
     'Tokens',

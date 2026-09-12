@@ -156,9 +156,10 @@ def calculate_station_fee(
     (`nutrition = item_value × 0.1125`). A T4 refined resource and a T8 weapon differ by three
     orders of magnitude, so no single per-run number can be right for both.
 
-    `item_value` is `None` for the faction trade packs, whose ingredients are tokens with no
-    value anywhere in the chain. Those are untradeable, so the row has no sale price either —
-    charging an invented fee there would add cost to a line nobody can sell.
+    An ingredient without value already counts as zero in the derived value (task 4/13, measured
+    at the in-game station), so `item_value` is `None` only for an item with no published value
+    and no recipe — the fireworks, which have no ingredients. Charging an invented fee there would
+    be worse than charging none.
 
     Not rounded on purpose: where the game rounds a partial silver (it shows 28 for 28.08) is
     not established, and inventing a rule would fake precision the measurement does not have.

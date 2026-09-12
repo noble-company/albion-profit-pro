@@ -26,8 +26,8 @@ class CatalogItemOut(BaseModel):
     enchantment_level: int = 0
     weight: Decimal | None = None
     # Base da taxa da estação: o jogo cobra por nutrição consumida, e
-    # `nutrição = item_value × 0,1125` (task 4/18). Nulo para item cuja cadeia de receita não
-    # resolve — os trade packs de facção.
+    # `nutrição = item_value × 0,1125` (task 4/18). Nulo só para item sem valor publicado e sem
+    # receita — ingrediente sem valor conta zero (task 4/13).
     item_value: Decimal | None = None
     shop_category: str | None = None
     shop_subcategory: str | None = None

@@ -361,7 +361,7 @@ function prepararReceita(
     ),
     recipeSilver: multiplyByQuantity(recipe.silver_cost, production.executions),
     // O valor do item vem da SAÍDA, e é ele que decide o tamanho da taxa. Item sem valor
-    // (trade pack de facção) não paga estação — ver `calculateStationFee`.
+    // nenhum (sem receita, como os fogos de artifício) não paga estação — ver `calculateStationFee`.
     stationTotal: calculateStationFee(
       saida?.item_value ?? null,
       params.stationFeePer100Nutrition,

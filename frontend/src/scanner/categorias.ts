@@ -17,6 +17,16 @@ import { casaBusca } from './filters'
 type CatalogItem = ScannerCatalog['items'][number]
 type CatalogRecipe = ScannerCatalog['recipes'][number]
 
+/**
+ * As três telas do scanner. Comida & Poções (task 13) não tem catálogo próprio: lê o de craft e
+ * fica com o que é de cozinha — que, por isso mesmo, sai do Craft.
+ */
+export type TelaDoScanner = 'refining' | 'crafting' | 'consumables'
+
+export function catalogoDaTela(tela: TelaDoScanner): Exclude<CatalogKind, null> {
+  return tela === 'refining' ? 'refining' : 'crafting'
+}
+
 export const TOP_RECEITAS = 15
 
 /**
@@ -141,6 +151,68 @@ export const ORDEM_DO_REFINO: readonly string[] = [
 
 const OUTROS = 'other'
 
+const CONSUMIVEIS = 'consumables'
+
+/** A categoria sintética dos insumos — como `all`, não existe no bloco `shopcategories`. */
+export const CATEGORIA_DOS_INSUMOS = 'insumos'
+
+/**
+ * Os insumos da cozinha que moram na aba (decisão de 2026-09-12): `[código da aba, shop_category,
+ * shop_subcategory]`. O código é da aba e não do dump porque o mapa de rótulos é plano, e `fish`
+ * já é "Pesca" na Coleta. Espelho de `INSUMOS` em `backend/src/prices/snapshot.py`.
+ */
+export const INSUMOS: ReadonlyArray<readonly [string, string, string]> = [
+  ['fishsauce', 'crafting', 'fish'],
+  ['farmingproducts', 'farming', 'farmingproducts'],
+]
+
+/**
+ * A árvore de Comida & Poções. Comida e Poções seguem o `shopsubcategory2` do bloco
+ * `shopcategories` do dump, pelo `@value` — a mesma regra de `ORDEM_DO_CRAFT`.
+ */
+export const ORDEM_DOS_CONSUMIVEIS: ReadonlyArray<readonly [string, readonly string[]]> = [
+  [
+    'food',
+    [
+      'soups',
+      'salads',
+      'pies',
+      'roasts',
+      'omelettes',
+      'stews',
+      'sandwiches',
+      'grilledfish',
+      'event',
+      'other',
+    ],
+  ],
+  [
+    'potions',
+    [
+      'heal',
+      'energy',
+      'gigantify',
+      'resistance',
+      'slowfield',
+      'poison',
+      'invisibility',
+      'calming',
+      'cleanse',
+      'acid',
+      'berserk',
+      'lava',
+      'gather',
+      'tornado',
+      'lifeward',
+      'focus',
+      'event',
+      'other',
+    ],
+  ],
+  [CATEGORIA_DOS_INSUMOS, INSUMOS.map(([codigo]) => codigo)],
+  ['other', ['firework']],
+]
+
 /**
  * O que não se vende no mercado não entra em lugar nenhum: nem na árvore, nem no Top 15, nem na
  * busca. A regra é pelo **nome**, não pela categoria (decisão de 2026-09-10): `capes/other` mistura
@@ -153,16 +225,34 @@ export function receitaEscondida(outputItem: string): boolean {
   )
 }
 
+/** O código de insumo da aba, se o item é um. */
+function insumoDo(item: CatalogItem | undefined): string | undefined {
+  return INSUMOS.find(
+    ([, categoria, subcategoria]) =>
+      item?.shop_category === categoria && item?.shop_subcategory === subcategoria,
+  )?.[0]
+}
+
 /**
  * Onde uma receita mora na árvore: `[categoria, subcategoria]`, ou `[família, null]` no refino.
  * Item sem categoria no dump (os tokens de dungeon aleatória) vai para Outros em vez de sumir.
+ * `null` = a receita é de outra tela: o que é de cozinha mora só em Comida & Poções (task 13).
  */
 function lugarDaReceita(
   item: CatalogItem | undefined,
-  kind: CatalogKind,
-): [string, string | null] {
-  if (kind === 'refining') return [item?.shop_subcategory2 ?? OUTROS, null]
-  return [item?.shop_category ?? OUTROS, item?.shop_subcategory ?? OUTROS]
+  tela: TelaDoScanner,
+): [string, string | null] | null {
+  if (tela === 'refining') return [item?.shop_subcategory2 ?? OUTROS, null]
+
+  const insumo = insumoDo(item)
+  const daCozinha = item?.shop_category === CONSUMIVEIS || insumo !== undefined
+  if (tela === 'crafting') {
+    return daCozinha ? null : [item?.shop_category ?? OUTROS, item?.shop_subcategory ?? OUTROS]
+  }
+
+  if (!daCozinha) return null
+  if (insumo !== undefined) return [CATEGORIA_DOS_INSUMOS, insumo]
+  return [item?.shop_subcategory ?? OUTROS, item?.shop_subcategory2 ?? OUTROS]
 }
 
 export interface NoDaArvore {
@@ -189,13 +279,15 @@ function ordenar(nos: NoDaArvore[], ordem: readonly string[]): NoDaArvore[] {
 export function arvoreDeCategorias(
   recipes: readonly CatalogRecipe[],
   itemsByName: ReadonlyMap<string, CatalogItem>,
-  kind: CatalogKind,
+  tela: TelaDoScanner,
 ): NoDaArvore[] {
   const contagem = new Map<string, { receitas: number; filhos: Map<string, number> }>()
 
   for (const receita of recipes) {
     if (receitaEscondida(receita.output_item)) continue
-    const [categoria, subcategoria] = lugarDaReceita(itemsByName.get(receita.output_item), kind)
+    const lugar = lugarDaReceita(itemsByName.get(receita.output_item), tela)
+    if (lugar === null) continue
+    const [categoria, subcategoria] = lugar
     const no = contagem.get(categoria) ?? { receitas: 0, filhos: new Map<string, number>() }
     no.receitas += 1
     if (subcategoria !== null) {
@@ -204,8 +296,9 @@ export function arvoreDeCategorias(
     contagem.set(categoria, no)
   }
 
-  const ordemDasSubcategorias = new Map(ORDEM_DO_CRAFT)
-  const ordemDoTopo = kind === 'refining' ? ORDEM_DO_REFINO : ORDEM_DO_CRAFT.map(([c]) => c)
+  const ordem = tela === 'consumables' ? ORDEM_DOS_CONSUMIVEIS : ORDEM_DO_CRAFT
+  const ordemDasSubcategorias = new Map(ordem)
+  const ordemDoTopo = tela === 'refining' ? ORDEM_DO_REFINO : ordem.map(([c]) => c)
 
   const nos = [...contagem].map(([codigo, { receitas, filhos }]) => ({
     codigo,
@@ -249,7 +342,7 @@ export interface ReceitasDaSelecao {
 export function receitasDaSelecao(
   recipes: readonly CatalogRecipe[],
   itemsByName: ReadonlyMap<string, CatalogItem>,
-  kind: CatalogKind,
+  tela: TelaDoScanner,
   selecao: Selecao,
   busca: string,
 ): ReceitasDaSelecao {
@@ -270,9 +363,12 @@ export function receitasDaSelecao(
   for (const receita of recipes) {
     if (receitaEscondida(receita.output_item)) continue
     const item = itemsByName.get(receita.output_item)
+    // Top, Todas e busca também só alcançam a tela aberta: poção não volta ao Craft pela busca.
+    const lugar = lugarDaReceita(item, tela)
+    if (lugar === null) continue
 
     if (modo === 'categoria') {
-      const [categoria, subcategoria] = lugarDaReceita(item, kind)
+      const [categoria, subcategoria] = lugar
       if (categoria !== selecao.categoria) continue
       if (selecao.subcategoria && subcategoria !== selecao.subcategoria) continue
     } else if (modo === 'busca' && !casaBusca(item, receita.output_item, termo)) {

@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { apiClient, queryPolicies, safeApiCall } from '@/api'
 import type { components } from '@/api/schema'
 
+import type { TelaDoScanner } from './categorias'
+
 export type PriceSnapshot = components['schemas']['PriceSnapshotOut']
 type Realm = components['schemas']['AlbionServer']
 
@@ -64,7 +66,8 @@ export function mesmosPrecos(
  * receitas dela, pela mesma regra de `lugarDaReceita`.
  */
 export interface RecorteDoSnapshot {
-  kind: 'refining' | 'crafting'
+  /** A tela, não o catálogo: Comida & Poções lê o catálogo de craft com outra árvore (task 13). */
+  kind: TelaDoScanner
   category: string
   subcategory: string | null
 }

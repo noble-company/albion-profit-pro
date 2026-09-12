@@ -89,7 +89,8 @@ test('o valor do item manda no tamanho da taxa — por isso prata fixa não serv
 })
 
 test('sem valor de item a estação não cobra, e não inventa', () => {
-  // Trade pack de facção: os ingredientes são tokens sem valor em ponto nenhum da cadeia.
+  // Item sem valor publicado e sem receita (os fogos de artifício). Ingrediente sem valor não
+  // chega aqui como nulo: a derivação já o soma como zero (task 4/13).
   expect(calculateStationFee(null, '390', 10).toString()).toBe('0')
 })
 

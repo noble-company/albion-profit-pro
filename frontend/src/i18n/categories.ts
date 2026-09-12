@@ -158,6 +158,38 @@ const SHOP_LABELS: Record<string, string> = {
   tomes: 'Tomos',
   silverbag: 'Bolsas de prata',
 
+  // --- famílias de comida e poção (`shop_subcategory2`, task 4/13), pelo nome do jogo ---
+  soups: 'Sopas',
+  salads: 'Saladas',
+  pies: 'Tortas',
+  roasts: 'Assados',
+  omelettes: 'Omeletes',
+  stews: 'Guisados',
+  sandwiches: 'Sanduíches',
+  grilledfish: 'Peixe grelhado',
+  event: 'Evento',
+  heal: 'Cura',
+  energy: 'Energia',
+  gigantify: 'Crescimento',
+  resistance: 'Resistência',
+  slowfield: 'Pegajosa',
+  poison: 'Venenosa',
+  invisibility: 'Invisibilidade',
+  calming: 'Calmante',
+  cleanse: 'Purificadora',
+  acid: 'Ácida',
+  berserk: 'Fúria',
+  lava: 'Infernal',
+  gather: 'Coleta',
+  tornado: 'Tornado',
+  lifeward: 'Salva-vidas',
+  focus: 'Foco',
+  firework: 'Fogos de artifício',
+
+  // --- insumos da cozinha: códigos da aba, não do dump (`fish` já é "Pesca") ---
+  insumos: 'Insumos',
+  fishsauce: 'Molho de peixe',
+
   // --- coleta (ferramentas e equipamento de coleta) ---
   fish: 'Pesca',
   fiber: 'Fibra',

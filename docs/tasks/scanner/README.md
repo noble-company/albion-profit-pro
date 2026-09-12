@@ -118,7 +118,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | [11.5](11.5-estrategia-e-analise-exata.md) | Estratégia e análise exata | — | Premissa declarada; ponte para `/craft/simulate` |
 | [11.6](11.6-sessao-de-refino.md) | Sessão de refino | — | Compra pelas receitas iniciais; coluna Rendimento |
 | [12](12-tela-de-craft.md) | Tela de Craft | — | 5.523 receitas no Worker; ingredientes resumidos |
-| 13 | Comida & Poções | — | Aba própria, mesmo motor |
+| [13](13-comida-e-pocoes.md) | Comida & Poções | `W10` | Aba própria com os insumos da cozinha; a taxa da estação volta às 153 poções que a cobravam zero |
 | 14 | Calculadora sobre o engine | — | Instantânea ao digitar |
 | [17](17-painel-do-destino.md) | Painel do Destino | — | Custo de foco real: `Lucro/foco` deixa de errar por ate 16x |
 | [18](18-taxa-da-estacao-por-nutricao.md) | Taxa da estação por nutrição | `W5` | A estação cobra por nutrição consumida; prata fixa errava por 56x pra mais e 44x pra menos |
@@ -161,7 +161,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [x] 11.5 — Estratégia declarada e análise exata
 - [x] 11.6 — Sessão de refino (compra cheia, rendimento, estação por execução total)
 - [x] 12 — Tela de Craft (Worker, colunas do craft)
-- [ ] 13 — Comida & Poções
+- [x] 13 — Comida & Poções
 - [ ] 14 — Calculadora sobre o engine
 - [x] 17 — Painel do Destino (eficiência de foco)
 - [x] 18 — Taxa da estação por nutrição consumida
@@ -226,4 +226,5 @@ A [Fase 3.6](../correcoes/README.md) é substituída por esta. Destino de cada t
 | `W7` | **Item com mais de uma receita fica fora do catálogo.** O importador pula `craftingrequirements` em lista fora do refino: 727 itens base e 2.420 níveis encantados, quase todos equipamento de artefato de facção (artefato × token de favor). | task 27 |
 | `W8` | **O rollup diário e mensal parou quando o histórico cresceu.** `_rollup_diario` e `_rollup_mensal` inseriam com `INSERT ... VALUES`, 8 parâmetros por linha agregada; acima de 4.095 linhas passava do limite de 32.767 do asyncpg. O `InterfaceError` era tratado como transitório, então o job tentava de novo e caía de novo, e o `poda` falhava junto. A tabela diária estava parada em 2.194 linhas quando o histórico pedia 11.210. Virou `INSERT ... SELECT ... GROUP BY`, agregado no banco. | correção antes da task 23 (2026-09-11) |
 | `W9` | **O histórico do client está atribuído ao item errado.** O livro chega com o nome do item; o histórico, com o `AlbionId` numérico resolvido pelo `Index` do `items.json` do dataset. Em `market_scan`, de 440 varreduras de histórico com uma de livro a menos de 90 s na mesma cidade, só 43 são do mesmo item; o preço médio do histórico fica 22× o de mercado na mediana. Provável reordenação de índices do jogo depois da revisão `5cf2e8e9`. Com a regra "o client vence" da task 23, o bloco errado segura o certo da API pública. | task 28 |
+| `W10` | **A taxa da estação entrava como zero em 153 das 172 poções.** A derivação do valor do item (task 18) desistia quando um ingrediente não tinha valor — o extrato arcano, em toda poção encantada, e as partes de animal raro, em 8 tipos inteiros. Medido na estação do alquimista a 320 por 100 de nutrição: Poção de Cura T4.1 custou 432 e Poção de Fúria T4, 230 — exatamente os ingredientes com valor, com o resto contando zero. A mesma regra deu valor a 303 capas de facção, bolsas e montarias, que também cobravam zero. | task 13 |
 | `W2` | **Encantamento da saída tem duas fontes.** O servidor usa `recipe["enchantment_level"]` (coluna); o cliente derivava do sufixo `@N` do nome. Coincidem no dado real, mas o modo de falha seria silencioso — combo inexistente virando "sem preço". | task 06 |

@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   Calculator,
+  CookingPot,
   Hammer,
   KeyRound,
   LogOut,
@@ -57,6 +58,7 @@ const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/', label: 'Market Flip', icon: ArrowLeftRight, end: true },
   { to: '/refino', label: 'Refino', icon: Recycle },
   { to: '/craft', label: 'Craft', icon: Hammer },
+  { to: '/consumiveis', label: 'Comida & Poções', icon: CookingPot },
   { to: '/item', label: 'Itens', icon: Search },
   { to: '/painel', label: 'Painel do Destino', icon: Sparkles },
   { to: '/calculadora', label: 'Calculadora', icon: Calculator },

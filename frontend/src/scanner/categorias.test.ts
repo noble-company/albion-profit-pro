@@ -9,6 +9,7 @@ import {
   MIN_LETRAS_DA_BUSCA,
   ORDEM_DO_CRAFT,
   ORDEM_DO_REFINO,
+  ORDEM_DOS_CONSUMIVEIS,
   receitaEscondida,
   receitasDaSelecao,
   topPorLucro,
@@ -218,6 +219,141 @@ describe('o que é calculado (task 21)', () => {
       modo: 'categoria',
       receitas: ['T4_ARMOR_CLOTH_SET1'],
     })
+  })
+})
+
+describe('Comida & Poções (task 13)', () => {
+  // Fora da ordem do jogo de propósito: guisado antes de sopa, fúria antes de cura.
+  const itens = [
+    item('T4_MEAL_STEW', {
+      name_pt: 'Guisado de Cabra',
+      shop_category: 'consumables',
+      shop_subcategory: 'food',
+      shop_subcategory2: 'stews',
+    }),
+    item('T4_MEAL_SOUP', {
+      name_pt: 'Sopa de Cenoura',
+      shop_category: 'consumables',
+      shop_subcategory: 'food',
+      shop_subcategory2: 'soups',
+    }),
+    item('T4_POTION_BERSERK', {
+      name_pt: 'Poção de Fúria',
+      shop_category: 'consumables',
+      shop_subcategory: 'potions',
+      shop_subcategory2: 'berserk',
+    }),
+    item('T4_POTION_HEAL@1', {
+      name_pt: 'Poção de Cura',
+      enchantment_level: 1,
+      shop_category: 'consumables',
+      shop_subcategory: 'potions',
+      shop_subcategory2: 'heal',
+    }),
+    item('T4_BUTTER', {
+      name_pt: 'Manteiga de Cabra',
+      shop_category: 'farming',
+      shop_subcategory: 'farmingproducts',
+      shop_subcategory2: 'butter',
+    }),
+    item('T1_FISHSAUCE_LEVEL1', {
+      name_pt: 'Molho de Peixe Básico',
+      shop_category: 'crafting',
+      shop_subcategory: 'fish',
+      shop_subcategory2: 'other',
+    }),
+    item('T5_CONSUMABLE_FIREWORKS_YELLOW', {
+      name_pt: 'Fogos de Artifício Amarelos',
+      shop_category: 'consumables',
+      shop_subcategory: 'other',
+      shop_subcategory2: 'firework',
+    }),
+    // Ficam no craft: arma e extrato arcano (a alquimia não entrou na aba).
+    item('T4_MAIN_SWORD', {
+      name_pt: 'Espada Larga do Adepto',
+      shop_category: 'weapons',
+      shop_subcategory: 'sword',
+    }),
+    item('T1_ALCHEMY_EXTRACT_LEVEL1', {
+      name_pt: 'Extratos Arcanos Básicos',
+      shop_category: 'crafting',
+      shop_subcategory: 'alchemy',
+      shop_subcategory2: 'extract',
+    }),
+  ]
+  const receitas = itens.map((i) => receita(i.unique_name))
+  const mapa = new Map(itens.map((i) => [i.unique_name, i]))
+  const DA_ABA = [
+    'T1_FISHSAUCE_LEVEL1',
+    'T4_BUTTER',
+    'T4_MEAL_SOUP',
+    'T4_MEAL_STEW',
+    'T4_POTION_BERSERK',
+    'T4_POTION_HEAL@1',
+    'T5_CONSUMABLE_FIREWORKS_YELLOW',
+  ]
+
+  test('a árvore da aba: Comida, Poções, Insumos e Outros, com as famílias na ordem do jogo', () => {
+    const arvore = arvoreDeCategorias(receitas, mapa, 'consumables')
+
+    expect(arvore.map((no) => no.codigo)).toEqual(['food', 'potions', 'insumos', 'other'])
+    // O bloco `shopcategories` do dump: sopas (200) antes de guisados (700), cura antes de fúria.
+    expect(arvore[0]!.filhos.map((no) => no.codigo)).toEqual(['soups', 'stews'])
+    expect(arvore[1]!.filhos.map((no) => no.codigo)).toEqual(['heal', 'berserk'])
+    // `fishsauce`, não `fish`: o mapa de rótulos é plano e `fish` já é "Pesca" na Coleta.
+    expect(arvore[2]).toMatchObject({ codigo: 'insumos', rotulo: 'Insumos', receitas: 2 })
+    expect(arvore[2]!.filhos.map((no) => [no.codigo, no.rotulo])).toEqual([
+      ['fishsauce', 'Molho de peixe'],
+      ['farmingproducts', 'Produtos de fazenda'],
+    ])
+    expect(arvore[3]!.filhos.map((no) => no.codigo)).toEqual(['firework'])
+  })
+
+  test('o craft não mostra mais consumíveis nem os insumos da cozinha', () => {
+    const arvore = arvoreDeCategorias(receitas, mapa, 'crafting')
+
+    expect(arvore.map((no) => no.codigo)).toEqual(['weapons', 'crafting'])
+    // A alquimia continua no craft; o molho de peixe, que também é `crafting`, saiu.
+    expect(arvore[1]!.filhos.map((no) => no.codigo)).toEqual(['alchemy'])
+  })
+
+  test('Top, Todas e busca de cada tela só alcançam as receitas dela', () => {
+    const top = (tela: 'crafting' | 'consumables') =>
+      receitasDaSelecao(receitas, mapa, tela, { ...NADA, top: true }, '').receitas.sort()
+
+    expect(top('consumables')).toEqual(DA_ABA)
+    expect(top('crafting')).toEqual(['T1_ALCHEMY_EXTRACT_LEVEL1', 'T4_MAIN_SWORD'])
+    expect(
+      receitasDaSelecao(receitas, mapa, 'consumables', { ...NADA, categoria: TODAS_AS_CATEGORIAS }, '')
+        .receitas.sort(),
+    ).toEqual(DA_ABA)
+
+    expect(receitasDaSelecao(receitas, mapa, 'crafting', NADA, 'poção').receitas).toEqual([])
+    expect(
+      receitasDaSelecao(receitas, mapa, 'consumables', NADA, 'poção').receitas.sort(),
+    ).toEqual(['T4_POTION_BERSERK', 'T4_POTION_HEAL@1'])
+  })
+
+  test('categoria e família recortam o que é calculado', () => {
+    const saidas = (selecao: Selecao) =>
+      receitasDaSelecao(receitas, mapa, 'consumables', selecao, '').receitas.sort()
+
+    expect(saidas({ ...NADA, categoria: 'potions' })).toEqual([
+      'T4_POTION_BERSERK',
+      'T4_POTION_HEAL@1',
+    ])
+    expect(saidas({ ...NADA, categoria: 'insumos', subcategoria: 'fishsauce' })).toEqual([
+      'T1_FISHSAUCE_LEVEL1',
+    ])
+  })
+
+  test('todo código da árvore da aba tem rótulo em português', () => {
+    const codigos = ORDEM_DOS_CONSUMIVEIS.flatMap(([categoria, familias]) => [
+      categoria,
+      ...familias,
+    ])
+
+    expect(codigos.filter((codigo) => !rotuloDeCategoria(codigo))).toEqual([])
   })
 })
 

@@ -30,6 +30,11 @@ const CraftingScannerPage = lazy(() =>
     default: m.CraftingScannerPage,
   })),
 )
+const ConsumablesScannerPage = lazy(() =>
+  import('./scanner/ScannerPage').then((m) => ({
+    default: m.ConsumablesScannerPage,
+  })),
+)
 const DestinyBoardPage = lazy(() =>
   import('./destiny/DestinyBoardPage').then((m) => ({ default: m.DestinyBoardPage })),
 )
@@ -115,6 +120,14 @@ export function App() {
             element={
               <Boundary>
                 <CraftingScannerPage />
+              </Boundary>
+            }
+          />
+          <Route
+            path="/consumiveis"
+            element={
+              <Boundary>
+                <ConsumablesScannerPage />
               </Boundary>
             }
           />

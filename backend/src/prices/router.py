@@ -95,13 +95,16 @@ snapshot_router = APIRouter(
         "means no price, never zero. Pass `kind` + `category` (and optionally `subcategory`) to "
         "narrow the rows to the items the recipes of that shop category need: outputs, "
         "ingredients and upgrade resources. For `refining` the category is the family "
-        "(`shop_subcategory2`); a recipe whose output has no category lives under `other`."
+        "(`shop_subcategory2`); a recipe whose output has no category lives under `other`. "
+        "`consumables` reads the crafting recipes of the food & potions screen: the category is "
+        "the consumable subcategory and the subcategory is the family; `insumos` groups the "
+        "kitchen inputs (`fishsauce`, `farmingproducts`)."
     ),
 )
 async def read_price_snapshot(
     server: AlbionServer = Query(...),
     location_id: list[str] | None = Query(None),
-    kind: Literal["refining", "crafting"] | None = Query(None),
+    kind: Literal["refining", "crafting", "consumables"] | None = Query(None),
     category: str | None = Query(None),
     subcategory: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
@@ -142,7 +145,7 @@ def _validar_recorte(kind: str | None, category: str | None, subcategory: str | 
 )
 async def read_sales_volume(
     server: AlbionServer = Query(...),
-    kind: Literal["refining", "crafting"] | None = Query(None),
+    kind: Literal["refining", "crafting", "consumables"] | None = Query(None),
     category: str | None = Query(None),
     subcategory: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
