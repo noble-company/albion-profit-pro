@@ -32,7 +32,7 @@ import {
 } from './categorias'
 import { buildColumns, motivoSemPreco } from './columns'
 import { bestPerRecipe, computeScanner, explainRow, type ScannerRow } from './engine'
-import { applyFilters } from './filters'
+import { applyFilters, filtrarPorVolume, type VolumeDaLinha } from './filters'
 import { buildPriceIndex, priceKey } from './prices'
 import { itensComEscolhaPropria, origemDoItem, origemPadrao } from './pricing'
 import { ExactAnalysis } from './ExactAnalysis'
@@ -270,13 +270,29 @@ export function ScannerPage({
       )
   }, [itemsByName])
 
+  /**
+   * O volume de uma linha — **uma** função para a coluna Vende/dia e para o filtro, senão os dois
+   * poderiam discordar sobre a mesma linha. Nula enquanto as vendas não chegam.
+   */
+  const volumeDaLinha = useMemo<VolumeDaLinha | null>(
+    () =>
+      indiceDeVendas
+        ? (row) => volumeDaVenda(row, indiceDeVendas, cidadesDeVenda, scenario.outputQuality)
+        : null,
+    [indiceDeVendas, cidadesDeVenda, scenario.outputQuality],
+  )
+
   const visiveis = useMemo(() => {
-    const filtradas = applyFilters(linhas, filters, itemsByName)
+    const filtradas = filtrarPorVolume(
+      applyFilters(linhas, filters, itemsByName),
+      filters.minVolume,
+      volumeDaLinha,
+    )
     // O Top vem DEPOIS dos filtros: marcar T6 pede as 15 melhores de T6, não as T6 entre as 15.
     const recorte = modo === 'top' ? topPorLucro(filtradas, TOP_RECEITAS) : filtradas
     // O nome desempata a ordem por tier: é o nome que o jogador lê que define "alfabética".
     return sortRows(recorte, sort, nomeItem)
-  }, [linhas, filters, itemsByName, sort, nomeItem, modo])
+  }, [linhas, filters, itemsByName, volumeDaLinha, sort, nomeItem, modo])
 
   /** A largura da coluna Compra acompanha a receita com mais ingredientes do catálogo aberto. */
   const maxIngredientes = useMemo(
@@ -293,19 +309,9 @@ export function ScannerPage({
       buildColumns(locationName, nomeItem, {
         maxIngredientes,
         // Sem o dado ainda, a célula não mostra a linha; com ele, item sem histórico é traço.
-        volume: indiceDeVendas
-          ? (row) =>
-              volumeDaVenda(row, indiceDeVendas, cidadesDeVenda, scenario.outputQuality)
-          : undefined,
+        volume: volumeDaLinha ?? undefined,
       }),
-    [
-      locationName,
-      nomeItem,
-      maxIngredientes,
-      indiceDeVendas,
-      cidadesDeVenda,
-      scenario.outputQuality,
-    ],
+    [locationName, nomeItem, maxIngredientes, volumeDaLinha],
   )
 
   /**
@@ -608,6 +614,19 @@ export function ScannerPage({
               placeholder="qualquer"
               suffix="%"
             />
+            {/* Pedido no uso: lucro alto num item que vende 7 por dia não é lucro. O campo mostra
+                o texto cru; a leitura da URL descarta o que não é número. */}
+            <FilterNumberField
+              label="Vende/dia mínimo"
+              value={params.get('min_volume') ?? ''}
+              onChange={(v) => setParam('min_volume', v)}
+              placeholder="qualquer"
+              suffix="un."
+            />
+            <p className="text-xs text-foreground-subtle">
+              O mesmo número da coluna Vende/dia. Item sem histórico de venda continua na lista,
+              com traço.
+            </p>
             <FilterNumberField
               label="Idade máxima do dado"
               value={filters.maxAgeHours === null ? '' : String(filters.maxAgeHours)}

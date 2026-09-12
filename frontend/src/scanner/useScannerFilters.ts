@@ -117,6 +117,15 @@ function valorDaEscolha(origem: Origem): string | null {
   }
 }
 
+/**
+ * Um mínimo digitado: `1,5` vale `1.5`. O que não é número positivo vira **sem filtro**, nunca
+ * erro — o valor alimenta `money()` durante o render, e texto cru ali derrubaria a tela.
+ */
+function decimalOuNulo(raw: string | null): string | null {
+  const texto = (raw ?? '').trim().replace(',', '.')
+  return /^\d+(\.\d+)?$/.test(texto) ? texto : null
+}
+
 function numbers(raw: string | null): number[] {
   if (!raw) return []
   return raw
@@ -140,6 +149,7 @@ export function useScannerFilters() {
       // desmarcação explícita esconde.
       showUnpriced: params.get('unpriced') !== 'false',
       profitableOnly: params.get('profit_only') === 'true',
+      minVolume: decimalOuNulo(params.get('min_volume')),
     }),
     [params],
   )

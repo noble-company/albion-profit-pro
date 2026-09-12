@@ -4,7 +4,13 @@ import type { components } from '@/api/schema'
 import { money } from '@/lib/money'
 
 import type { ScannerRow, ScannerState } from './engine'
-import { applyFilters, DEFAULT_FILTERS, type ScannerFilters } from './filters'
+import {
+  applyFilters,
+  DEFAULT_FILTERS,
+  filtrarPorVolume,
+  type ScannerFilters,
+  type VolumeDaLinha,
+} from './filters'
 
 /**
  * Task 4/09. O teste que carrega a fase é `showUnpriced nasce ligado`: é a inversão de
@@ -192,6 +198,59 @@ describe('filtros financeiros', () => {
     expect(
       filtrar(linhas, { maxAgeHours: 6 }).map((r) => r.outputItem),
     ).toEqual(['novo'])
+  })
+})
+
+describe('vende/dia mínimo (pedido no uso, 2026-09-12)', () => {
+  // O volume não mora na linha: vem do histórico de vendas e das cidades de Vender em.
+  const VOLUMES: Record<string, string | null> = {
+    POUCO: '7',
+    NO_LIMITE: '100',
+    MUITO: '12400',
+    SEM_HISTORICO: null,
+  }
+  const volumeDe: VolumeDaLinha = (r) => {
+    const valor = VOLUMES[r.outputItem]
+    return valor === undefined || valor === null ? null : money(valor)
+  }
+  const nomes = (linhas: ScannerRow[]) => linhas.map((r) => r.outputItem)
+
+  test('esconde o que vende menos que o mínimo; o limite exato fica', () => {
+    const linhas = [row('POUCO'), row('NO_LIMITE'), row('MUITO')]
+
+    expect(nomes(filtrarPorVolume(linhas, '100', volumeDe))).toEqual(['NO_LIMITE', 'MUITO'])
+  })
+
+  test('item sem histórico de venda CONTINUA aparecendo — o jogador olha a linha', () => {
+    // Ausência de histórico não é zero vendido. Decisão do usuário: prefere ver e decidir.
+    const linhas = [row('POUCO'), row('SEM_HISTORICO')]
+
+    expect(nomes(filtrarPorVolume(linhas, '100', volumeDe))).toEqual(['SEM_HISTORICO'])
+  })
+
+  test('vale para linha sem preço também: volume é fato do mercado, não do cálculo', () => {
+    const linhas = [semPreco('POUCO'), semPreco('MUITO')]
+
+    expect(nomes(filtrarPorVolume(linhas, '100', volumeDe))).toEqual(['MUITO'])
+  })
+
+  test('sem mínimo, ou antes das vendas chegarem, nada é filtrado', () => {
+    const linhas = [row('POUCO'), row('SEM_HISTORICO')]
+
+    expect(filtrarPorVolume(linhas, null, volumeDe)).toEqual(linhas)
+    // Esconder tudo enquanto o histórico carrega faria a tabela piscar vazia.
+    expect(filtrarPorVolume(linhas, '100', null)).toEqual(linhas)
+  })
+
+  test('compara por decimal, não por Number', () => {
+    const linhas = [row('POUCO')]
+
+    expect(filtrarPorVolume(linhas, '7', volumeDe)).toHaveLength(1)
+    expect(filtrarPorVolume(linhas, '7.0000000001', volumeDe)).toHaveLength(0)
+  })
+
+  test('nasce desligado', () => {
+    expect(DEFAULT_FILTERS.minVolume).toBeNull()
   })
 })
 

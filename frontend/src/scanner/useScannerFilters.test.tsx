@@ -313,6 +313,21 @@ describe('preço de compra e de venda na barra (task 25)', () => {
   })
 })
 
+describe('vende/dia mínimo (pedido no uso, 2026-09-12)', () => {
+  test('sobrevive ao F5 e aceita vírgula', () => {
+    expect(render().result.current.filters.minVolume).toBeNull()
+    expect(render('/craft?min_volume=100').result.current.filters.minVolume).toBe('100')
+    expect(render('/craft?min_volume=1,5').result.current.filters.minVolume).toBe('1.5')
+  })
+
+  test('o que não é número vira sem filtro, nunca erro na tela', () => {
+    // O valor alimenta `money()` durante o render; texto cru ali derrubaria a tela.
+    expect(render('/craft?min_volume=abc').result.current.filters.minVolume).toBeNull()
+    expect(render('/craft?min_volume=-5').result.current.filters.minVolume).toBeNull()
+    expect(render('/craft?min_volume=1,').result.current.filters.minVolume).toBeNull()
+  })
+})
+
 describe('o que analisar (task 21)', () => {
   test('sem nada na URL, nada está selecionado', () => {
     expect(render().result.current.selecao).toEqual({

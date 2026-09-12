@@ -1,5 +1,5 @@
 import type { components } from '@/api/schema'
-import { compare, money } from '@/lib/money'
+import { compare, money, type Money } from '@/lib/money'
 
 import type { ScannerRow } from './engine'
 
@@ -32,6 +32,8 @@ export interface ScannerFilters {
    */
   showUnpriced: boolean
   profitableOnly: boolean
+  /** Vende/dia mínimo, string decimal — aplicado por `filtrarPorVolume`, não por `applyFilters` */
+  minVolume: string | null
 }
 
 export const DEFAULT_FILTERS: ScannerFilters = {
@@ -43,6 +45,34 @@ export const DEFAULT_FILTERS: ScannerFilters = {
   maxAgeHours: null,
   showUnpriced: true,
   profitableOnly: false,
+  minVolume: null,
+}
+
+/** Unidades vendidas por dia de uma linha; `null` = sem histórico. Ver `volumeDaVenda`. */
+export type VolumeDaLinha = (row: ScannerRow) => Money | null
+
+/**
+ * Vende/dia mínimo (pedido no uso, 2026-09-12).
+ *
+ * Fora de `applyFilters` porque o volume não está na linha: vem do histórico de vendas
+ * (`GET /prices/sales`) e depende das cidades de Vender em — é o mesmo número da coluna.
+ *
+ * Item **sem histórico continua aparecendo** — decisão do jogador: ausência de histórico não é
+ * zero vendido, e ele prefere olhar a linha a perdê-la. Vale com ou sem preço, porque volume é
+ * fato do mercado, não do cálculo. Enquanto as vendas não chegam (`volumeDe` nulo), nada é
+ * filtrado: esconder tudo faria a tabela piscar vazia.
+ */
+export function filtrarPorVolume(
+  rows: ScannerRow[],
+  minVolume: string | null,
+  volumeDe: VolumeDaLinha | null,
+): ScannerRow[] {
+  if (minVolume === null || volumeDe === null) return rows
+  const minimo = money(minVolume)
+  return rows.filter((row) => {
+    const volume = volumeDe(row)
+    return volume === null || compare(volume, minimo) >= 0
+  })
 }
 
 /**

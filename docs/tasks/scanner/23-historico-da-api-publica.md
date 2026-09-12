@@ -144,6 +144,24 @@ dataset para a revisão do jogo corrige a atribuição retroativamente.
 - **`_na_categoria`** virou uma cópia só da regra de categoria, usada pelo snapshot (22) e pelas
   vendas (23), que pedem só as saídas.
 
+### Ajuste no uso: Vende/dia mínimo (2026-09-12)
+
+Pedido: "adicionar uma opção pra eu filtrar o volume de vendas dia". Campo **Vende/dia mínimo** no
+grupo Resultado, na URL como `min_volume`.
+
+- **O mesmo número da coluna.** `volumeDaLinha` é uma função só na tela, usada pela coluna e pelo
+  filtro: venda numa cidade, o volume dela; pela média ou com preço fixo, a soma das cidades de
+  Vender em.
+- **Item sem histórico continua na lista** — decisão do usuário, depois de pedir o contrário e
+  voltar atrás: "exibe sim, e aí eu vou lá e olho". Ausência de histórico não é zero vendido.
+- **Vale antes do Top 15** e para linha com ou sem preço: volume é fato do mercado, não do cálculo.
+- **Enquanto as vendas não chegam, não filtra.** Esconder tudo faria a tabela piscar vazia.
+- **Texto que não é número vira sem filtro** (`decimalOuNulo`), nunca erro: o valor alimenta
+  `money()` durante o render. Vírgula vale como ponto.
+- Fora de `applyFilters` (`filtrarPorVolume`), porque o volume não mora na linha.
+
+Guards vermelhos primeiro: 6 em `filters.test.ts`, 2 em `useScannerFilters.test.tsx`.
+
 ### Pendente pra você testar
 
 1. Com o frontend no ar, abrir `/refino` → **Tecido**: a célula de Venda mostra "…mil/dia" ao lado da
