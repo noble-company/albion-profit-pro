@@ -120,7 +120,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | [11.6](11.6-sessao-de-refino.md) | Sessão de refino | — | Compra pelas receitas iniciais; coluna Rendimento |
 | [12](12-tela-de-craft.md) | Tela de Craft | — | 5.523 receitas no Worker; ingredientes resumidos |
 | [13](13-comida-e-pocoes.md) | Comida & Poções | `W10` | Aba própria com os insumos da cozinha; a taxa da estação volta às 153 poções que a cobravam zero |
-| 14 | Calculadora sobre o engine | — | Instantânea ao digitar |
+| [14](14-calculadora-sobre-o-engine.md) | Calculadora sobre o engine | `E05` | Uma receita em todas as cidades, instantânea ao digitar; a mesma barra e o mesmo painel do scanner |
 | [17](17-painel-do-destino.md) | Painel do Destino | — | Custo de foco real: `Lucro/foco` deixa de errar por ate 16x |
 | [18](18-taxa-da-estacao-por-nutricao.md) | Taxa da estação por nutrição | `W5` | A estação cobra por nutrição consumida; prata fixa errava por 56x pra mais e 44x pra menos |
 | [19](19-uma-linha-por-receita-em-ordem-de-tier.md) | Uma linha por receita, ordem de tier | — | A lista se lê como o mercado do jogo; o modo "todas as cidades" sai |
@@ -164,7 +164,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [x] 11.6 — Sessão de refino (compra cheia, rendimento, estação por execução total)
 - [x] 12 — Tela de Craft (Worker, colunas do craft)
 - [x] 13 — Comida & Poções
-- [ ] 14 — Calculadora sobre o engine
+- [x] 14 — Calculadora sobre o engine
 - [x] 17 — Painel do Destino (eficiência de foco)
 - [x] 18 — Taxa da estação por nutrição consumida
 - [x] 19 — Uma linha por receita, em ordem de tier

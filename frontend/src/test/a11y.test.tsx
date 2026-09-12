@@ -106,7 +106,8 @@ test('Refino — sem violação séria (axe)', async () => {
 })
 
 test('Calculadora — sem violação séria (axe)', async () => {
-  await expectNoSeriousViolations(<CalculadoraPage />, /Calculadora de craft/)
+  // Task 4/14: a Calculadora abre pedindo o item, e o cálculo acontece ao escolher.
+  await expectNoSeriousViolations(<CalculadoraPage />, /Escolha um item/)
 })
 
 test('Busca — sem violação séria (axe)', async () => {

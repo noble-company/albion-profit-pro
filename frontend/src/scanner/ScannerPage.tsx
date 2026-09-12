@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { useRecipeCatalog } from '@/catalog/hooks'
 import { formatarNomeCurto } from '@/lib/formatters'
-import { money, percentageToRate } from '@/lib/money'
 import { useDestinyBoard } from '@/destiny/hooks'
 import { useCidades, useLocationName } from '@/lib/locations'
 
@@ -30,22 +29,20 @@ import {
   topPorLucro,
   type TelaDoScanner,
 } from './categorias'
-import { buildColumns, motivoSemPreco } from './columns'
-import { bestPerRecipe, computeScanner, explainRow, type ScannerRow } from './engine'
+import { GrupoCenario, GrupoMercado } from './BarraDoCenario'
+import { buildColumns } from './columns'
+import { DetalheDaLinha } from './DetalheDaLinha'
+import { bestPerRecipe, computeScanner, type ScannerRow } from './engine'
 import { applyFilters, filtrarPorVolume, type VolumeDaLinha } from './filters'
-import { buildPriceIndex, priceKey } from './prices'
-import { itensComEscolhaPropria, origemDoItem, origemPadrao } from './pricing'
-import { ExactAnalysis } from './ExactAnalysis'
-import { RowDetails } from './RowDetails'
+import { buildPriceIndex } from './prices'
 import { ScannerTable } from './ScannerTable'
-import { cidadesFiltradas, estadoDaTela, podeAnalisar, precosNaMaoPara } from './tela'
+import { cidadesFiltradas, estadoDaTela, hrefDaCalculadora } from './tela'
 import { DEFAULT_SORT, sortRows, type SortState } from './sorting'
 import { usePriceSnapshot, type RecorteDoSnapshot } from './usePriceSnapshot'
 import { useSalesVolume } from './useSalesVolume'
-import { buildSalesIndex, chaveDeVenda, volumeDaVenda } from './vendas'
+import { buildSalesIndex, volumeDaVenda } from './vendas'
 import { useScannerWorker } from './useScannerWorker'
-import { RETORNOS_PADRAO, rendimentoPorCemRecursos } from './return-rates'
-import { DEFAULT_QUANTITY, useScannerFilters } from './useScannerFilters'
+import { useScannerFilters } from './useScannerFilters'
 
 /**
  * A tela do scanner (task 4/11) — onde a arquitetura da fase encosta no usuário.
@@ -318,88 +315,26 @@ export function ScannerPage({
    * O painel da linha aberta. É calculado **sob demanda**, só para ela: rodar `explainRow` em
    * 110 linhas para guardar detalhe que ninguém abriu seria pagar caro por nada.
    */
+  // O mesmo painel da Calculadora (task 14), com o atalho para abrir a receita nela.
   const renderDetail = useCallback(
-    (row: ScannerRow) => {
-      if (!catalogo.catalog || !indice) return null
-      const receita = catalogo.catalog.recipes.find(
-        (r) => r.output_item === row.outputItem,
-      )
-      const detail = explainRow(
-        { recipes: catalogo.catalog.recipes, items: catalogo.catalog.items },
-        indice,
-        paramsDoEngine,
-        { outputItem: row.outputItem, locationId: row.locationId },
-      )
-
-      if (!detail || !receita) {
-        return (
-          <p className="text-xs text-foreground-subtle">
-            Sem cotação suficiente para abrir o extrato desta receita — falta{' '}
-            {motivoSemPreco(row) ?? 'preço'}. A lista de compras continua na linha.
-          </p>
-        )
-      }
-
-      return (
-        <RowDetails
-          detail={detail}
+    (row: ScannerRow) =>
+      catalogo.catalog && indice ? (
+        <DetalheDaLinha
+          row={row}
+          catalog={catalogo.catalog}
+          indice={indice}
+          params={paramsDoEngine}
+          cidades={cidades}
           nomeItem={nomeItem}
           locationName={locationName}
-          precoPorCidade={cidades.map((cidade) => {
-            const entrada = indice.get(
-              priceKey(
-                row.outputItem,
-                cidade.id,
-                scenario.outputQuality,
-                receita.enchantment_level,
-              ),
-            )
-            return {
-              locationId: cidade.id,
-              sell: entrada?.sell ? money(entrada.sell.price) : null,
-              buy: entrada?.buy ? money(entrada.buy.price) : null,
-              unitsPerDay:
-                indiceDeVendas?.get(
-                  chaveDeVenda(row.outputItem, cidade.id, scenario.outputQuality),
-                ) ?? null,
-            }
-          })}
-          cidades={cidades}
-          origemDe={(lado, item) => origemDoItem(pricing, lado, item)}
-          padraoDe={(lado) => origemPadrao(pricing, lado)}
+          pricing={pricing}
+          scenario={scenario}
+          realm={realm}
           onOrigem={definirOrigem}
-          analise={
-            realm && detail.row.profit && podeAnalisar(detail.row) ? (
-              <ExactAnalysis
-                request={{
-                  server: realm,
-                  output_item: row.outputItem,
-                  location_id: row.locationId,
-                  quantity: scenario.quantity,
-                  output_quality: scenario.outputQuality,
-                  scope: 'all',
-                  return_rate: scenario.returnRate,
-                  station_fee_per_100_nutrition: scenario.stationFeePer100Nutrition,
-                  use_focus: scenario.useFocus,
-                  premium: scenario.premium,
-                  // As exceções de preço da barra viajam junto: sem elas o "exato" ignoraria
-                  // o preço que o jogador declarou pagar e as duas contas não se comparariam.
-                  manual_prices: precosNaMaoPara(pricing, row.outputItem),
-                }}
-                estimativa={detail.row.profit}
-                acquisitionMode={detail.row.acquisitionMode ?? 'immediate'}
-                saleMode={detail.row.saleMode ?? 'immediate'}
-              />
-            ) : detail.row.saleBasis === 'average' ? (
-              // A média não é um mercado: não há livro de ordens para analisar (task 24).
-              <p className="text-xs text-foreground-subtle">
-                A análise exata precisa de uma cidade de venda. Escolha uma no seletor da Venda.
-              </p>
-            ) : undefined
-          }
+          indiceDeVendas={indiceDeVendas}
+          linkDaCalculadora={hrefDaCalculadora(params, row.outputItem)}
         />
-      )
-    },
+      ) : null,
     [
       catalogo.catalog,
       indice,
@@ -412,29 +347,13 @@ export function ScannerPage({
       scenario,
       definirOrigem,
       indiceDeVendas,
+      params,
     ],
   )
 
   const comPreco = useMemo(
     () => linhas.filter((l) => l.state === 'priced').length,
     [linhas],
-  )
-
-  /**
-   * Qual atalho corresponde ao que está no campo. A comparação é pela **taxa normalizada**,
-   * não pelo texto: quem digitou `36.7` com ponto marcou o mesmo atalho de quem digitou `36,7`.
-   */
-  const atalhoAtivo = useMemo(() => {
-    const atual = scenario.returnRate
-    return (
-      RETORNOS_PADRAO.find((r) => percentageToRate(r.percent) === atual)?.percent ?? null
-    )
-  }, [scenario.returnRate])
-
-  /** `100 / (1 − taxa)` — a soma da série de refinos sucessivos. Ver `rendimentoPorCemRecursos`. */
-  const rendimentoDoRetorno = useMemo(
-    () => rendimentoPorCemRecursos(scenario.returnRate),
-    [scenario.returnRate],
   )
 
   if (!realm) {
@@ -454,24 +373,6 @@ export function ScannerPage({
   const erro = catalogo.error ?? precos.error
   const noDaCategoria = arvore.find((no) => no.codigo === selecao.categoria)
   const contagem = (n: number) => n.toLocaleString('pt-BR')
-
-  const valorDaCompra =
-    pricing.base.kind === 'cheapest'
-      ? 'min'
-      : pricing.base.kind === 'city'
-        ? pricing.base.locationId
-        : pricing.base.kind === 'sale_city'
-          ? 'sale'
-          : ''
-  const opcoesDeCompra = [
-    { value: 'min', label: 'Menor preço das cidades' },
-    // Links antigos da 11.3 continuam abrindo com a base deles. A opção só aparece para o seletor
-    // não mostrar "Média" enquanto a conta usa outra coisa.
-    ...(pricing.base.kind === 'city'
-      ? [{ value: pricing.base.locationId, label: locationName(pricing.base.locationId) }]
-      : []),
-    ...(pricing.base.kind === 'sale_city' ? [{ value: 'sale', label: 'Cidade da venda' }] : []),
-  ]
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -533,55 +434,18 @@ export function ScannerPage({
             </p>
           </FilterGroup>
 
-          <FilterGroup legend="Mercado">
-            {/* Uma linha por receita, com a melhor cidade escolhida só entre as marcadas. Tirar
-                Brecilien e Caerleon da conta é o caso típico: pagam mais, mas o caminho é PvP. */}
-            <FilterChips
-              label="Vender em"
-              options={cidades.map((c) => c.id)}
-              selected={sellIn}
-              onToggle={(id) => toggleText('sell_in', id)}
-              formatOption={locationName}
-              emptyHint="todas"
-            />
-            {/* De onde vem o preço de venda de TODOS os itens (task 25). Sem cidade específica:
-                marcar só uma em Vender em já é isso, e as duas juntas permitiriam contradição. */}
-            <FilterSelectField
-              label="Preço de venda"
-              value={pricing.saleBase === 'average' ? 'avg' : ''}
-              onChange={(v) => setParam('sale_price', v)}
-              options={[{ value: 'avg', label: 'Média das cidades' }]}
-              allLabel="Melhor cidade"
-            />
-            <PrecoProprio
-              quantidade={itensComEscolhaPropria(pricing, 'venda')}
-              onLimpar={() => limparEscolhas('venda')}
-            />
-            {/* O mesmo motivo vale para comprar (task 24): ninguém busca fibra onde não vai
-                vender tecido. A média de cada ingrediente varre só estas. */}
-            <FilterChips
-              label="Comprar em"
-              options={cidades.map((c) => c.id)}
-              selected={buyIn}
-              onToggle={(id) => toggleText('buy_in', id)}
-              formatOption={locationName}
-              emptyHint="todas"
-            />
-            <FilterSelectField
-              label="Preço de compra"
-              value={valorDaCompra}
-              onChange={(v) => setParam('ing_price', v)}
-              options={opcoesDeCompra}
-              allLabel="Média das cidades"
-            />
-            <PrecoProprio
-              quantidade={itensComEscolhaPropria(pricing, 'compra')}
-              onLimpar={() => limparEscolhas('compra')}
-            />
-            <p className="text-xs text-foreground-subtle">
-              Para um item específico, escolha de onde vem o preço no painel da linha.
-            </p>
-          </FilterGroup>
+          {/* A mesma barra da Calculadora (task 14): um campo novo entra nas duas de uma vez. */}
+          <GrupoMercado
+            cidades={cidades}
+            locationName={locationName}
+            sellIn={sellIn}
+            buyIn={buyIn}
+            pricing={pricing}
+            toggleText={toggleText}
+            setParam={setParam}
+            limparEscolhas={limparEscolhas}
+            dica="Para um item específico, escolha de onde vem o preço no painel da linha."
+          />
 
           <FilterGroup legend="Item">
             <FilterChips
@@ -655,101 +519,18 @@ export function ScannerPage({
             />
           </FilterGroup>
 
-          {/* Separado de propósito: estes mudam o VALOR das linhas, não quais linhas existem. */}
-          <FilterGroup legend="Seu cenário">
-            {/* O padrão escolhe o cenário mais lucrativo, que supõe as duas ordens sendo
-                aceitas. Travar aqui responde a outra pergunta: quanto rende do jeito que eu
-                de fato opero. */}
-            <FilterSelectField
-              label="Como você compra"
-              value={strategy.acquisition === 'best' ? '' : strategy.acquisition}
-              onChange={(v) => setParam('buy', v)}
-              options={[
-                { value: 'immediate', label: 'Compra imediata (paga a oferta)' },
-                { value: 'buy_order', label: 'Ordem de compra (espera na fila)' },
-              ]}
-              allLabel="Melhor cenário"
-            />
-            <FilterSelectField
-              label="Como você vende"
-              value={strategy.sale === 'best' ? '' : strategy.sale}
-              onChange={(v) => setParam('sell', v)}
-              options={[
-                { value: 'immediate', label: 'Venda imediata (entrega na ordem)' },
-                { value: 'sell_order', label: 'Ordem de venda (espera na fila)' },
-              ]}
-              allLabel="Melhor cenário"
-            />
-            <FilterNumberField
-              label="Receitas a fazer"
-              value={params.get('qty') ?? ''}
-              onChange={(v) => setParam('qty', v)}
-              placeholder={String(DEFAULT_QUANTITY)}
-            />
-            <p className="text-xs text-foreground-subtle">
-              Quantas receitas você compra material para fazer. O que o retorno devolver vira
-              refino a mais — está na coluna <strong>Rendimento</strong>.
-            </p>
-            <FilterNumberField
-              label="Retorno de recurso"
-              // O valor cru digitado, não a taxa convertida: o campo mostra "36,7", e
-              // `percentageToRate` converte para 0.367 na leitura (task 3.6/01).
-              value={params.get('return_rate') ?? ''}
-              onChange={(v) => setParam('return_rate', v)}
-              placeholder="0"
-              suffix="%"
-            />
-            {/* Atalhos, não substituto do campo: quem tem uma taxa diferente continua digitando.
-                Os quatro valores saem da fórmula do jogo — ver `return-rates.ts`. */}
-            <FilterChips
-              label="Taxas do jogo"
-              emptyHint="personalizado"
-              options={RETORNOS_PADRAO.map((r) => r.percent)}
-              selected={atalhoAtivo ? [atalhoAtivo] : []}
-              onToggle={(percent) => setParam('return_rate', percent)}
-              formatOption={(percent) => `${percent.replace('.', ',')}%`}
-              titleOption={(percent) =>
-                RETORNOS_PADRAO.find((r) => r.percent === percent)?.descricao ?? ''
-              }
-            />
-            {rendimentoDoRetorno && (
-              // O retorno é recursivo: o que volta é refinado de novo. A conta abaixo é a soma
-              // dessa série, e é ela que já está embutida na lista de compras.
-              <p className="text-xs text-foreground-subtle">
-                Com esse retorno, <strong>100 recursos rendem ~{rendimentoDoRetorno}</strong>{' '}
-                itens — o que volta é refinado de novo, e assim por diante. Já está no custo.
-              </p>
-            )}
-            <FilterNumberField
-              label="Taxa da estação"
-              value={
-                scenario.stationFeePer100Nutrition === '0'
-                  ? ''
-                  : scenario.stationFeePer100Nutrition
-              }
-              onChange={(v) => setParam('station_fee', v)}
-              placeholder="0"
-              suffix="/100 nut."
-            />
-            <p className="text-xs text-foreground-subtle">
-              A <strong>taxa de uso por 100 de nutrição</strong> que a estação cobra — o número
-              que aparece no topo da janela dela no jogo. Quanto cada receita consome sai do
-              valor do item, então a mesma taxa custa centavos num recurso T4 e milhares numa
-              arma T8.
-            </p>
-            <FilterCheckbox
-              label="Conta Premium"
-              description="Imposto de venda 4% em vez de 8%"
-              checked={scenario.premium}
-              onChange={(c) => setParam('premium', c ? null : 'false')}
-            />
-            <FilterCheckbox
-              label="Usar foco"
-              description="Habilita a coluna Lucro/foco"
-              checked={scenario.useFocus}
-              onChange={(c) => setParam('focus', c ? 'true' : null)}
-            />
-          </FilterGroup>
+          <GrupoCenario
+            params={params}
+            scenario={scenario}
+            strategy={strategy}
+            setParam={setParam}
+            textoDaQuantidade={
+              <>
+                Quantas receitas você compra material para fazer. O que o retorno devolver vira
+                refino a mais — está na coluna <strong>Rendimento</strong>.
+              </>
+            }
+          />
 
           <Button variant="outline" size="sm" className="w-full" onClick={reset}>
             Limpar filtros
@@ -828,30 +609,6 @@ export function RefiningScannerPage() {
       title="O que vale a pena refinar"
       description="Todas as receitas de refino, em todas as cidades — inclusive as que ainda não têm preço."
     />
-  )
-}
-
-/**
- * Quantos itens não seguem a barra num lado, e o atalho para que voltem a seguir (task 25).
- *
- * Mudar a barra não apaga escolha de item — ela é a mais específica. Sem esta linha, uma receita
- * que ignora a barra não teria explicação na tela.
- */
-function PrecoProprio({ quantidade, onLimpar }: { quantidade: number; onLimpar: () => void }) {
-  if (quantidade === 0) return null
-  return (
-    <p className="flex items-baseline justify-between gap-2 text-xs text-foreground-subtle">
-      <span>
-        {quantidade === 1 ? '1 item com preço próprio' : `${quantidade} itens com preço próprio`}
-      </span>
-      <button
-        type="button"
-        onClick={onLimpar}
-        className="font-medium text-primary underline-offset-2 hover:underline"
-      >
-        limpar
-      </button>
-    </p>
   )
 }
 

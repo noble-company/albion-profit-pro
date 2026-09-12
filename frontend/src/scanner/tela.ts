@@ -48,6 +48,59 @@ export function cidadesFiltradas(
   return validas.length > 0 ? validas : cidades.map((c) => c.id)
 }
 
+/**
+ * O que é da **tabela** e não do cenário: qual lista mostrar e o que esconder dela. Não vai para a
+ * Calculadora, que tem uma receita só.
+ */
+const SO_DA_TABELA = [
+  'cat',
+  'top',
+  'q',
+  'min_profit',
+  'min_roi',
+  'min_volume',
+  'no_volume',
+  'unpriced',
+  'profit_only',
+  'max_age',
+  'tier',
+  'ench',
+]
+
+/**
+ * "Abrir na Calculadora" (task 14): o mesmo item com o mesmo cenário. As duas telas leem os
+ * mesmos parâmetros, então o lucro da cidade na Calculadora bate com o da linha que abriu ela.
+ */
+export function hrefDaCalculadora(params: URLSearchParams, item: string): string {
+  const cenario = new URLSearchParams(params)
+  for (const chave of SO_DA_TABELA) cenario.delete(chave)
+  cenario.set('item', item)
+  return `/calculadora?${cenario.toString()}`
+}
+
+/**
+ * Mensagem para "Receitas a fazer" (task 14, corrige `E05`). A leitura da URL já troca o valor
+ * inválido por um seguro — o que faltava era **dizer**: a Calculadora antiga bloqueava e ficava
+ * muda. Vazio é o padrão, não erro.
+ */
+export function erroDaQuantidade(raw: string | null): string | null {
+  const texto = (raw ?? '').trim()
+  if (texto === '') return null
+  return /^\d+$/.test(texto) && Number(texto) >= 1 ? null : 'Use um número inteiro a partir de 1'
+}
+
+/**
+ * Mensagem para o retorno de recurso. `percentageToRate('abc')` dava `0` em silêncio, e `150` era
+ * cortado para 99%: nos dois casos a conta seguia com outro número que o digitado, sem aviso.
+ */
+export function erroDoRetorno(raw: string | null): string | null {
+  const texto = (raw ?? '').trim().replace(',', '.')
+  if (texto === '') return null
+  return /^\d+(\.\d+)?$/.test(texto) && Number(texto) <= 99
+    ? null
+    : 'Use um percentual entre 0 e 99'
+}
+
 /** Traço, nunca zero. Ausência de preço não é preço zero — é a microcópia da §5 virada em código. */
 export const TRACO = '—'
 

@@ -10,6 +10,7 @@ import {
   ORDEM_DO_CRAFT,
   ORDEM_DO_REFINO,
   ORDEM_DOS_CONSUMIVEIS,
+  recorteDaReceita,
   receitaEscondida,
   receitasDaSelecao,
   topPorLucro,
@@ -354,6 +355,49 @@ describe('Comida & Poções (task 13)', () => {
     ])
 
     expect(codigos.filter((codigo) => !rotuloDeCategoria(codigo))).toEqual([])
+  })
+})
+
+describe('o recorte de uma receita só (task 14)', () => {
+  // A Calculadora pede o preço da categoria do item, pela mesma regra do servidor
+  // (`_na_categoria`). O realm inteiro seriam 187 KB a cada 30 s para cotar uma receita.
+  test('refino: a família', () => {
+    const tecido = item('T4_CLOTH', {
+      shop_category: 'crafting',
+      shop_subcategory: 'refinedresources',
+      shop_subcategory2: 'cloth',
+    })
+    expect(recorteDaReceita(tecido, 'refining')).toEqual({
+      kind: 'refining',
+      category: 'cloth',
+      subcategory: null,
+    })
+  })
+
+  test('craft: categoria e subcategoria do dump — inclusive o que mora na aba de Comida & Poções', () => {
+    const pocao = item('T4_POTION_HEAL', {
+      shop_category: 'consumables',
+      shop_subcategory: 'potions',
+      shop_subcategory2: 'heal',
+    })
+    expect(recorteDaReceita(pocao, 'crafting')).toEqual({
+      kind: 'crafting',
+      category: 'consumables',
+      subcategory: 'potions',
+    })
+  })
+
+  test('item sem categoria no dump mora em Outros, dos dois lados', () => {
+    expect(recorteDaReceita(item('T4_RANDOM_DUNGEON_TOKEN_2'), 'crafting')).toEqual({
+      kind: 'crafting',
+      category: 'other',
+      subcategory: 'other',
+    })
+    expect(recorteDaReceita(undefined, 'refining')).toEqual({
+      kind: 'refining',
+      category: 'other',
+      subcategory: null,
+    })
   })
 })
 

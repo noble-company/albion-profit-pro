@@ -1,313 +1,337 @@
-import { useMutation } from '@tanstack/react-query'
-import { Controller, useForm } from 'react-hook-form'
-import { useSearchParams } from 'react-router'
+import { Calculator } from 'lucide-react'
+import { useMemo, useState } from 'react'
 
 import { useServer } from '@/app/ServerContext'
+import { useRecipeCatalog } from '@/catalog/hooks'
+import { RequireRealm } from '@/components/AppShell'
 import { ItemAutocomplete } from '@/components/ItemAutocomplete'
+import { SidebarSection } from '@/components/shell/SidebarSlot'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
-import { WarningBadges } from '@/components/opportunities/WarningBadges'
-import { MODE_LABELS } from '@/lib/craft-labels'
-import { formatarNomeItem, formatarPct, formatarSilver } from '@/lib/formatters'
-import { useLocationName } from '@/lib/locations'
-import { useLocations } from '@/prices/hooks'
+import { useDestinyBoard } from '@/destiny/hooks'
+import { formatarNomeCurto, formatarNomeItem } from '@/lib/formatters'
+import { useCidades, useLocationName } from '@/lib/locations'
+import { formatPercent, formatQuantity, formatSilver, type Money } from '@/lib/money'
+import { GrupoCenario, GrupoMercado } from '@/scanner/BarraDoCenario'
+import { recorteDaReceita } from '@/scanner/categorias'
+import { motivoSemPreco } from '@/scanner/columns'
+import { DetalheDaLinha } from '@/scanner/DetalheDaLinha'
+import { computeScanner, type ScannerRow } from '@/scanner/engine'
+import { buildPriceIndex } from '@/scanner/prices'
+import { cidadesFiltradas, TRACO } from '@/scanner/tela'
+import { usePriceSnapshot } from '@/scanner/usePriceSnapshot'
+import { useSalesVolume } from '@/scanner/useSalesVolume'
+import { useScannerFilters } from '@/scanner/useScannerFilters'
+import { buildSalesIndex, formatarVolume, volumeDaVenda } from '@/scanner/vendas'
 
-import { simulateCraft, type CraftRequest, type CraftResult } from './service'
+import { linhaEscolhida, linhasPorLucro, receitaDoItem } from './calculadora'
 
-type FormValues = Omit<CraftRequest, 'server'>
-const PREFS = 'albion-profit-pro:calculator:v1'
-
-const BASE_DEFAULTS: FormValues = {
-  output_item: '',
-  quantity: 1,
-  output_quality: 1,
-  scope: 'all',
-  return_rate: '0',
-  station_fee_per_100_nutrition: '0',
-  use_focus: false,
-  premium: true,
-  sales_tax_rate: null,
-  setup_fee_rate: null,
-  ingredient_overrides: {},
-  manual_prices: {},
-  location_id: '',
-}
-
-/** Preferências gravadas no `submit` — antes eram escritas e nunca lidas (task 3.5/24 item 1). */
-function readPrefs(): Partial<FormValues> {
-  try {
-    const raw = localStorage.getItem(PREFS)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as {
-      version?: number
-      output_quality?: number
-      scope?: FormValues['scope']
-      premium?: boolean
-      use_focus?: boolean
-    }
-    if (parsed.version !== 1) return {}
-    return {
-      output_quality: parsed.output_quality,
-      scope: parsed.scope,
-      premium: parsed.premium,
-      use_focus: parsed.use_focus,
-    }
-  } catch {
-    return {}
-  }
-}
-
-function Result({ result }: { result: CraftResult }) {
-  return (
-    <section className="mt-8">
-      <div className="rounded-xl border border-primary/40 bg-primary/10 p-4">
-        <p className="text-sm uppercase tracking-widest text-primary">
-          Cenário pessimista imediato
-        </p>
-        <p className="mt-2 text-2xl font-bold">
-          {result.scenarios[0]?.profit == null
-            ? 'Resultado indisponível'
-            : formatarSilver(result.scenarios[0].profit)}
-        </p>
-      </div>
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
-        {result.scenarios.map((scenario, index) => (
-          <article
-            key={`${scenario.acquisition_mode}-${scenario.sale_mode}`}
-            className="rounded-xl border border-border bg-surface p-4"
-          >
-            <h3 className="font-semibold">
-              {index === 0 ? 'Pessimista · ' : ''}
-              {MODE_LABELS[scenario.acquisition_mode] ??
-                scenario.acquisition_mode}{' '}
-              → {MODE_LABELS[scenario.sale_mode] ?? scenario.sale_mode}
-            </h3>
-            <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between gap-3">
-                <dt>Custo total</dt>
-                <dd className="tabular-nums">
-                  {formatarSilver(scenario.costs.total_cost)}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt>Receita líquida</dt>
-                <dd className="tabular-nums">
-                  {formatarSilver(scenario.revenue.net_revenue)}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt>Lucro</dt>
-                <dd className="tabular-nums text-profit">
-                  {formatarSilver(scenario.profit)}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt>ROI</dt>
-                <dd className="tabular-nums text-profit">
-                  {formatarPct(scenario.roi)}
-                </dd>
-              </div>
-            </dl>
-            <WarningBadges warnings={scenario.warnings} className="mt-3" />
-          </article>
-        ))}
-      </div>
-      <p className="mt-5 text-sm text-foreground-muted">
-        Produção: {result.produced_quantity} · Execuções: {result.executions} ·
-        Sobra: {result.surplus_quantity} · Foco: {result.focus_consumed}
-      </p>
-      <h3 className="mt-6 font-semibold">Ingredientes</h3>
-      <ul className="mt-2 space-y-2 text-sm">
-        {result.ingredients.map((ingredient) => (
-          <li
-            key={`${ingredient.position}-${ingredient.unique_name}`}
-            className="rounded border border-border p-3"
-          >
-            <span className="font-medium">
-              {formatarNomeItem(null, ingredient.unique_name)}
-            </span>{' '}
-            · bruto {ingredient.gross_quantity} · efetivo{' '}
-            {String(ingredient.effective_quantity)} · compra{' '}
-            {ingredient.purchase_quantity}
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
+/**
+ * Calculadora (task 4/14) — o scanner com uma receita só.
+ *
+ * Mesmo engine, mesmos parâmetros de URL, mesma barra e mesmo painel de detalhe do scanner. O
+ * número muda enquanto o jogador digita: nada aqui vai à rede, a não ser o "Analisar com o livro
+ * real". Antes, cada mudança era um `POST /craft/simulate` atrás de um botão — que ficava mudo
+ * quando faltava um campo (`E05`).
+ */
 export function CalculadoraPage() {
   const { realm } = useServer()
-  const [searchParams] = useSearchParams()
-  const locations = useLocations()
   const locationName = useLocationName()
-  const mutation = useMutation({ mutationFn: simulateCraft })
+  const cidades = useCidades()
   const {
-    register,
-    control,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormValues>({
-    defaultValues: {
-      ...BASE_DEFAULTS,
-      ...readPrefs(),
-      output_item: searchParams.get('item') || '',
-    },
-  })
+    params,
+    scenario,
+    pricing,
+    sellIn,
+    buyIn,
+    strategy,
+    definirOrigem,
+    limparEscolhas,
+    setParam,
+    toggleText,
+  } = useScannerFilters()
 
-  if (!realm)
+  /** O item vive na URL: o link do Market Flip e o "Abrir Calculadora" do systray abrem por ela. */
+  const item = params.get('item') ?? ''
+  /** O texto do campo é local — a URL só recebe o item quando ele é escolhido de verdade. */
+  const [texto, setTexto] = useState(item)
+  /** A cidade que o jogador clicou; nula = a melhor. */
+  const [cidadeClicada, setCidadeClicada] = useState<string | null>(null)
+
+  const refino = useRecipeCatalog('refining')
+  const craft = useRecipeCatalog('crafting')
+  const painelDoDestino = useDestinyBoard()
+
+  const receita = useMemo(
+    () => receitaDoItem(item, refino.catalog, craft.catalog),
+    [item, refino.catalog, craft.catalog],
+  )
+  const itemsByName = useMemo(
+    () => new Map((receita?.catalog.items ?? []).map((i) => [i.unique_name, i])),
+    [receita],
+  )
+
+  /** Preço só da categoria do item (task 22): uma receita não precisa do realm inteiro. */
+  const recorte = useMemo(
+    () => (receita ? recorteDaReceita(itemsByName.get(item), receita.kind) : null),
+    [receita, itemsByName, item],
+  )
+  const mercadosPedidos = useMemo(() => cidades.flatMap((c) => c.ids), [cidades])
+  const precos = usePriceSnapshot(realm, mercadosPedidos, recorte, recorte !== null)
+  const vendas = useSalesVolume(realm, recorte, recorte !== null)
+
+  /** `1301` → `1002`: dois mercados, uma Lymhurst. Ver `agruparCidades`. */
+  const canonico = useMemo(() => {
+    const porMercado = new Map(cidades.flatMap((c) => c.ids.map((id) => [id, c.id])))
+    return (locationId: string) => porMercado.get(locationId) ?? locationId
+  }, [cidades])
+  const indice = useMemo(
+    () => (precos.snapshot ? buildPriceIndex(precos.snapshot, canonico) : null),
+    [precos.snapshot, canonico],
+  )
+  const indiceDeVendas = useMemo(
+    () => (vendas.vendas ? buildSalesIndex(vendas.vendas, canonico) : null),
+    [vendas.vendas, canonico],
+  )
+
+  const cidadesDeVenda = useMemo(() => cidadesFiltradas(sellIn, cidades), [sellIn, cidades])
+  const cidadesDeCompra = useMemo(() => cidadesFiltradas(buyIn, cidades), [buyIn, cidades])
+  const receitas = useMemo(() => (item ? [item] : []), [item])
+
+  const paramsDoEngine = useMemo(
+    () => ({
+      ...scenario,
+      locations: cidadesDeVenda,
+      priceLocations: cidadesDeCompra,
+      recipes: receitas,
+      pricing,
+      strategy,
+      destinyBoard: painelDoDestino,
+    }),
+    [scenario, cidadesDeVenda, cidadesDeCompra, receitas, pricing, strategy, painelDoDestino],
+  )
+
+  /** Uma linha por cidade de Vender em. Uma receita só: na thread principal, sem Worker. */
+  const linhas = useMemo(
+    () =>
+      receita && indice ? linhasPorLucro(computeScanner(receita.catalog, indice, paramsDoEngine)) : [],
+    [receita, indice, paramsDoEngine],
+  )
+  const escolhida = linhaEscolhida(linhas, cidadeClicada)
+
+  const nomeItem = useMemo(
+    () => (unique: string) =>
+      formatarNomeCurto(itemsByName.get(unique)?.name_pt ?? itemsByName.get(unique)?.name_en, unique),
+    [itemsByName],
+  )
+
+  if (!realm) {
     return (
-      <EstadoVazio title="Escolha um servidor">
-        Selecione um servidor antes de simular.
-      </EstadoVazio>
+      <RequireRealm>
+        <span />
+      </RequireRealm>
     )
-
-  const runSimulation = (values: FormValues) => {
-    localStorage.setItem(
-      PREFS,
-      JSON.stringify({
-        version: 1,
-        output_quality: Number(values.output_quality),
-        scope: values.scope,
-        premium: values.premium,
-        use_focus: values.use_focus,
-      }),
-    )
-    mutation.mutate({
-      server: realm,
-      ...values,
-      quantity: Number(values.quantity),
-      output_quality: Number(values.output_quality),
-      return_rate: String(values.return_rate),
-      station_fee_per_100_nutrition: String(values.station_fee_per_100_nutrition),
-    })
   }
 
-  const lastVariables = mutation.variables
-  const retryLastSimulation = lastVariables
-    ? () => mutation.mutate(lastVariables)
+  const carregando =
+    item !== '' && (refino.loading || craft.loading || (recorte !== null && precos.loading))
+  const erro = refino.error ?? craft.error ?? precos.error
+  const volumeDe = indiceDeVendas
+    ? (row: ScannerRow) =>
+        volumeDaVenda(row, indiceDeVendas, cidadesDeVenda, scenario.outputQuality)
     : undefined
 
   return (
-    <section>
-      <p className="text-sm uppercase tracking-widest text-primary">{realm}</p>
-      <h1 className="mt-2 text-3xl font-bold">Calculadora de craft</h1>
-      <form
-        className="mt-6 grid gap-4 rounded-xl border border-border bg-surface p-5 md:grid-cols-3"
-        onSubmit={(event) => void handleSubmit(runSimulation)(event)}
-      >
-        <div className="md:col-span-3">
-          <Controller
-            control={control}
-            name="output_item"
-            rules={{ required: 'Informe o item' }}
-            render={({ field }) => (
-              <ItemAutocomplete
-                label="Item"
-                value={field.value}
-                onChange={field.onChange}
-                filters={{ apenas_craftaveis: true }}
-                error={errors.output_item?.message}
-                autoFocus
+    <div className="flex h-full flex-col gap-4">
+      <SidebarSection title="Cenário">
+        <div className="space-y-5">
+          <GrupoMercado
+            cidades={cidades}
+            locationName={locationName}
+            sellIn={sellIn}
+            buyIn={buyIn}
+            pricing={pricing}
+            toggleText={toggleText}
+            setParam={setParam}
+            limparEscolhas={limparEscolhas}
+            dica="Para um ingrediente específico, escolha de onde vem o preço no detalhe da cidade."
+          />
+          <GrupoCenario
+            params={params}
+            scenario={scenario}
+            strategy={strategy}
+            setParam={setParam}
+            comQualidade
+            textoDaQuantidade={
+              <>
+                Quantas receitas você compra material para fazer. O que o retorno devolver vira
+                produção a mais — está no detalhe da cidade.
+              </>
+            }
+          />
+        </div>
+      </SidebarSection>
+
+      <header className="shrink-0 space-y-3">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight">Calculadora</h1>
+          <p className="mt-1 text-sm text-foreground-muted">
+            Uma receita em todas as cidades. O número muda enquanto você digita; o exato, com o
+            livro inteiro, é o <strong>Analisar com o livro real</strong>.
+          </p>
+        </div>
+        <div className="max-w-xl">
+          <ItemAutocomplete
+            label="Item"
+            value={texto}
+            onChange={setTexto}
+            onSelect={(escolhido) => {
+              setCidadeClicada(null)
+              setParam('item', escolhido.unique_name)
+            }}
+            filters={{ apenas_craftaveis: true }}
+            autoFocus={!item}
+          />
+        </div>
+      </header>
+
+      {!item ? (
+        <EstadoVazio title="Escolha um item" icon={<Calculator className="size-6" />}>
+          Busque pelo nome acima. A conta usa o cenário da barra à direita — os mesmos campos do
+          scanner.
+        </EstadoVazio>
+      ) : erro ? (
+        <EstadoErro title="Não foi possível carregar a Calculadora">
+          O catálogo ou os preços não vieram. A navegação ao lado continua funcionando.
+        </EstadoErro>
+      ) : carregando ? (
+        <Carregando label="Carregando receita e preços…" />
+      ) : !receita ? (
+        <EstadoVazio title="Este item não tem receita" icon={<Calculator className="size-6" />}>
+          {formatarNomeItem(null, item)} não é craftado nem refinado. Escolha outro item.
+        </EstadoVazio>
+      ) : (
+        <>
+          <ComparacaoPorCidade
+            linhas={linhas}
+            escolhida={escolhida}
+            onEscolher={setCidadeClicada}
+            locationName={locationName}
+            volumeDe={volumeDe}
+          />
+          {escolhida && indice && (
+            <section
+              aria-label={`Detalhe em ${locationName(escolhida.locationId)}`}
+              className="rounded-xl border border-border bg-surface p-4"
+            >
+              <h2 className="mb-3 text-sm font-semibold">
+                {nomeItem(item)} em {locationName(escolhida.locationId)}
+              </h2>
+              <DetalheDaLinha
+                row={escolhida}
+                catalog={receita.catalog}
+                indice={indice}
+                params={paramsDoEngine}
+                cidades={cidades}
+                nomeItem={nomeItem}
+                locationName={locationName}
+                pricing={pricing}
+                scenario={scenario}
+                realm={realm}
+                onOrigem={definirOrigem}
+                indiceDeVendas={indiceDeVendas}
               />
-            )}
-          />
-        </div>
-        <label>
-          Quantidade
-          <input
-            type="number"
-            min="1"
-            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
-            {...register('quantity', {
-              valueAsNumber: true,
-              min: { value: 1, message: 'Mínimo 1' },
-            })}
-          />
-        </label>
-        <label>
-          Cidade
-          <select
-            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
-            {...register('location_id', { required: 'Selecione a cidade' })}
-          >
-            <option value="">Selecionar</option>
-            {locations.map((location) => (
-              <option key={location.location_id} value={location.location_id}>
-                {locationName(location.location_id)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Qualidade
-          <select
-            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
-            {...register('output_quality', { valueAsNumber: true })}
-          >
-            {[1, 2, 3, 4, 5].map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Escopo
-          <select
-            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
-            {...register('scope')}
-          >
-            <option value="all">Toda plataforma</option>
-            <option value="mine">Minha cobertura</option>
-          </select>
-        </label>
-        <label>
-          Retorno de recursos
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="1"
-            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
-            {...register('return_rate')}
-          />
-        </label>
-        <label>
-          {/* Taxa de uso por 100 de nutrição, que é como a estação cobra no jogo — não prata
-              fixa por execução (task 4/18). */}
-          Taxa da estação (por 100 de nutrição)
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            className="mt-1 w-full rounded border border-border-strong bg-background px-3 py-2"
-            {...register('station_fee_per_100_nutrition')}
-          />
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" {...register('use_focus')} /> Usar foco
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" {...register('premium')} /> Premium
-        </label>
-        <button
-          className="rounded bg-primary px-4 py-2 font-semibold text-on-primary md:col-span-3"
-          disabled={mutation.isPending}
-          type="submit"
-        >
-          {mutation.isPending ? 'Calculando…' : 'Simular craft'}
-        </button>
-      </form>
-      {mutation.isError && (
-        <div className="mt-5">
-          <EstadoErro
-            title="Não foi possível simular"
-            onRetry={retryLastSimulation}
-          />
-        </div>
+            </section>
+          )}
+        </>
       )}
-      {mutation.isPending && <Carregando label="Calculando cenários…" />}
-      {mutation.data && <Result result={mutation.data} />}
+    </div>
+  )
+}
+
+/**
+ * "Onde vale a pena isto": as cidades lado a lado, na ordem do lucro. Cidade sem preço fica, com o
+ * motivo — sumir com ela diria que ali não se vende (`X01`). Clicar troca o detalhe.
+ */
+function ComparacaoPorCidade({
+  linhas,
+  escolhida,
+  onEscolher,
+  locationName,
+  volumeDe,
+}: {
+  linhas: ScannerRow[]
+  escolhida: ScannerRow | null
+  onEscolher: (locationId: string) => void
+  locationName: (id: string) => string
+  volumeDe?: (row: ScannerRow) => Money | null
+}) {
+  const celula = 'px-3 py-2 text-right tabular-nums'
+  return (
+    <section className="overflow-x-auto rounded-xl border border-border bg-surface">
+      <table aria-label="Lucro por cidade" className="w-full text-sm">
+        <thead className="text-xs uppercase tracking-wide text-foreground-subtle">
+          <tr className="border-b border-border">
+            <th scope="col" className="px-3 py-2 text-left">
+              Cidade
+            </th>
+            <th scope="col" className="px-3 py-2 text-right">
+              Lucro
+            </th>
+            <th scope="col" className="px-3 py-2 text-right">
+              ROI
+            </th>
+            <th scope="col" className="px-3 py-2 text-right">
+              Preço de venda
+            </th>
+            <th scope="col" className="px-3 py-2 text-right">
+              Vende/dia
+            </th>
+            <th scope="col" className="px-3 py-2 text-right">
+              Investimento
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map((linha) => {
+            const ativa = linha.locationId === escolhida?.locationId
+            const volume = volumeDe?.(linha)
+            const corDoLucro =
+              linha.profit === null
+                ? 'font-normal text-foreground-subtle'
+                : linha.profit.isNegative()
+                  ? 'text-danger'
+                  : 'text-profit'
+            return (
+              <tr
+                key={linha.locationId}
+                className={`border-b border-border/60 ${ativa ? 'bg-surface-raised' : ''}`}
+              >
+                <td className="px-3 py-2">
+                  <button
+                    type="button"
+                    aria-pressed={ativa}
+                    onClick={() => onEscolher(linha.locationId)}
+                    className="font-medium text-buy-side underline-offset-2 hover:underline"
+                  >
+                    {locationName(linha.locationId)}
+                  </button>
+                </td>
+                <td className={`${celula} font-semibold ${corDoLucro}`}>
+                  {linha.profit ? formatSilver(linha.profit) : (motivoSemPreco(linha) ?? TRACO)}
+                </td>
+                <td className={celula}>{linha.roi ? formatPercent(linha.roi) : TRACO}</td>
+                <td className={celula}>
+                  {linha.saleUnitPrice ? formatQuantity(linha.saleUnitPrice, 0) : TRACO}
+                </td>
+                <td className={`${celula} text-foreground-muted`}>
+                  {volume === undefined ? '' : `${volume ? formatarVolume(volume) : TRACO}/dia`}
+                </td>
+                <td className={celula}>{linha.totalCost ? formatSilver(linha.totalCost) : TRACO}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </section>
   )
 }

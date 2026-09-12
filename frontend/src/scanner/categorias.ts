@@ -4,6 +4,7 @@ import { compare } from '@/lib/money'
 
 import type { ScannerCatalog, ScannerRow } from './engine'
 import { casaBusca } from './filters'
+import type { RecorteDoSnapshot } from './usePriceSnapshot'
 
 /**
  * O que a tela calcula (task 4/21).
@@ -223,6 +224,25 @@ export function receitaEscondida(outputItem: string): boolean {
   return (
     nome.startsWith('UNIQUE_') || nome.startsWith('QUESTITEM_') || nome.endsWith('_NONTRADABLE')
   )
+}
+
+/**
+ * O recorte do snapshot para **uma** receita (task 14): a categoria do item, pela regra do
+ * catálogo em que ela mora — a mesma de `_na_categoria` no servidor. A Calculadora cota uma
+ * receita; o realm inteiro seriam 187 KB a cada 30 s.
+ */
+export function recorteDaReceita(
+  item: CatalogItem | undefined,
+  kind: 'refining' | 'crafting',
+): RecorteDoSnapshot {
+  if (kind === 'refining') {
+    return { kind, category: item?.shop_subcategory2 ?? OUTROS, subcategory: null }
+  }
+  return {
+    kind,
+    category: item?.shop_category ?? OUTROS,
+    subcategory: item?.shop_subcategory ?? OUTROS,
+  }
 }
 
 /** O código de insumo da aba, se o item é um. */

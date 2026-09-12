@@ -4,7 +4,98 @@ import type { Cidade } from '@/lib/locations'
 import { money } from '@/lib/money'
 
 import type { PricingPolicy } from './pricing'
-import { cidadesFiltradas, estadoDaTela, podeAnalisar, precosNaMaoPara } from './tela'
+import {
+  cidadesFiltradas,
+  erroDaQuantidade,
+  erroDoRetorno,
+  estadoDaTela,
+  hrefDaCalculadora,
+  podeAnalisar,
+  precosNaMaoPara,
+} from './tela'
+
+describe('Abrir na Calculadora (task 14)', () => {
+  const doScanner = new URLSearchParams(
+    [
+      'cat=weapons/bow',
+      'top=15',
+      'q=espada',
+      'qty=300',
+      'return_rate=24',
+      'station_fee=500',
+      'sell_in=2004',
+      'sell_in=1002',
+      'buy_in=1002',
+      'px=T4_PLANKS:100',
+      'ing_price=min',
+      'buy=immediate',
+      'focus=true',
+      'min_profit=5000',
+      'min_roi=10',
+      'min_volume=100',
+      'no_volume=false',
+      'unpriced=false',
+      'profit_only=true',
+      'max_age=6',
+      'tier=4',
+      'ench=1',
+    ].join('&'),
+  )
+
+  test('leva o item e o cenário — é a mesma conta, noutra tela', () => {
+    const url = new URL(hrefDaCalculadora(doScanner, 'T4_2H_BOW'), 'http://app')
+
+    expect(url.pathname).toBe('/calculadora')
+    expect(url.searchParams.get('item')).toBe('T4_2H_BOW')
+    for (const chave of ['qty', 'return_rate', 'station_fee', 'px', 'ing_price', 'buy', 'focus', 'buy_in']) {
+      expect(url.searchParams.getAll(chave), chave).toEqual(doScanner.getAll(chave))
+    }
+    expect(url.searchParams.getAll('sell_in')).toEqual(['2004', '1002'])
+  })
+
+  test('deixa de fora o que é da tabela: categoria, Top, busca e filtros de resultado', () => {
+    const url = new URL(hrefDaCalculadora(doScanner, 'T4_2H_BOW'), 'http://app')
+
+    for (const chave of [
+      'cat',
+      'top',
+      'q',
+      'min_profit',
+      'min_roi',
+      'min_volume',
+      'no_volume',
+      'unpriced',
+      'profit_only',
+      'max_age',
+      'tier',
+      'ench',
+    ]) {
+      expect(url.searchParams.has(chave), chave).toBe(false)
+    }
+  })
+})
+
+describe('erro no campo, não botão mudo (task 14, corrige E05)', () => {
+  test('quantidade: inteiro a partir de 1; vazio é o padrão, não erro', () => {
+    expect(erroDaQuantidade(null)).toBeNull()
+    expect(erroDaQuantidade('')).toBeNull()
+    expect(erroDaQuantidade('300')).toBeNull()
+    for (const invalido of ['0', '-5', '1.5', 'abc']) {
+      expect(erroDaQuantidade(invalido), invalido).toMatch(/inteiro a partir de 1/)
+    }
+  })
+
+  test('retorno: de 0 a 99%, com vírgula ou ponto', () => {
+    expect(erroDoRetorno(null)).toBeNull()
+    expect(erroDoRetorno('24')).toBeNull()
+    expect(erroDoRetorno('36,7')).toBeNull()
+    expect(erroDoRetorno('53.9')).toBeNull()
+    // `percentageToRate('abc')` dava 0 em silêncio: o jogador via retorno zero sem saber por quê.
+    for (const invalido of ['150', '100', '-1', 'abc']) {
+      expect(erroDoRetorno(invalido), invalido).toMatch(/entre 0 e 99/i)
+    }
+  })
+})
 
 /**
  * Task 4/12, segunda correção de desempenho.

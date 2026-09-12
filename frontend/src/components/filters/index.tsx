@@ -1,5 +1,5 @@
 import { Search, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 
 import { Checkbox } from '@/components/ui/checkbox'
 
@@ -138,32 +138,50 @@ export function FilterChips<T extends string | number>({
   )
 }
 
+/**
+ * Campo numérico. `error` (task 4/14, corrige `E05`): a mensagem fica **fora** do rótulo, ligada
+ * por `aria-describedby` — dentro dele, o leitor de tela leria o erro como parte do nome do campo.
+ */
 export function FilterNumberField({
   label,
   value,
   onChange,
   placeholder,
   suffix,
+  error,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
   suffix?: string
+  error?: string | null
 }) {
+  const idDoErro = useId()
   return (
-    <label className={filterLabel}>
-      {label}
-      {suffix && <span className="ml-1 normal-case">({suffix})</span>}
-      <input
-        type="text"
-        inputMode="decimal"
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => onChange(event.target.value)}
-        className={`${filterControl} tabular-nums`}
-      />
-    </label>
+    <div>
+      <label className={filterLabel}>
+        {label}
+        {suffix && <span className="ml-1 normal-case">({suffix})</span>}
+        <input
+          type="text"
+          inputMode="decimal"
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? idDoErro : undefined}
+          className={`${filterControl} tabular-nums ${
+            error ? 'border-danger focus:border-danger focus:ring-danger/30' : ''
+          }`}
+        />
+      </label>
+      {error && (
+        <p id={idDoErro} className="mt-1 text-xs text-danger">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
 
