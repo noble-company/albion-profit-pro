@@ -129,6 +129,28 @@ function secao(titulo: string) {
   return within(screen.getByRole('heading', { name: titulo }).closest('section')!)
 }
 
+describe('enquadramento (pedido no uso, 2026-09-12)', () => {
+  // Na linha do scanner o painel tem a largura da tabela; no centro da Calculadora, espremido
+  // entre as barras, as três colunas e as tabelas sem quebra empurravam a página para o lado.
+  test('as colunas seguem a largura do PAINEL, não a da janela', () => {
+    montar()
+    const grade = screen.getByRole('heading', { name: 'Extrato' }).closest('section')!
+      .parentElement!.parentElement!
+
+    expect(grade.parentElement).toHaveClass('@container')
+    expect(grade.className).toMatch(/@\w+:grid-cols-3/)
+    expect(grade.className).not.toMatch(/(^|\s)lg:grid-cols-3/)
+  })
+
+  test('as tabelas rolam dentro do painel, sem empurrar a tela', () => {
+    montar()
+
+    for (const titulo of ['Venda', 'Cenários']) {
+      expect(secao(titulo).getByRole('table').parentElement, titulo).toHaveClass('overflow-x-auto')
+    }
+  })
+})
+
 describe('extrato', () => {
   test('o custo total do painel é o MESMO da linha da tabela', () => {
     // O defeito que este teste existe para pegar: um painel que soma diferente da linha

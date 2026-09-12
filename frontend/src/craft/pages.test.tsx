@@ -190,6 +190,14 @@ describe('Calculadora sobre o engine (task 14)', () => {
     expect(chamadas).toEqual(pedidos)
   })
 
+  test('o campo do item mostra o nome do jogo, não o código', async () => {
+    // Pedido no uso (2026-09-12): "não exibir o nome técnico T4_MAIN_SWORD, só o nome do jogo".
+    abrir('/calculadora?item=T4_MAIN_SWORD&qty=10')
+
+    await waitFor(async () => expect(await cidadesNaOrdem()).toHaveLength(2))
+    expect(screen.getByRole('combobox', { name: /Item/ })).toHaveValue('Espada Larga T4')
+  })
+
   test('quantidade inválida diz o quê, no campo (corrige E05)', async () => {
     abrir('/calculadora?item=T4_MAIN_SWORD&qty=0')
 

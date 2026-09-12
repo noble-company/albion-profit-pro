@@ -132,6 +132,15 @@ export function CalculadoraPage() {
     )
   }
 
+  /**
+   * O que o campo mostra: o nome do jogo (pedido no uso, 2026-09-12). Enquanto o texto é o próprio
+   * item da URL — a tela acabou de abrir, ou o jogador ainda não mexeu —, troca o código pelo nome.
+   */
+  const nomeDoItem = item
+    ? formatarNomeItem(itemsByName.get(item)?.name_pt ?? itemsByName.get(item)?.name_en, item)
+    : ''
+  const valorDoCampo = texto === item ? nomeDoItem : texto
+
   const carregando =
     item !== '' && (refino.loading || craft.loading || (recorte !== null && precos.loading))
   const erro = refino.error ?? craft.error ?? precos.error
@@ -141,7 +150,7 @@ export function CalculadoraPage() {
     : undefined
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full min-w-0 flex-col gap-4">
       <SidebarSection title="Cenário">
         <div className="space-y-5">
           <GrupoMercado
@@ -182,11 +191,13 @@ export function CalculadoraPage() {
         <div className="max-w-xl">
           <ItemAutocomplete
             label="Item"
-            value={texto}
+            value={valorDoCampo}
             onChange={setTexto}
             onSelect={(escolhido) => {
               setCidadeClicada(null)
               setParam('item', escolhido.unique_name)
+              // O autocomplete escreve o código ao escolher; o campo mostra o nome do jogo.
+              setTexto(formatarNomeItem(escolhido.name_pt ?? escolhido.name_en, escolhido.unique_name))
             }}
             filters={{ apenas_craftaveis: true }}
             autoFocus={!item}
@@ -221,7 +232,8 @@ export function CalculadoraPage() {
           {escolhida && indice && (
             <section
               aria-label={`Detalhe em ${locationName(escolhida.locationId)}`}
-              className="rounded-xl border border-border bg-surface p-4"
+              // `min-w-0` + rolagem própria: o detalhe nunca empurra a página para o lado.
+              className="min-w-0 overflow-x-auto rounded-xl border border-border bg-surface p-4"
             >
               <h2 className="mb-3 text-sm font-semibold">
                 {nomeItem(item)} em {locationName(escolhida.locationId)}

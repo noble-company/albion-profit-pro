@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react'
 
+import { ItemImage } from '@/components/ItemImage'
 import { EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { useBuscaItens } from '@/items/hooks'
 import type { CatalogItem, SearchFilters } from '@/items/service'
@@ -140,23 +141,23 @@ export function ItemAutocomplete({
               onMouseDown={(event) => event.preventDefault()}
               onMouseEnter={() => setActive(index)}
               onClick={() => commit(item)}
-              className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${
                 index === active
                   ? 'bg-primary/15 text-foreground'
                   : 'text-foreground hover:bg-surface-raised'
               }`}
             >
-              <span className="font-medium">
+              {/* Pedido no uso (2026-09-12): o ícone do jogo e só o nome do jogo. O código
+                  técnico (`T4_MAIN_SWORD`) saiu — o tier e o encanto já estão no nome. */}
+              <ItemImage uniqueName={item.unique_name} size={64} className="size-8" />
+              <span className="min-w-0 flex-1 truncate font-medium">
                 {formatarNomeItem(
                   item.name_pt ?? item.name_en,
                   item.unique_name,
                 )}
               </span>
-              <span className="ml-2 text-xs text-foreground-subtle">
-                {item.unique_name}
-              </span>
               {!item.has_recipe && (
-                <span className="ml-2 rounded bg-surface-raised px-1.5 py-0.5 text-xs text-foreground-subtle">
+                <span className="shrink-0 rounded bg-surface-raised px-1.5 py-0.5 text-xs text-foreground-subtle">
                   sem receita
                 </span>
               )}

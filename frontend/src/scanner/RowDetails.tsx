@@ -139,7 +139,11 @@ export function RowDetails({
         : formatSilver(row.saleUnitPrice)
 
   return (
-    <div className="grid gap-x-8 gap-y-5 text-sm lg:grid-cols-3">
+    // Colunas pela largura do PAINEL (container query), não da janela. Na linha do scanner o
+    // painel tem a largura da tabela e cabe em três; no centro da Calculadora, espremido entre as
+    // barras, `lg:grid-cols-3` empurrava a página inteira para o lado (pedido no uso, 2026-09-12).
+    <div className="@container">
+    <div className="grid gap-x-8 gap-y-5 text-sm @3xl:grid-cols-2 @6xl:grid-cols-3">
       {/* ---------------- o dinheiro ---------------- */}
       <div className="min-w-0 space-y-5">
         <Secao titulo="Extrato">
@@ -278,6 +282,9 @@ export function RowDetails({
             onOrigem={(escolha) => onOrigem('venda', row.outputItem, escolha)}
           />
 
+          {/* Rola aqui dentro: a tabela não quebra linha, e sem isto empurrava a tela inteira para
+              o lado quando o painel era estreito (Calculadora, pedido no uso). */}
+          <div className="overflow-x-auto">
           <table className="w-full whitespace-nowrap text-xs">
             <thead className="text-2xs uppercase tracking-wide text-foreground-subtle">
               <tr>
@@ -310,9 +317,11 @@ export function RowDetails({
               ))}
             </tbody>
           </table>
+          </div>
         </Secao>
 
         <Secao titulo="Cenários">
+          <div className="overflow-x-auto">
           <table className="w-full whitespace-nowrap text-xs">
             <thead className="text-2xs uppercase tracking-wide text-foreground-subtle">
               <tr>
@@ -357,12 +366,14 @@ export function RowDetails({
               ))}
             </tbody>
           </table>
+          </div>
           <p className="text-2xs leading-snug text-foreground-subtle">
             Valores em silver. Ordem de compra e de venda rendem mais, mas dependem de alguém
             aceitar — o número supõe que a fila anda.
           </p>
         </Secao>
       </div>
+    </div>
     </div>
   )
 }

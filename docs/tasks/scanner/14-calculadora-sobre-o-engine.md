@@ -114,6 +114,24 @@ da tela e o `jest-axe` da Calculadora.
   gravada em `localStorage` (`albion-profit-pro:calculator:v1`) também saiu — o cenário mora na URL,
   como no scanner.
 
+### Ajuste no uso: enquadramento e busca (2026-09-12)
+
+Reportado com print: a tela "ficou meio fora de enquadro", e a busca mostrava o código técnico.
+
+- **O painel empurrava a página para o lado.** `RowDetails` escolhia as colunas pela largura da
+  **janela** (`lg:grid-cols-3`). Na linha do scanner o painel tem a largura da tabela e cabe; no
+  centro da Calculadora, entre as duas barras, as três colunas e as tabelas sem quebra de linha
+  estouravam, e os títulos da tabela de cidades encavalavam. Agora o painel é um `@container`: 2
+  colunas a partir de 48rem **do painel**, 3 a partir de 72rem, e as duas tabelas rolam dentro dele.
+  A seção de detalhe da Calculadora também rola por conta própria.
+- **A busca mostra o ícone e só o nome do jogo.** O `unique_name` saiu da lista (o tier e o
+  encanto já estão no nome). Vale para toda tela que usa o `ItemAutocomplete`.
+- **O campo do item mostra o nome, não o código.** O autocomplete continua emitindo o
+  `unique_name` (a Busca navega com ele); a Calculadora troca pelo nome do jogo no campo, e o item
+  da URL aparece com o nome assim que o catálogo chega.
+
+Guards vermelhos primeiro: 2 no `RowDetails.test.tsx`, 1 no `ItemAutocomplete.test.tsx`, 1 na tela.
+
 ### Pendente pra você testar
 
 1. Abrir **Calculadora**, buscar um item (ex.: Espada Larga) e conferir as cidades em ordem de lucro.

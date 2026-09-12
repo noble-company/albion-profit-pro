@@ -103,6 +103,20 @@ test('clicar num resultado emite o unique_name canônico', async () => {
   expect(onSelect).toHaveBeenCalledWith('T5_CLOTH')
 })
 
+test('cada resultado mostra o ícone e o nome do jogo — sem o código técnico', async () => {
+  // Pedido no uso (2026-09-12): "exibir os ícones dos itens na hora da busca, e não exibir o
+  // nome técnico T4_MAIN_SWORD, só o nome do jogo".
+  const user = userEvent.setup()
+  mockSearch()
+  renderWithProviders(<Harness />)
+
+  await user.type(screen.getByRole('combobox'), 'pano')
+  const opcao = await screen.findByRole('option', { name: /Pano T4/ }, { timeout: 2000 })
+
+  expect(opcao.querySelector('img')?.getAttribute('src')).toContain('T4_CLOTH')
+  expect(opcao).not.toHaveTextContent('T4_CLOTH')
+})
+
 test('menos de 2 caracteres não abre a lista', async () => {
   const user = userEvent.setup()
   mockSearch()
