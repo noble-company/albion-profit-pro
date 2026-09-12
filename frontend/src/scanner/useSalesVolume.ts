@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { apiClient, safeApiCall } from '@/api'
+import { apiClient, queryPolicies, safeApiCall } from '@/api'
 import type { components } from '@/api/schema'
 
 import type { RecorteDoSnapshot } from './usePriceSnapshot'
@@ -9,14 +9,13 @@ import type { SalesOut } from './vendas'
 type Realm = components['schemas']['AlbionServer']
 
 /**
- * O histórico muda a cada 6 h (os blocos do jogo), e a média é de 7 dias completos: polling de 30 s
- * como o do preço só gastaria requisição. Uma hora de `staleTime` já é folga.
- */
-const UMA_HORA = 60 * 60_000
-
-/**
  * Unidades vendidas por dia (task 4/23), no mesmo recorte do snapshot de preço (task 22): com uma
  * categoria, só as saídas dela; sem categoria, o realm. Sem nada escolhido, nada é pedido.
+ *
+ * Política `demand` (task 4/29, achado `W11`): o jogador abre o histórico de um item no jogo e
+ * volta para o navegador, e o backend já recalculou o diário daquela série no upload. Voltar para
+ * a aba busca de novo o dado com mais de um minuto. Sem polling: o volume não muda sozinho a cada
+ * 30 s como o preço, e 1 h de `staleTime` deixava o número velho até um F5.
  */
 export function useSalesVolume(
   realm: Realm | null,
@@ -47,8 +46,7 @@ export function useSalesVolume(
       return response.data as SalesOut
     },
     enabled: realm !== null && habilitado,
-    staleTime: UMA_HORA,
-    refetchOnWindowFocus: false,
+    ...queryPolicies.demand,
   })
 
   return { vendas: query.data ?? null }

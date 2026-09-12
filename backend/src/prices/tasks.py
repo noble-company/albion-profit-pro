@@ -1,6 +1,6 @@
 import asyncio
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 import httpx
 import structlog
@@ -21,6 +21,12 @@ from src.prices.models import (
     MarketHistoryMonthly,
     MarketOrder,
 )
+from src.prices.rollup import (
+    daily_repair_bounds,
+    inserir_diario,
+    tomar_lock_do_rollup,
+    utc_now,
+)
 from src.prices.snapshot import upsert_snapshot
 from src.quarantine.task_base import QuarantinableTask
 from src.recipes.models import Recipe, RecipeIngredient
@@ -31,7 +37,7 @@ log = structlog.get_logger()
 # Política de retenção: grãos mais finos ficam pouco tempo
 # porque o grão mais grosso já cobre o mesmo período (ver docs/tasks/backend/31-...).
 RETENCAO_BUCKET_1H = timedelta(hours=48)
-RETENCAO_BUCKET_6H = timedelta(days=90)
+# A de 6 h (90 dias) mora em `src/prices/rollup.py`: o ingest também respeita a janela dela.
 RETENCAO_DIARIO = timedelta(days=730)  # ~2 anos
 
 # Dias sem nenhuma varredura reafirmar uma ordem antes de considerá-la morta, mesmo com
@@ -65,43 +71,21 @@ def _run_periodic(nome: str, fn) -> None:
     asyncio.run(_wrapper())
 
 
-def _utc_now(now: datetime | None = None) -> datetime:
-    value = now or datetime.now(timezone.utc)
-    if value.tzinfo is None:
-        raise ValueError("now precisa ter timezone")
-    return value.astimezone(timezone.utc)
-
-
-def _utc_day_start(value: datetime) -> datetime:
-    return value.replace(hour=0, minute=0, second=0, microsecond=0)
-
-
-def _daily_repair_bounds(now: datetime | None = None) -> tuple[datetime, datetime, datetime]:
-    """Retorna (início a limpar, primeiro dia reconstruível, fim exclusivo).
-
-    A retenção de 90 dias é móvel e preserva hora/minuto. O dia que contém seu cutoff pode
-    já ter perdido buckets, portanto é removido dos derivados mas não reconstruído. O dia
-    corrente também é removido e fica fora do rollup até fechar em UTC.
-    """
-    current = _utc_now(now)
-    raw_cutoff = current - RETENCAO_BUCKET_6H
-    cleanup_start = _utc_day_start(raw_cutoff)
-    complete_start = cleanup_start
-    if raw_cutoff > cleanup_start:
-        complete_start += timedelta(days=1)
-    return cleanup_start, complete_start, _utc_day_start(current)
-
-
 async def _rollup_diario(sessionmaker, now: datetime | None = None) -> tuple[date, date]:
     """Agrega só os buckets de 6h (`bucket_seconds=21600`) por dia — os de 1h não entram
     aqui de propósito: são o mesmo giro real visto numa granularidade mais fina, e somar os
     dois contaria a mesma transação duas vezes. Só reconstrói dias UTC completos cuja fonte
     bruta ainda está integralmente retida; o dia corrente e o dia parcial na borda são
-    removidos dos derivados. `preco_medio` é média ponderada por volume."""
-    cleanup_start, complete_start, end = _daily_repair_bounds(now)
-    dia_expr = cast(MarketHistoryEntry.bucket_start, Date)
+    removidos dos derivados. `preco_medio` é média ponderada por volume.
+
+    O ingest recalcula a série que acabou de chegar sem esperar esta rodada (task 4/29); o lock
+    exclusivo garante que as duas escritas nunca se cruzam."""
+    cleanup_start, complete_start, end = daily_repair_bounds(now)
 
     async with sessionmaker() as session:
+        # Antes do DELETE: espera o ingest que está no meio de um recálculo, e os blocos que ele
+        # gravou já aparecem para o SELECT abaixo.
+        await tomar_lock_do_rollup(session)
         # DELETE + rebuild dentro da mesma transação também corrige derivados que ficaram
         # órfãos após reparos/remoções no bruto. O dia da borda e o corrente são apagados,
         # mas apenas os dias comprovadamente completos voltam a ser inseridos.
@@ -111,59 +95,12 @@ async def _rollup_diario(sessionmaker, now: datetime | None = None) -> tuple[dat
                 MarketHistoryDaily.dia <= end.date(),
             )
         )
-        soma_itens = func.sum(MarketHistoryEntry.item_amount)
-        soma_prata = func.sum(MarketHistoryEntry.silver_amount)
-        agregado = (
-            select(
-                func.gen_random_uuid(),
-                MarketHistoryEntry.server_id,
-                MarketHistoryEntry.item_id,
-                MarketHistoryEntry.location_id,
-                MarketHistoryEntry.quality_level,
-                dia_expr,
-                cast(soma_itens, BigInteger),
-                soma_prata,
-                case((soma_itens == 0, 0), else_=soma_prata / soma_itens),
-            )
-            .where(
-                MarketHistoryEntry.bucket_seconds == 21600,
+        await session.execute(
+            inserir_diario(
                 MarketHistoryEntry.bucket_start >= complete_start,
                 MarketHistoryEntry.bucket_start < end,
             )
-            .group_by(
-                MarketHistoryEntry.server_id,
-                MarketHistoryEntry.item_id,
-                MarketHistoryEntry.location_id,
-                MarketHistoryEntry.quality_level,
-                dia_expr,
-            )
         )
-        # Uma instrução, agregada no banco. O `INSERT ... VALUES` com uma linha de parâmetros por
-        # dia agregado parou em 4.095 linhas: 8 colunas por linha passam do limite de 32.767
-        # parâmetros do asyncpg, e o histórico local já pedia 11.210 (achado de 2026-09-10).
-        stmt = pg_insert(MarketHistoryDaily).from_select(
-            [
-                "id",
-                "server_id",
-                "item_id",
-                "location_id",
-                "quality_level",
-                "dia",
-                "item_amount",
-                "silver_amount",
-                "preco_medio",
-            ],
-            agregado,
-        )
-        stmt = stmt.on_conflict_do_update(
-            constraint="uq_market_history_daily",
-            set_={
-                "item_amount": stmt.excluded.item_amount,
-                "silver_amount": stmt.excluded.silver_amount,
-                "preco_medio": stmt.excluded.preco_medio,
-            },
-        )
-        await session.execute(stmt)
         await session.commit()
     return cleanup_start.date(), end.date()
 
@@ -184,9 +121,9 @@ async def _rollup_mensal(
     assim uma janela de 90 dias começando no meio do mês não sobrescreve o mensal com apenas
     o pedaço recente desse mês. `end` é exclusivo e normalmente representa hoje em UTC.
     """
-    current = _utc_now(now)
+    current = utc_now(now)
     if repair_start is None or end is None:
-        repair_start, _, repair_end = _daily_repair_bounds(current)
+        repair_start, _, repair_end = daily_repair_bounds(current)
         repair_start = repair_start.date()
         end = repair_end.date()
     month_start = _primeiro_dia_do_mes(repair_start)
@@ -255,7 +192,7 @@ async def _rollup_mensal(
 
 async def _repair_rollups(sessionmaker, now: datetime | None = None) -> None:
     """Ordem obrigatória: diário autoritativo primeiro, mensal derivado depois."""
-    current = _utc_now(now)
+    current = utc_now(now)
     repair_start, end = await _rollup_diario(sessionmaker, current)
     await _rollup_mensal(sessionmaker, repair_start, end, current)
 
@@ -265,8 +202,8 @@ async def _poda(sessionmaker, now: datetime | None = None) -> None:
     de 2 anos, ordens expiradas e ordens que ninguém mais varre há
     `MARKET_ORDER_STALE_AFTER`. Mensal não é podado (retenção indefinida, é a base de
     previsão)."""
-    now = _utc_now(now)
-    raw_6h_cutoff, _, _ = _daily_repair_bounds(now)
+    now = utc_now(now)
+    raw_6h_cutoff, _, _ = daily_repair_bounds(now)
     async with sessionmaker() as session:
         await session.execute(
             delete(MarketHistoryEntry).where(
@@ -297,7 +234,7 @@ async def _poda(sessionmaker, now: datetime | None = None) -> None:
 
 async def _repair_then_prune(sessionmaker, now: datetime | None = None) -> None:
     """Nunca remove bruto antes de confirmar que diário e mensal foram reconstruídos."""
-    current = _utc_now(now)
+    current = utc_now(now)
     await _repair_rollups(sessionmaker, current)
     await _poda(sessionmaker, current)
 
@@ -472,7 +409,7 @@ async def _sync_aodp_history_realm(
     varredura em andamento) e `iniciada_em`. Ao terminar, sobra só `ultima_iniciada_em`, que decide
     quando a próxima começa — 6 h depois do início da anterior.
     """
-    agora = _utc_now(now)
+    agora = utc_now(now)
     chave = chave_do_historico(realm)
     estado = await redis.hgetall(chave)
 

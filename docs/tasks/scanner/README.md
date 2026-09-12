@@ -86,6 +86,7 @@ BLOCO 4 — a tela que o jogador pediu (achados do uso real, 2026-09-10)
 26 Retorno de recurso por ingrediente       ── depende de 05, 06, 11.6, 12
 27 Itens com mais de uma receita            ── depende de 26
 28 Dataset do jogo atualizado               ── depende de 23
+29 Volume por dia na hora do upload         ── depende de 23, 28
 15 Aposentar o ranking materializado       ── depende de 11, 12
 16 Documentos reconciliados                ── depende de 15
 ```
@@ -132,6 +133,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 | [26](26-retorno-de-recurso-por-ingrediente.md) | Retorno de recurso por ingrediente | `W6` | Artefato e o que não retorna é comprado para todas as execuções |
 | [27](27-itens-com-mais-de-uma-receita.md) | Itens com mais de uma receita | `W7` | Armas e armaduras de artefato de facção entram no catálogo |
 | [28](28-dataset-do-jogo-atualizado.md) | Dataset do jogo atualizado | `W9` | O histórico do client volta ao item certo; o da API pública acompanha a renumeração |
+| [29](29-volume-por-dia-na-hora-do-upload.md) | Volume por dia na hora do upload | `W11` | O histórico aberto no jogo aparece na tela em segundos, não em até 2 h |
 | [15](15-aposentar-o-ranking-materializado.md) | Aposentar o ranking materializado | `X03` | `recipe_ranking` e o beat `*/10` deixam de existir |
 | 16 | Documentos reconciliados | — | Specs param de descrever a arquitetura revogada |
 
@@ -175,6 +177,7 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [x] 26 — Retorno de recurso por ingrediente
 - [x] 27 — Itens com mais de uma receita
 - [x] 28 — Dataset do jogo atualizado
+- [x] 29 — Volume por dia na hora do upload
 - [x] 15 — Aposentar o ranking materializado
 - [ ] 16 — Documentos reconciliados
 
@@ -227,4 +230,5 @@ A [Fase 3.6](../correcoes/README.md) é substituída por esta. Destino de cada t
 | `W8` | **O rollup diário e mensal parou quando o histórico cresceu.** `_rollup_diario` e `_rollup_mensal` inseriam com `INSERT ... VALUES`, 8 parâmetros por linha agregada; acima de 4.095 linhas passava do limite de 32.767 do asyncpg. O `InterfaceError` era tratado como transitório, então o job tentava de novo e caía de novo, e o `poda` falhava junto. A tabela diária estava parada em 2.194 linhas quando o histórico pedia 11.210. Virou `INSERT ... SELECT ... GROUP BY`, agregado no banco. | correção antes da task 23 (2026-09-11) |
 | `W9` | **O histórico do client está atribuído ao item errado.** O livro chega com o nome do item; o histórico, com o `AlbionId` numérico resolvido pelo `Index` do `items.json` do dataset. Em `market_scan`, de 440 varreduras de histórico com uma de livro a menos de 90 s na mesma cidade, só 43 são do mesmo item; o preço médio do histórico fica 22× o de mercado na mediana. Provável reordenação de índices do jogo depois da revisão `5cf2e8e9`. Com a regra "o client vence" da task 23, o bloco errado segura o certo da API pública. | task 28 |
 | `W10` | **A taxa da estação entrava como zero em 153 das 172 poções.** A derivação do valor do item (task 18) desistia quando um ingrediente não tinha valor — o extrato arcano, em toda poção encantada, e as partes de animal raro, em 8 tipos inteiros. Medido na estação do alquimista a 320 por 100 de nutrição: Poção de Cura T4.1 custou 432 e Poção de Fúria T4, 230 — exatamente os ingredientes com valor, com o resto contando zero. A mesma regra deu valor a 303 capas de facção, bolsas e montarias, que também cobravam zero. | task 13 |
+| `W11` | **O volume por dia chegava à tela até 2 h depois do upload.** `GET /prices/sales` lê só o diário, refeito de hora em hora; o frontend guardava a resposta 1 h e ignorava o foco. Medido ao vivo: séries do client que chegaram antes do rollup das 03:00 batiam em 836/836 dias, as que chegaram depois divergiam em 84/110. | task 29 |
 | `W2` | **Encantamento da saída tem duas fontes.** O servidor usa `recipe["enchantment_level"]` (coluna); o cliente derivava do sufixo `@N` do nome. Coincidem no dado real, mas o modo de falha seria silencioso — combo inexistente virando "sem preço". | task 06 |
