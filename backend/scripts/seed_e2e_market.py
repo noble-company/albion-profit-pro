@@ -19,10 +19,11 @@ Uso (a partir de ``backend/``, com a stack de ``docker-compose.yml`` no ar e as 
 aplicadas)::
 
     uv run python -m scripts.seed_e2e_market --realm west --reset
-    uv run python -m scripts.seed_e2e_market --rebuild-ranking --realm west
 
 ``--reset`` apaga ``market_order`` do realm antes de semear (idempotência dura).
-``--rebuild-ranking`` só reconstrói ``recipe_ranking`` (síncrono, sem Celery) e sai.
+
+O antigo ``--rebuild-ranking`` saiu com o ranking materializado (task 4/15): as telas de
+produção calculam no navegador sobre ``/prices/snapshot`` e não precisam de passo extra.
 """
 
 import argparse
@@ -39,7 +40,6 @@ from src.cache.redis_client import new_redis_client
 from src.database import create_worker_engine
 from src.ingest.schemas import MarketUploadIn
 from src.ingest.service import save_market_orders
-from src.opportunities.ranking_service import rebuild_ranking
 from src.prices.constants import AlbionServer
 from src.prices.models import MarketOrder
 
@@ -74,7 +74,7 @@ FLIP_LEGS = (
 # (receita real do dump). Preços na ordem de grandeza da economia real; margem positiva
 # deliberada pra dar uma linha lucrativa estável na tela de Refino. Ingredientes como `offer`
 # (o refino compra do book); a saída como `request` (o refino vende num pedido de compra) —
-# é o que dá preço de venda imediata e torna a receita "elegível" no rebuild.
+# é o que dá preço de venda imediata à receita.
 REFINING_LEGS = (
     # (ItemTypeId, EnchantmentLevel, LocationId, AuctionType, UnitPrice no fio, Amount, source_id)
     ("T4_FIBER", 0, "3005", "offer", 130 * 10_000, 5_000, 990_000_010),
@@ -167,22 +167,11 @@ def _refining_payload() -> dict:
     return {"Orders": orders}
 
 
-async def _seed(realm: str, reset: bool, rebuild_ranking_only: bool) -> None:
+async def _seed(realm: str, reset: bool) -> None:
     engine = create_worker_engine()
     sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
     redis = new_redis_client()
     try:
-        if rebuild_ranking_only:
-            async with sessionmaker() as session:
-                run = await rebuild_ranking(session, realm)
-            log.info(
-                "e2e_market.ranking_reconstruido",
-                realm=realm,
-                avaliadas=run.evaluated_recipes,
-                precificadas=run.priced_recipes,
-            )
-            return
-
         if reset:
             async with sessionmaker() as session:
                 await session.execute(delete(MarketOrder).where(MarketOrder.server_id == realm))
@@ -214,13 +203,8 @@ def main() -> None:
         choices=[s.value for s in AlbionServer],
     )
     parser.add_argument("--reset", action="store_true", help="apaga market_order do realm antes")
-    parser.add_argument(
-        "--rebuild-ranking",
-        action="store_true",
-        help="só reconstrói recipe_ranking do realm (síncrono, sem Celery) e sai",
-    )
     args = parser.parse_args()
-    asyncio.run(_seed(args.realm, args.reset, args.rebuild_ranking))
+    asyncio.run(_seed(args.realm, args.reset))
 
 
 if __name__ == "__main__":

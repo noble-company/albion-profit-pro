@@ -54,7 +54,6 @@ jobs:
           uv run alembic upgrade head
           uv run python -m scripts.seed_static_data
           uv run python -m scripts.seed_e2e_market --realm west --reset
-          uv run python -m scripts.seed_e2e_market --rebuild-ranking --realm west
           docker compose exec -T redis redis-cli FLUSHALL
 
       - name: Start the API
