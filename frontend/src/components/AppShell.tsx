@@ -18,6 +18,7 @@ import {
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
+import { ESCALAS, useEscala, type Escala } from '@/app/escala'
 import { REALMS, useServer, type Realm } from '@/app/ServerContext'
 import { useTheme, type Theme } from '@/app/ThemeContext'
 import { useAuth } from '@/auth/useAuth'
@@ -153,6 +154,25 @@ function ThemeSelect({ className }: { className?: string }) {
   )
 }
 
+/** Tamanho da interface inteira — ver `EscalaContext` (pedido no uso, 2026-09-12). */
+function EscalaSelect({ className }: { className?: string }) {
+  const { escala, setEscala } = useEscala()
+  return (
+    <Select value={String(escala)} onValueChange={(value) => setEscala(Number(value) as Escala)}>
+      <SelectTrigger aria-label="Tamanho" className={className ?? 'h-9 w-full'}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {ESCALAS.map((opcao) => (
+          <SelectItem key={opcao} value={String(opcao)}>
+            {opcao === 100 ? 'Tamanho normal' : `Tamanho ${opcao}%`}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 /** Coluna da esquerda: **só navegação** e contexto de conta. Filtros vivem à direita. */
 function NavColumn({
   collapsed,
@@ -179,6 +199,7 @@ function NavColumn({
           <>
             <RealmSelect />
             <ThemeSelect />
+            <EscalaSelect />
           </>
         )}
         <Button

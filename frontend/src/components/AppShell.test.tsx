@@ -50,6 +50,8 @@ test('servidor e tema são alcançáveis nos dois breakpoints', () => {
   const sidebar = document.querySelector('aside')!
   expect(within(sidebar).getByRole('combobox', { name: 'Servidor' })).toBeInTheDocument()
   expect(within(sidebar).getByRole('combobox', { name: 'Tema' })).toBeInTheDocument()
+  // Pedido no uso (2026-09-12): aumentar a interface inteira fica junto do tema.
+  expect(within(sidebar).getByRole('combobox', { name: 'Tamanho' })).toBeInTheDocument()
 
   // Fora da sidebar (barra mobile), sem depender de abrir o Sheet.
   expect(screen.getAllByRole('combobox', { name: 'Servidor' })).toHaveLength(2)

@@ -1,5 +1,5 @@
 import { ItemImage } from '@/components/ItemImage'
-import { formatarNomeCurto } from '@/lib/formatters'
+import { partesDoNomeCurto } from '@/lib/formatters'
 import { formatPercent, formatQuantity, formatSilver, type Money } from '@/lib/money'
 
 import { CardDeCompra } from './CardDeCompra'
@@ -64,16 +64,25 @@ export function buildColumns(
       header: 'Item',
       sortField: 'tier',
       width: 'minmax(12rem, 1.2fr)',
-      cell: (row, item) => (
-        <span className="flex min-w-0 items-center gap-2">
-          <ItemImage uniqueName={row.outputItem} size={64} className="size-7 shrink-0" />
-          {/* O nome já traz o `T4.2`, para recurso e equipamento. Sem selo de qualidade: não há
-              controle de qualidade na barra, e a tabela inteira diria "Normal" em toda linha. */}
-          <span className="truncate font-medium">
-            {formatarNomeCurto(item?.name_pt ?? item?.name_en, row.outputItem)}
+      cell: (row, item) => {
+        const { nome, grau } = partesDoNomeCurto(item?.name_pt ?? item?.name_en, row.outputItem)
+        return (
+          <span className="flex min-w-0 items-center gap-2">
+            <ItemImage uniqueName={row.outputItem} size={64} className="size-9 shrink-0" />
+            {/* Pedido no uso (2026-09-12): o grau colado no fim era cortado junto com o nome.
+                Nome em até 2 linhas, grau embaixo; o nome inteiro fica no hover. Sem selo de
+                qualidade: não há controle de qualidade na barra, e toda linha diria "Normal". */}
+            <span className="flex min-w-0 flex-col leading-tight">
+              <span className="line-clamp-2 font-medium" title={grau ? `${nome} ${grau}` : nome}>
+                {nome}
+              </span>
+              {grau && (
+                <span className="text-xs tabular-nums text-foreground-subtle">{grau}</span>
+              )}
+            </span>
           </span>
-        </span>
-      ),
+        )
+      },
     },
     {
       key: 'investimento',

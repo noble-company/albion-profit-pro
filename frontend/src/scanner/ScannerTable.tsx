@@ -1,10 +1,12 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, ChevronRight, Inbox } from 'lucide-react'
-import { Fragment, useCallback, useMemo, useRef, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 
 import type { components } from '@/api/schema'
+import { useEscalaAtual } from '@/app/escala'
 import { EstadoVazio } from '@/components/ui/states'
 
+import { ALTURA_DA_LINHA_REM, remEmPx } from './altura'
 import type { ScannerRow } from './engine'
 import { CAMPOS_ESTRUTURAIS, type SortField, type SortState } from './sorting'
 
@@ -15,8 +17,9 @@ import { CAMPOS_ESTRUTURAIS, type SortField, type SortState } from './sorting'
  * vira o universo, e ordenar/filtrar sobre ela mente (`F08`). O conjunto inteiro fica em
  * memória, já calculado; só as ~30 linhas visíveis existem no DOM.
  *
- * Densidade e hierarquia seguem `docs/13-linguagem-visual.md` §1-2: linha de 44 px, número à
- * direita com `tabular-nums`, cabeçalho fixo, lucro e ROI com peso primário.
+ * Densidade e hierarquia seguem `docs/13-linguagem-visual.md` §1-2: número à direita com
+ * `tabular-nums`, cabeçalho fixo, lucro e ROI com peso primário. A linha é a exceção da §1:
+ * `3.5rem`, para o nome em 2 linhas com o grau embaixo.
  */
 
 type CatalogItem = components['schemas']['CatalogItemOut']
@@ -37,7 +40,8 @@ export interface ScannerColumn {
   cell: (row: ScannerRow, item: CatalogItem | undefined) => ReactNode
 }
 
-const ROW_HEIGHT = 44 // `h-11` da §1
+/** O cabeçalho continua numa linha só — `h-11` da §1. A linha mora em `altura.ts`. */
+const ALTURA_DO_CABECALHO_REM = 2.75
 const OVERSCAN = 8
 
 /**
@@ -109,7 +113,7 @@ export function ScannerTable({
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => remEmPx(ALTURA_DA_LINHA_REM),
     getItemKey,
     overscan: OVERSCAN,
     // Retângulo de partida, antes da primeira medição real: sem ele o primeiro frame sai com
@@ -117,6 +121,13 @@ export function ScannerTable({
     // renderiza linha nenhuma de qualquer jeito; ver ScannerTable.test.tsx.)
     initialRect: { width: 1200, height: 600 },
   })
+
+  // Trocar o Tamanho muda a altura de toda linha, inclusive das que o virtualizador ainda não
+  // mediu e guardou pela estimativa antiga.
+  const escala = useEscalaAtual()
+  useEffect(() => {
+    virtualizer.measure()
+  }, [escala, virtualizer])
 
   const gridTemplate = useMemo(
     () => columns.map((column) => column.width).join(' '),
@@ -159,7 +170,7 @@ export function ScannerTable({
           <div
             role="row"
             className="sticky top-0 z-20 grid items-center gap-2 border-b border-border bg-surface-raised px-3 text-xs font-semibold uppercase tracking-wide text-foreground-subtle"
-            style={{ gridTemplateColumns: gridTemplate, height: ROW_HEIGHT }}
+            style={{ gridTemplateColumns: gridTemplate, height: `${ALTURA_DO_CABECALHO_REM}rem` }}
           >
             {columns.map((column, index) => {
               const alvos =
@@ -242,7 +253,10 @@ export function ScannerTable({
                     className={`group grid w-full items-center gap-2 border-b border-border/60 px-3 text-sm transition-colors hover:bg-surface-raised ${
                       semPreco ? 'text-foreground-subtle' : 'text-foreground'
                     } ${aberta ? 'bg-surface-raised' : ''}`}
-                    style={{ gridTemplateColumns: gridTemplate, height: ROW_HEIGHT }}
+                    style={{
+                      gridTemplateColumns: gridTemplate,
+                      height: `${ALTURA_DA_LINHA_REM}rem`,
+                    }}
                   >
                     {columns.map((column, index) => (
                       <div
@@ -276,9 +290,10 @@ export function ScannerTable({
                                 />
                               </button>
                             )}
-                            {/* O `truncate` desce para cá porque a célula virou flex por causa
-                                do chevron; numa flexbox ele precisa de um filho que encolha. */}
-                            <span className="min-w-0 flex-1 truncate">
+                            {/* Sem `truncate` aqui: ele forçava uma linha só, e o nome agora
+                                quebra em até 2 (pedido no uso, 2026-09-12). Quem corta é a
+                                própria célula, com `line-clamp-2`; `min-w-0` deixa encolher. */}
+                            <span className="min-w-0 flex-1">
                               {column.cell(row, item)}
                             </span>
                           </>

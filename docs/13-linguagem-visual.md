@@ -21,7 +21,7 @@ O produto é um scanner de mercado: a tabela **é** a tela principal, não um an
 
 | Decisão | Valor |
 |---|---|
-| Altura de linha | `h-11` (44px) — compacta o bastante pra caber ~15 linhas numa tela de laptop sem parecer espremida; nunca `p-4` (16px) em toda célula como hoje, que empurra a tabela pra fora da dobra com 8 linhas. |
+| Altura de linha | `h-11` (44px) — compacta o bastante pra caber ~15 linhas numa tela de laptop sem parecer espremida; nunca `p-4` (16px) em toda célula como hoje, que empurra a tabela pra fora da dobra com 8 linhas. **Exceção no scanner (2026-09-12, pedido no uso):** a linha tem `3.5rem` (56 px no tamanho normal) — o nome do item quebra em até 2 linhas com o grau (`T4.1`) embaixo, porque colado no fim do nome o grau era cortado junto com ele. A altura é em `rem` para acompanhar o seletor **Tamanho** da barra (100–170%), que muda o `font-size` da raiz. O cabeçalho continua em `h-11`. |
 | Padding de célula | `px-3 py-2` (não `p-4`). |
 | Alinhamento | Texto (item, cidade, modo) à **esquerda**. Todo número (preço, taxa, quantidade, lucro, ROI) à **direita**, com `tabular-nums` — dígitos alinham entre linhas, o olho lê a coluna, não a linha. |
 | Largura de coluna | Cada coluna numérica tem `min-width` fixo calculado pelo maior valor plausível (ex.: preço até 8 dígitos + separador), não `auto`. Colunas de texto (`item`, `cidade`) crescem. |

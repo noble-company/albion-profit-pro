@@ -147,6 +147,33 @@ describe('as 8 colunas (task 20)', () => {
   })
 })
 
+describe('item (pedido no uso, 2026-09-12)', () => {
+  const elmo = {
+    unique_name: 'T4_HEAD_PLATE_SET1@1',
+    name_pt: 'Elmo de Soldado do Adepto',
+    tier: 4,
+  } as CatalogItem
+
+  test('o grau sai do nome e fica embaixo dele, num elemento próprio', () => {
+    renderCell('item', row({ outputItem: 'T4_HEAD_PLATE_SET1@1' }), elmo)
+
+    const nome = screen.getByText('Elmo de Soldado')
+    const grau = screen.getByText('T4.1')
+    expect(nome).not.toBe(grau)
+    expect(nome).not.toHaveTextContent('T4')
+  })
+
+  test('nome longo quebra em até 2 linhas em vez de sumir com reticências', () => {
+    renderCell('item', row({ outputItem: 'T4_HEAD_PLATE_SET1@1' }), elmo)
+
+    const nome = screen.getByText('Elmo de Soldado')
+    expect(nome).toHaveClass('line-clamp-2')
+    expect(nome).not.toHaveClass('truncate')
+    // Se passar de 2 linhas, o nome inteiro continua no hover.
+    expect(nome).toHaveAttribute('title', 'Elmo de Soldado T4.1')
+  })
+})
+
 describe('lucro', () => {
   test('prata e percentual na mesma célula', () => {
     renderCell('lucro', row())

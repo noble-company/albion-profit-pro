@@ -29,14 +29,37 @@ export function formatarNomeItem(
   name: string | null | undefined,
   uniqueName: string,
 ) {
-  const base = (name || uniqueName).replace(
-    / do (Novato|Adepto|Perito|Mestre|Ancião)$/i,
-    '',
-  )
+  return juntarNome(partesDoNomeItem(name, uniqueName))
+}
+
+/**
+ * Nome e grau (`T4.1`) separados (pedido no uso, 2026-09-12). Colado no fim do nome, o grau era
+ * cortado junto com ele — "Elmo de Soldado T..." escondia o que distingue uma linha da outra. A
+ * tabela mostra o grau embaixo; o resto do app continua com o nome inteiro, montado daqui.
+ */
+export interface NomeEmPartes {
+  nome: string
+  /** `null` = o código não tem tier (`UNIQUE_…`) */
+  grau: string | null
+}
+
+function juntarNome({ nome, grau }: NomeEmPartes): string {
+  return grau ? `${nome} ${grau}` : nome
+}
+
+function grauDe(tier: string, enchantment: string | undefined): string {
+  return `T${tier}${enchantment && Number(enchantment) > 0 ? `.${enchantment}` : ''}`
+}
+
+export function partesDoNomeItem(
+  name: string | null | undefined,
+  uniqueName: string,
+): NomeEmPartes {
+  const nome = (name || uniqueName).replace(/ do (Novato|Adepto|Perito|Mestre|Ancião)$/i, '')
   const match = uniqueName.match(/^T(\d+)(?:_[^@]+)?(?:@(\d+))?$/i)
-  if (!match) return base
+  if (!match) return { nome, grau: null }
   const [, tier, enchantment] = match
-  return `${base} T${tier}${enchantment && Number(enchantment) > 0 ? `.${enchantment}` : ''}`
+  return { nome, grau: grauDe(tier!, enchantment) }
 }
 
 /**
@@ -72,13 +95,21 @@ export function formatarNomeCurto(
   name: string | null | undefined,
   uniqueName: string,
 ) {
+  return juntarNome(partesDoNomeCurto(name, uniqueName))
+}
+
+/** `formatarNomeCurto` em partes — a coluna Item da tabela mostra o grau embaixo do nome. */
+export function partesDoNomeCurto(
+  name: string | null | undefined,
+  uniqueName: string,
+): NomeEmPartes {
   const match = uniqueName.match(/^T(\d+)_([A-Z]+)(?:_LEVEL\d+)?(?:@(\d+))?$/i)
   const familia = match?.[2]
   const curto = familia ? RECURSO_CURTO[familia.toUpperCase()] : undefined
-  if (!match || !curto) return formatarNomeItem(name, uniqueName)
+  if (!match || !curto) return partesDoNomeItem(name, uniqueName)
 
   const [, tier, , enchantment] = match
-  return `${curto} T${tier}${enchantment && Number(enchantment) > 0 ? `.${enchantment}` : ''}`
+  return { nome: curto, grau: grauDe(tier!, enchantment) }
 }
 
 export function formatarQualidade(value: number | null | undefined) {

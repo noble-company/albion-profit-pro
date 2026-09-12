@@ -5,7 +5,50 @@ import {
   formatarNomeItem,
   formatarPct,
   formatarSilver,
+  partesDoNomeCurto,
 } from './formatters'
+
+describe('nome e grau separados (pedido no uso, 2026-09-12)', () => {
+  // O tier colado no fim do nome era cortado junto com ele: "Elmo de Soldado T..." escondia
+  // exatamente o que distingue uma linha da outra. A tabela mostra o grau embaixo do nome.
+  it('equipamento: o nome do jogo sem o tier, e o grau à parte', () => {
+    expect(partesDoNomeCurto('Espada Larga do Adepto', 'T4_2H_CLAYMORE@1')).toEqual({
+      nome: 'Espada Larga',
+      grau: 'T4.1',
+    })
+    expect(partesDoNomeCurto('Sopa de Cenoura', 'T3_MEAL_SOUP')).toEqual({
+      nome: 'Sopa de Cenoura',
+      grau: 'T3',
+    })
+  })
+
+  it('recurso continua curto', () => {
+    expect(partesDoNomeCurto('Minério de Titânio Excepcional', 'T5_ORE_LEVEL3@3')).toEqual({
+      nome: 'Minério',
+      grau: 'T5.3',
+    })
+  })
+
+  it('item sem tier no código não inventa grau', () => {
+    expect(partesDoNomeCurto('Smoking de Casamento', 'UNIQUE_ARMOR_VANITY_WEDDING_TUXEDO')).toEqual({
+      nome: 'Smoking de Casamento',
+      grau: null,
+    })
+  })
+
+  it('juntar as partes dá exatamente o nome curto de antes — ordenação e busca não mudam', () => {
+    for (const [nome, codigo] of [
+      ['Espada Larga do Adepto', 'T4_2H_CLAYMORE@1'],
+      ['Minério de Titânio Excepcional', 'T5_ORE_LEVEL3@3'],
+      ['Smoking de Casamento', 'UNIQUE_ARMOR_VANITY_WEDDING_TUXEDO'],
+    ] as const) {
+      const partes = partesDoNomeCurto(nome, codigo)
+      expect([partes.nome, partes.grau].filter(Boolean).join(' ')).toBe(
+        formatarNomeCurto(nome, codigo),
+      )
+    }
+  })
+})
 
 describe('nome curto de recurso', () => {
   // O jogador lê "Minério T5.3" mais rápido do que "Minério de Titânio Excepcional T5.3", e a

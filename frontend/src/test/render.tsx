@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router'
 
 import { createQueryClient } from '@/api/query'
 import { AuthProvider } from '@/auth/AuthContext'
+import { EscalaProvider } from '@/app/EscalaContext'
 import { ServerProvider } from '@/app/ServerContext'
 import { ThemeProvider } from '@/app/ThemeContext'
 import { ToastProvider } from '@/components/ui/ToastProvider'
@@ -18,15 +19,17 @@ function makeProviders(initialEntries: string[]) {
     return (
       <QueryClientProvider client={client}>
         <ThemeProvider>
-          <ServerProvider>
-            <ToastProvider>
-              <AuthProvider>
-                <MemoryRouter initialEntries={initialEntries}>
-                  {children}
-                </MemoryRouter>
-              </AuthProvider>
-            </ToastProvider>
-          </ServerProvider>
+          <EscalaProvider>
+            <ServerProvider>
+              <ToastProvider>
+                <AuthProvider>
+                  <MemoryRouter initialEntries={initialEntries}>
+                    {children}
+                  </MemoryRouter>
+                </AuthProvider>
+              </ToastProvider>
+            </ServerProvider>
+          </EscalaProvider>
         </ThemeProvider>
       </QueryClientProvider>
     )
