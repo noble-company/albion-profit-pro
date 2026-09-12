@@ -8,13 +8,14 @@ import { createContext, useContext } from 'react'
  * propósito (bordas de 1 px) fica igual, como deve.
  *
  * Opções em vez de um valor fixo: a 170% a tabela pede rolagem lateral numa tela de laptop, e quem
- * joga em monitor grande pode querer mais que quem joga no notebook.
+ * joga em monitor grande pode querer mais que quem joga no notebook. 200% e 220% entraram depois
+ * de testar os 170% ("aumentar o zoom em mais 50%").
  *
  * Fora de `EscalaContext.tsx` porque arquivo de componente que também exporta constante ou hook
  * perde o *fast refresh* do Vite (`react-refresh/only-export-components`) — o mesmo motivo de
  * `scanner/tela.ts`.
  */
-export const ESCALAS = [100, 115, 130, 150, 170] as const
+export const ESCALAS = [100, 115, 130, 150, 170, 200, 220] as const
 export type Escala = (typeof ESCALAS)[number]
 
 export type EscalaContextValue = {

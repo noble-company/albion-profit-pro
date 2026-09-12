@@ -28,11 +28,13 @@ afterEach(() => {
 })
 
 describe('tamanho da interface', () => {
-  test('nasce em 100% e oferece até 170%', () => {
+  test('nasce em 100% e oferece até 220%', () => {
     const { result } = renderHook(() => useEscala(), { wrapper })
 
     expect(result.current.escala).toBe(100)
     expect(ESCALAS).toContain(170)
+    // Pedido no uso, depois de testar os 170%: "aumentar o zoom em mais 50%".
+    expect(Math.max(...ESCALAS)).toBe(220)
     expect(document.documentElement.style.fontSize).toBe('100%')
   })
 
