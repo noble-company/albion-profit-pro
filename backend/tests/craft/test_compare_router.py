@@ -8,6 +8,7 @@ from src.craft.compare_service import compare_craft
 from src.craft.schemas import CraftCompareRequest
 from src.database import engine as db_engine
 from src.items.models import Item, Location
+from src.items.service import list_eligible_craft_locations
 from src.prices.models import MarketOrder
 from src.recipes.models import Recipe, RecipeIngredient
 
@@ -258,17 +259,32 @@ async def test_selected_order_modes_use_correct_sides_and_fees(
     assert direct["warnings"] == ["ordem_nao_garantida"]
 
 
+async def _compare_counting_selects(db_session, request, user_id):
+    selects: list[str] = []
+
+    def _on_execute(conn, cursor, statement, parameters, context, executemany):
+        if "SELECT" in statement.upper():
+            selects.append(statement)
+
+    event.listen(db_engine.sync_engine, "before_cursor_execute", _on_execute)
+    try:
+        result = await compare_craft(db_session, request, user_id)
+    finally:
+        event.remove(db_engine.sync_engine, "before_cursor_execute", _on_execute)
+    return result, selects
+
+
 async def test_compare_query_count_does_not_grow_with_city_count(db_session, usuario) -> None:
+    """Mede antes e depois de somar 12 cidades, em vez de fixar números.
+
+    Os dois números fixos que havia aqui envelheceram: a contagem de cidades (12) quebrou quando a
+    migration `f2d7e8f9a0b1` deixou o `1301` de Lymhurst gravado como cidade, e o teto de 6 SELECTs
+    quando a task 4/18 somou `get_item_values` — uma consulta para a família toda, não por cidade.
+    A medida de base precisa de uma cidade: sem nenhuma, cobertura e livro retornam antes de
+    consultar.
+    """
     await _seed_chain(db_session)
-    for index in range(12):
-        db_session.add(
-            Location(
-                location_id=str(10_000 + index),
-                name=f"Cidade {index}",
-                kind="city",
-                is_royal_city=False,
-            )
-        )
+    db_session.add(Location(location_id="1002", name="Lymhurst", kind="city", is_royal_city=True))
     await db_session.commit()
     request = CraftCompareRequest.model_validate(
         _payload(
@@ -281,18 +297,22 @@ async def test_compare_query_count_does_not_grow_with_city_count(db_session, usu
             }
         )
     )
-    selects = []
+    cidades_antes = len(await list_eligible_craft_locations(db_session))
+    _, selects_antes = await _compare_counting_selects(db_session, request, usuario.id)
 
-    def _on_execute(conn, cursor, statement, parameters, context, executemany):
-        if "SELECT" in statement.upper():
-            selects.append(statement)
+    for index in range(12):
+        db_session.add(
+            Location(
+                location_id=str(10_000 + index),
+                name=f"Cidade {index}",
+                kind="city",
+                is_royal_city=False,
+            )
+        )
+    await db_session.commit()
+    result, selects = await _compare_counting_selects(db_session, request, usuario.id)
 
-    event.listen(db_engine.sync_engine, "before_cursor_execute", _on_execute)
-    try:
-        result = await compare_craft(db_session, request, usuario.id)
-    finally:
-        event.remove(db_engine.sync_engine, "before_cursor_execute", _on_execute)
-
-    assert len(result["ranked_cities"]) == 12
-    # city list + item + recipe family + selectin ingredients + coverage + book levels
-    assert len(selects) <= 6
+    assert len(result["ranked_cities"]) == cidades_antes + 12
+    assert len(selects) == len(selects_antes), [
+        " ".join(s.split("FROM", 1)[-1].split())[:90] for s in selects
+    ]
