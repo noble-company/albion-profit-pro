@@ -43,9 +43,12 @@ export function EstadoVazio({
 export function EstadoErro({
   title = 'Não foi possível carregar',
   onRetry,
+  children,
 }: {
   title?: string
   onRetry?: () => void
+  /** Uma frase explicando a limitação, no tom da §5 de docs/13-linguagem-visual.md. */
+  children?: ReactNode
 }) {
   return (
     <Card role="alert" className="border-destructive/40 bg-destructive/10">
@@ -55,11 +58,14 @@ export function EstadoErro({
           {title}
         </CardTitle>
       </CardHeader>
-      {onRetry && (
-        <CardContent>
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            Tentar novamente
-          </Button>
+      {(children || onRetry) && (
+        <CardContent className="space-y-3">
+          {children && <p className="text-sm text-foreground-muted">{children}</p>}
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              Tentar novamente
+            </Button>
+          )}
         </CardContent>
       )}
     </Card>

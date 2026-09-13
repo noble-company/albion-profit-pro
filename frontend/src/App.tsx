@@ -7,7 +7,7 @@ import { AppShell } from '@/components/AppShell'
 import { Carregando } from '@/components/ui/states'
 
 // Code splitting de verdade (task 3.5/25, F11): cada rota de tela vira um chunk próprio,
-// carregado sob demanda. `/refino` e `/craft` compartilham o chunk de `production-pages`.
+// carregado sob demanda.
 const MarketFlipPage = lazy(() =>
   import('@/opportunities/pages').then((m) => ({ default: m.MarketFlipPage })),
 )
@@ -20,15 +20,23 @@ const ItemPricesPage = lazy(() =>
 const CalculadoraPage = lazy(() =>
   import('@/craft/pages').then((m) => ({ default: m.CalculadoraPage })),
 )
-const RefiningRankingPage = lazy(() =>
-  import('@/opportunities/production-pages').then((m) => ({
-    default: m.RefiningRankingPage,
+const RefiningScannerPage = lazy(() =>
+  import('@/scanner/ScannerPage').then((m) => ({
+    default: m.RefiningScannerPage,
   })),
 )
-const CraftingRankingPage = lazy(() =>
-  import('@/opportunities/production-pages').then((m) => ({
-    default: m.CraftingRankingPage,
+const CraftingScannerPage = lazy(() =>
+  import('./scanner/ScannerPage').then((m) => ({
+    default: m.CraftingScannerPage,
   })),
+)
+const ConsumablesScannerPage = lazy(() =>
+  import('./scanner/ScannerPage').then((m) => ({
+    default: m.ConsumablesScannerPage,
+  })),
+)
+const DestinyBoardPage = lazy(() =>
+  import('./destiny/DestinyBoardPage').then((m) => ({ default: m.DestinyBoardPage })),
 )
 const TokensPage = lazy(() =>
   import('@/tokens/pages').then((m) => ({ default: m.TokensPage })),
@@ -84,6 +92,14 @@ export function App() {
             }
           />
           <Route
+            path="/painel"
+            element={
+              <Boundary>
+                <DestinyBoardPage />
+              </Boundary>
+            }
+          />
+          <Route
             path="/calculadora"
             element={
               <Boundary>
@@ -95,7 +111,7 @@ export function App() {
             path="/refino"
             element={
               <Boundary>
-                <RefiningRankingPage />
+                <RefiningScannerPage />
               </Boundary>
             }
           />
@@ -103,7 +119,15 @@ export function App() {
             path="/craft"
             element={
               <Boundary>
-                <CraftingRankingPage />
+                <CraftingScannerPage />
+              </Boundary>
+            }
+          />
+          <Route
+            path="/consumiveis"
+            element={
+              <Boundary>
+                <ConsumablesScannerPage />
               </Boundary>
             }
           />

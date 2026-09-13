@@ -1,7 +1,9 @@
 import Decimal from 'decimal.js'
 
+import { NUTRITION_FEE_BASIS, NUTRITION_PER_ITEM_VALUE } from './craft-constants'
 import {
   ceilToInteger,
+  divide,
   money,
   percentageCharge,
   type Money,
@@ -136,6 +138,39 @@ export function calculateFocusConsumed(
 }
 
 /** `ceil(base × taxa)` — cada cobrança percentual arredondada para cima isoladamente. */
+/**
+ * Prata cobrada pela estação por `executions` execuções — espelho de `calculate_station_fee`.
+ *
+ * O jogo **não** cobra um valor fixo por execução: cobra por nutrição consumida, e a nutrição
+ * sai do valor do item (`nutrição = itemValue × 0,1125`). Um recurso T4 e uma arma T8 diferem
+ * por três ordens de grandeza, então nenhum número fixo por execução pode estar certo nos dois.
+ *
+ * Ingrediente sem valor já chega somado como zero (task 4/13, medido na estação), então
+ * `itemValue` nulo sobra só para item sem valor publicado **e** sem receita — os fogos de
+ * artifício, que não têm ingrediente. Cobrar uma taxa inventada ali seria pior que não cobrar.
+ */
+export function calculateStationFee(
+  itemValue: MoneyInput | null,
+  feePer100Nutrition: MoneyInput,
+  executions: number,
+): Money {
+  const fee = money(feePer100Nutrition)
+  if (fee.isNegative()) {
+    throw new RangeError('fee_per_100_nutrition deve ser não-negativo')
+  }
+  if (itemValue === null || executions <= 0) return money(0)
+
+  const valor = money(itemValue)
+  if (valor.isNegative()) {
+    throw new RangeError('item_value deve ser não-negativo')
+  }
+  return valor
+    .times(NUTRITION_PER_ITEM_VALUE)
+    .times(fee)
+    .dividedBy(NUTRITION_FEE_BASIS)
+    .times(executions)
+}
+
 export function calculatePercentageCharge(
   base: MoneyInput,
   rate: MoneyInput,
@@ -197,7 +232,7 @@ export function calculateFinancialResult(
   const profit = net.minus(cost)
   return {
     profit,
-    profitPerUnit: profit.div(producedQuantity),
-    roi: cost.isZero() ? null : profit.div(cost),
+    profitPerUnit: divide(profit, producedQuantity),
+    roi: cost.isZero() ? null : divide(profit, cost),
   }
 }

@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 
+import type { components } from '@/api/schema'
 import { useLocations } from '@/prices/hooks'
+
+type LocationOut = components['schemas']['LocationOut']
 
 /**
  * Fonte única do nome de uma cidade: a tabela `location` no backend, via `/locations`
@@ -24,28 +27,68 @@ export function useLocationName(): (
   }, [locations])
 }
 
-export type MarketToggle = { name: string; ids: string[] }
+export interface Cidade {
+  /** id canônico do grupo — o menor id, escolha estável; é ele que vira a linha da tabela */
+  id: string
+  name: string
+  /** todos os mercados que **são** a mesma cidade */
+  ids: string[]
+}
+
+export type MarketToggle = Cidade
 
 /**
- * Cidades para os botões de filtro do Market Flip, agrupadas por nome — o caso Lymhurst
- * (`1002` mercado principal + `1301` cluster do portal) tem os dois IDs com o mesmo `name`
- * no banco, então o agrupamento vem do dado, não de uma lista no componente. Ordem = a que
- * o `/locations` já devolve (cidade real primeiro, depois nome).
+ * Agrupa mercados que são a mesma cidade (task 4/11.2.2).
+ *
+ * Lymhurst tem dois `location_id` na tabela `location` (`1002` e `1301`, ver a migração
+ * `f2d7e8f9a0b1`) com o mesmo nome. Tratá-los como mercados distintos duplica a cidade no
+ * filtro e, pior, deixa o preço capturado num deles invisível no outro.
+ *
+ * O agrupamento é **pelo nome vindo do banco**, não por uma lista no cliente: nome igual, mesma
+ * cidade. É isso que mantém o Black Market (`3003`) separado de Caerleon (`3005`) — nomes
+ * diferentes, livros diferentes, preços diferentes.
+ *
+ * `somenteNomeadas` descarta id sem nome. O ingest cria linha em `location` para todo id
+ * desconhecido que aparece numa captura (`4000`, por exemplo); como chip de filtro isso vira um
+ * botão chamado "4000", que não é cidade nenhuma que o jogador possa escolher.
+ */
+export function agruparCidades(
+  locations: LocationOut[],
+  somenteNomeadas = false,
+): Cidade[] {
+  const byName = new Map<string, Cidade>()
+  for (const loc of locations) {
+    if (loc.kind !== 'city') continue
+    if (somenteNomeadas && !loc.name) continue
+    const existing = byName.get(loc.display_name)
+    if (existing) {
+      existing.ids = [...existing.ids, loc.location_id].sort()
+      existing.id = existing.ids[0] as string
+    } else {
+      byName.set(loc.display_name, {
+        id: loc.location_id,
+        name: loc.display_name,
+        ids: [loc.location_id],
+      })
+    }
+  }
+  return [...byName.values()]
+}
+
+/**
+ * Cidades para os botões de filtro do Market Flip. Ordem = a que o `/locations` já devolve
+ * (cidade real primeiro, depois nome).
  */
 export function useMarketToggles(): MarketToggle[] {
   const locations = useLocations()
-  return useMemo(() => {
-    const byName = new Map<string, MarketToggle>()
-    for (const loc of locations) {
-      if (loc.kind !== 'city') continue
-      const existing = byName.get(loc.display_name)
-      if (existing) existing.ids.push(loc.location_id)
-      else
-        byName.set(loc.display_name, {
-          name: loc.display_name,
-          ids: [loc.location_id],
-        })
-    }
-    return [...byName.values()]
-  }, [locations])
+  return useMemo(() => agruparCidades(locations), [locations])
+}
+
+/**
+ * Cidades para o scanner: só as que têm nome, cada uma com todos os seus mercados. O `useMemo`
+ * não é cosmético — sem ele a lista nasce nova a cada render e o scanner inteiro recalcula.
+ */
+export function useCidades(): Cidade[] {
+  const locations = useLocations()
+  return useMemo(() => agruparCidades(locations, true), [locations])
 }

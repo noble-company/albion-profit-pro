@@ -12,7 +12,7 @@ from src.prices.models import MarketOrder, MarketScan
 from src.recipes.models import Recipe, RecipeIngredient
 
 
-def _item(unique_name: str, albion_id: int) -> Item:
+def _item(unique_name: str, albion_id: int, item_value: str | None = None) -> Item:
     return Item(
         unique_name=unique_name,
         albion_id=albion_id,
@@ -20,6 +20,7 @@ def _item(unique_name: str, albion_id: int) -> Item:
         name_en=unique_name,
         tier=2,
         enchantment_level=0,
+        item_value=Decimal(item_value) if item_value else None,
         busca_normalizada=unique_name.casefold(),
     )
 
@@ -28,13 +29,15 @@ async def _seed_recipe(
     db_session,
     *,
     output_item: str = "T2_CLOTH",
-    ingredients: list[tuple[str, int]] | None = None,
+    # `(nome, quantidade)` ou `(nome, quantidade, retorna)` — a marca do dump (task 4/26).
+    ingredients: list[tuple] | None = None,
     amount_crafted: int = 1,
     silver_cost: int = 0,
     crafting_focus: int = 18,
+    item_value: str | None = None,
 ) -> None:
     ingredients = ingredients or [("T2_FIBER", 1)]
-    db_session.add(_item(output_item, 900_000))
+    db_session.add(_item(output_item, 900_000, item_value))
     recipe = Recipe(
         output_item_unique_name=output_item,
         output_item_id=900_000,
@@ -43,9 +46,11 @@ async def _seed_recipe(
         crafting_focus=crafting_focus,
         craft_time=Decimal("0"),
     )
-    for position, (unique_name, count) in enumerate(ingredients):
+    for position, (unique_name, count, *marca) in enumerate(ingredients):
         item_id = 900_001 + position
         db_session.add(_item(unique_name, item_id))
+        # Só passa a marca quando o teste declara: os outros testes continuam no padrão da coluna.
+        extra = {"return_eligible": marca[0]} if marca else {}
         recipe.ingredients.append(
             RecipeIngredient(
                 ingredient_unique_name=unique_name,
@@ -53,6 +58,7 @@ async def _seed_recipe(
                 count=count,
                 enchantment_level=0,
                 position=position,
+                **extra,
             )
         )
     db_session.add(recipe)
@@ -103,7 +109,7 @@ def _payload(**overrides) -> dict:
         "quantity": 8,
         "location_id": "1002",
         "return_rate": "0",
-        "station_cost_per_execution": "3",
+        "station_fee_per_100_nutrition": "3",
         "use_focus": True,
         "premium": True,
     }
@@ -139,7 +145,9 @@ async def test_simulate_contract_is_published_in_openapi(client) -> None:
 async def test_four_scenarios_use_slippage_and_correct_fees(
     cliente_autenticado, db_session
 ) -> None:
-    await _seed_recipe(db_session)
+    # `@itemvalue` real do T2_CLOTH. Sem ele a estação não cobra nada e o teste deixaria de
+    # exercitar a taxa que o nome dele promete (task 4/18).
+    await _seed_recipe(db_session, item_value="4")
     db_session.add_all(
         [
             _order("T2_FIBER", "offer", "100", 5),
@@ -151,7 +159,9 @@ async def test_four_scenarios_use_slippage_and_correct_fees(
     )
     await db_session.commit()
 
-    response = await cliente_autenticado.post("/craft/simulate", json=_payload())
+    response = await cliente_autenticado.post(
+        "/craft/simulate", json=_payload(station_fee_per_100_nutrition="500")
+    )
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -171,22 +181,22 @@ async def test_four_scenarios_use_slippage_and_correct_fees(
     assert len(body["scenarios"]) == 4
 
     immediate = _scenario(body, "immediate", "immediate")
-    assert immediate["costs"]["total_cost"] == "854.0000"
+    assert immediate["costs"]["total_cost"] == "848.0000"
     assert immediate["revenue"]["net_revenue"] == "1152.0000"
-    assert immediate["profit"] == "298.0000"
+    assert immediate["profit"] == "304.0000"
     assert immediate["warnings"] == []
 
     both_orders = _scenario(body, "buy_order", "sell_order")
     assert both_orders["costs"]["ingredient_cost"] == "720.0000"
     assert both_orders["costs"]["acquisition_setup_fee"] == "18"
-    assert both_orders["costs"]["total_cost"] == "762.0000"
+    assert both_orders["costs"]["total_cost"] == "756.0000"
     assert both_orders["revenue"] == {
         "gross_revenue": "1280.0000",
         "sales_tax": "52",
         "sale_setup_fee": "32",
         "net_revenue": "1196.0000",
     }
-    assert both_orders["profit"] == "434.0000"
+    assert both_orders["profit"] == "440.0000"
     assert both_orders["warnings"] == ["ordem_nao_garantida"]
 
 
@@ -225,6 +235,69 @@ async def test_amount_crafted_return_focus_and_explicit_return_exception(
     assert artefact["purchase_quantity"] == 6
 
 
+# --- Quem retorna vem da receita (task 4/26) ---
+
+_PRECOS_NA_MAO = {
+    "T2_FIBER": {"offer": "10", "request": "9"},
+    "T2_ARTEFACT": {"offer": "20", "request": "18"},
+    "T2_CLOTH": {"offer": "30", "request": "28"},
+}
+
+
+async def _artefato_da_receita(cliente_autenticado, db_session, **pedido) -> tuple[dict, dict]:
+    # 3 execuções; a fibra consome 9 e o artefato 6. Com 50% de retorno, o artefato elegível
+    # compraria 3 — é a diferença que os testes abaixo olham.
+    await _seed_recipe(
+        db_session,
+        amount_crafted=5,
+        ingredients=[("T2_FIBER", 3), ("T2_ARTEFACT", 2, False)],
+    )
+    response = await cliente_autenticado.post(
+        "/craft/simulate",
+        json=_payload(quantity=11, return_rate="0.5", manual_prices=_PRECOS_NA_MAO, **pedido),
+    )
+    assert response.status_code == 200, response.text
+    fibra, artefato = response.json()["ingredients"]
+    return fibra, artefato
+
+
+async def test_quem_nao_retorna_vem_da_receita_sem_o_pedido_dizer(cliente_autenticado, db_session):
+    """O dump marca o artefato com `@maxreturnamount="0"`. Antes, o `simulate_craft` supunha que
+    tudo retornava e só o override do pedido corrigia — e nenhuma tela manda o override."""
+    fibra, artefato = await _artefato_da_receita(cliente_autenticado, db_session)
+
+    assert fibra["return_eligible"] is True
+    assert fibra["purchase_quantity"] == 5  # 9 × 0,5 = 4,5 → 5
+    assert artefato["return_eligible"] is False
+    assert artefato["purchase_quantity"] == 6
+
+
+async def test_override_so_de_qualidade_nao_devolve_o_retorno_ao_artefato(
+    cliente_autenticado, db_session
+):
+    """`IngredientOverride.return_eligible` tinha padrão `True`: mandar só a qualidade de um
+    ingrediente reescreveria a marca da receita e daria desconto de retorno ao artefato."""
+    _, artefato = await _artefato_da_receita(
+        cliente_autenticado,
+        db_session,
+        ingredient_overrides={"T2_ARTEFACT": {"quality_level": 1}},
+    )
+
+    assert artefato["return_eligible"] is False
+    assert artefato["purchase_quantity"] == 6
+
+
+async def test_override_explicito_continua_vencendo_a_receita(cliente_autenticado, db_session):
+    _, artefato = await _artefato_da_receita(
+        cliente_autenticado,
+        db_session,
+        ingredient_overrides={"T2_ARTEFACT": {"return_eligible": True}},
+    )
+
+    assert artefato["return_eligible"] is True
+    assert artefato["purchase_quantity"] == 3
+
+
 async def test_zero_rate_overrides_are_honored(cliente_autenticado, db_session) -> None:
     await _seed_recipe(db_session)
     payload = _payload(
@@ -251,7 +324,7 @@ async def test_full_return_needs_no_ingredient_price(cliente_autenticado, db_ses
     await _seed_recipe(db_session)
     payload = _payload(
         return_rate="1",
-        station_cost_per_execution="0",
+        station_fee_per_100_nutrition="0",
         manual_prices={"T2_CLOTH": {"offer": "20", "request": "19"}},
     )
 
@@ -466,3 +539,46 @@ async def test_query_count_does_not_grow_with_ingredient_count(db_session, usuar
 
     assert len(result["ingredients"]) == 12
     assert len(selects) <= 5
+
+
+async def test_taxa_da_estacao_sai_da_nutricao_e_nao_de_prata_fixa(
+    cliente_autenticado, db_session
+) -> None:
+    """Task 4/18. A estação cobra por **nutrição consumida**, não por execução.
+
+    O número de referência veio da estação aberta no jogo: taxa de uso 390 por 100 de nutrição
+    refinando um item de valor 64 custa 28 — e não 390. Sem isto a tela cobrava a taxa cheia por
+    execução, o que num recurso T4 dava 56× a mais e numa arma T8, 9× a menos.
+    """
+    await _seed_recipe(db_session, item_value="64")
+    db_session.add_all(
+        [
+            _order("900001", "offer", "10", 1_000),
+            _order("900000", "request", "500", 1_000),
+        ]
+    )
+    await db_session.commit()
+
+    payload = _payload(quantity=1, station_fee_per_100_nutrition="390")
+    body = (await cliente_autenticado.post("/craft/simulate", json=payload)).json()
+
+    # 64 × 0,1125 = 7,2 de nutrição; 7,2 × 390/100 = 28,08.
+    assert body["scenarios"][0]["costs"]["station_cost"] == "28.08"
+
+
+async def test_sem_valor_de_item_a_estacao_nao_cobra(cliente_autenticado, db_session) -> None:
+    """Os trade packs de facção não têm valor em ponto nenhum da cadeia. Cobrar uma taxa
+    arbitrária ali inventaria custo para uma linha que ninguém consegue vender."""
+    await _seed_recipe(db_session, item_value=None)
+    db_session.add_all(
+        [
+            _order("900001", "offer", "10", 1_000),
+            _order("900000", "request", "500", 1_000),
+        ]
+    )
+    await db_session.commit()
+
+    payload = _payload(quantity=1, station_fee_per_100_nutrition="390")
+    body = (await cliente_autenticado.post("/craft/simulate", json=payload)).json()
+
+    assert body["scenarios"][0]["costs"]["station_cost"] == "0"

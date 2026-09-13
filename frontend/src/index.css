@@ -1,6 +1,13 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* O texto pequeno das legendas (11 px). Era `text-[0.6875rem]` escrito à mão, que não passa por
+   variável e não acompanharia o Tamanho do conteúdo. */
+@theme {
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: calc(1 / 0.6875);
+}
+
 /* Nenhuma classe dark: existe hoje em src/, mas a variante fica pronta caso
    surja: casa com qualquer tema resolvido que não seja explicitamente claro
    (padrão = escuro), acompanhando o mecanismo de data-theme da task 13. */
@@ -149,6 +156,26 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+}
+
+/* Tamanho do conteúdo central (pedido no uso, 2026-09-12: "aumenta só o conteúdo da tabela, não
+   de tudo"). O Tailwind v4 escreve espaçamento como `calc(var(--spacing) * n)` e texto como
+   `var(--text-sm)`: redefinir as variáveis aqui escala tudo o que está dentro do `main` — e as
+   barras laterais, fora dele, ficam como estão. `--escala` vem do seletor Tamanho (1 a 2,2).
+   O line-height de cada tamanho é uma razão sem unidade e acompanha sozinho. `@utility`, e não
+   uma regra de classe: `index.css` só tem tokens, base e at-rules (`no-color-literals.test.ts`). */
+@utility escala-do-conteudo {
+  --spacing: calc(0.25rem * var(--escala, 1));
+  --text-2xs: calc(0.6875rem * var(--escala, 1));
+  --text-xs: calc(0.75rem * var(--escala, 1));
+  --text-sm: calc(0.875rem * var(--escala, 1));
+  --text-base: calc(1rem * var(--escala, 1));
+  --text-lg: calc(1.125rem * var(--escala, 1));
+  --text-xl: calc(1.25rem * var(--escala, 1));
+  --text-2xl: calc(1.5rem * var(--escala, 1));
+  --text-3xl: calc(1.875rem * var(--escala, 1));
+  --text-4xl: calc(2.25rem * var(--escala, 1));
+  font-size: calc(1rem * var(--escala, 1));
 }
 
 button,

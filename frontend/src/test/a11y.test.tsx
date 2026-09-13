@@ -8,7 +8,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest'
 import { CalculadoraPage } from '@/craft/pages'
 import { BuscaItem } from '@/items/pages'
 import { MarketFlipPage } from '@/opportunities/pages'
-import { RefiningRankingPage } from '@/opportunities/production-pages'
+import { RefiningScannerPage } from '@/scanner/ScannerPage'
 import { ItemPricesPage } from '@/prices/pages'
 import { TokensPage } from '@/tokens/pages'
 
@@ -28,22 +28,6 @@ const EMPTY_FLIP = {
   limit: 25,
   offset: 0,
 }
-const EMPTY_RANKING = {
-  server: 'west',
-  kind: 'refining',
-  opportunities: [],
-  total: 0,
-  limit: 25,
-  offset: 0,
-  coverage: {
-    evaluated_recipes: 0,
-    priced_recipes: 0,
-    total_recipes: 0,
-    computed_at: null,
-    stale: true,
-  },
-}
-
 beforeEach(() => {
   localStorage.clear()
   localStorage.setItem('albion-profit-pro:realm', 'west')
@@ -55,9 +39,6 @@ beforeEach(() => {
     http.get('http://localhost:8000/items/search', () => HttpResponse.json([])),
     http.get('http://localhost:8000/opportunities/flips', () =>
       HttpResponse.json(EMPTY_FLIP),
-    ),
-    http.get('http://localhost:8000/opportunities/refining', () =>
-      HttpResponse.json(EMPTY_RANKING),
     ),
     http.get('http://localhost:8000/items/:item/prices', () =>
       HttpResponse.json({
@@ -115,14 +96,18 @@ test('Market Flip — sem violação séria (axe)', async () => {
 })
 
 test('Refino — sem violação séria (axe)', async () => {
+  // Passou a apontar para a tela do scanner na task 4/15: a antiga foi apagada junto com o
+  // ranking materializado. O título é o mesmo, e a cobertura de acessibilidade continua na
+  // tela que o usuário de fato abre.
   await expectNoSeriousViolations(
-    <RefiningRankingPage />,
+    <RefiningScannerPage />,
     /O que vale a pena refinar/,
   )
 })
 
 test('Calculadora — sem violação séria (axe)', async () => {
-  await expectNoSeriousViolations(<CalculadoraPage />, /Calculadora de craft/)
+  // Task 4/14: a Calculadora abre pedindo o item, e o cálculo acontece ao escolher.
+  await expectNoSeriousViolations(<CalculadoraPage />, /Escolha um item/)
 })
 
 test('Busca — sem violação séria (axe)', async () => {

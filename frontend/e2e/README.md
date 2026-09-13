@@ -36,16 +36,13 @@ uv run python -m scripts.seed_static_data
 # 3. Mercado determinístico da E2E (não sobe worker Celery — usa o caminho de escrita do ingest)
 uv run python -m scripts.seed_e2e_market --realm west --reset
 
-# 4. Ranking de produção materializado para as telas de Refino/Craft (síncrono, sem beat)
-uv run python -m scripts.seed_e2e_market --rebuild-ranking --realm west
-
-# 5. Cache de leitura tem TTL de ~30s; limpar evita servir uma resposta pré-seed
+# 4. Cache de leitura tem TTL de ~30s; limpar evita servir uma resposta pré-seed
 docker compose exec redis redis-cli FLUSHALL
 
-# 6. API real (CORS já cobre a origem do preview em ENVIRONMENT=development)
+# 5. API real (CORS já cobre a origem do preview em ENVIRONMENT=development)
 uv run uvicorn src.main:app --host 127.0.0.1 --port 8000 &
 
-# 7. E2E — o playwright.config.ts faz `npm run build && npm run preview` sozinho
+# 6. E2E — o playwright.config.ts faz `npm run build && npm run preview` sozinho
 cd ../frontend && npm run test:e2e
 ```
 
@@ -54,7 +51,7 @@ Parar tudo: `kill %1` (uvicorn) e `cd backend && docker compose down -v`.
 ## Notas
 
 - **Windows:** o worker Celery em prefork estoura `WinError 5` (`W9`). Esta suíte não sobe
-  worker nenhum — o seed de mercado e o rebuild do ranking rodam síncronos por script.
+  worker nenhum — o seed de mercado roda síncrono por script.
 - **`seed_e2e_market.py`** desloca o `Expires` dos fixtures reais 14 dias pra frente a cada
   execução, então o dado nunca vence entre rodadas. O cenário de flip
   (`T4_FIBER_LEVEL3@3`, Fort Sterling → Caerleon, ROI 32%) tem preço na ordem de grandeza

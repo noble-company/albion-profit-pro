@@ -8,6 +8,7 @@ from sqlalchemy import (
     Numeric,
     String,
     UniqueConstraint,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -94,5 +95,9 @@ class RecipeIngredient(Base):
     count: Mapped[int]  # @count
     enchantment_level: Mapped[int] = mapped_column(default=0)  # @enchantmentlevel
     position: Mapped[int]  # ordem original de craftresource no dump (base zero)
+    # Falso para o que o jogo não devolve no retorno de recurso — artefato, cristal, token, capa
+    # base: `@maxreturnamount="0"` no dump (task 4/26). Por linha, não por item: o mesmo item
+    # pode retornar numa receita e não em outra.
+    return_eligible: Mapped[bool] = mapped_column(default=True, server_default=true())
 
     recipe: Mapped["Recipe"] = relationship(back_populates="ingredients")

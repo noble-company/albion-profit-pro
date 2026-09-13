@@ -2,6 +2,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, text
 from starlette.datastructures import Headers
@@ -12,14 +13,17 @@ from src.api_tokens.router import client_router
 from src.api_tokens.router import router as api_tokens_router
 from src.auth.router import router as auth_router
 from src.cache.redis_client import get_redis
+from src.catalog.router import router as catalog_router
 from src.config import get_settings
 from src.craft.router import router as craft_router
 from src.database import async_session_maker
+from src.destiny.router import router as destiny_router
 from src.ingest.router import router as ingest_router
 from src.items.router import router as items_router
 from src.logging_config import configure_logging
 from src.opportunities.router import router as opportunities_router
 from src.prices.router import router as prices_router
+from src.prices.router import snapshot_router as prices_snapshot_router
 from src.readiness import check_rabbitmq
 from src.recipes.router import router as recipes_router
 from src.static_data.models import StaticDatasetVersion
@@ -54,6 +58,9 @@ class ValidarContentLengthMiddleware:
 app = FastAPI(title="Albion Profit Pro API")
 app.add_middleware(RequestBodyLimitMiddleware, max_body_size=MAX_CONTENT_LENGTH)
 app.add_middleware(ValidarContentLengthMiddleware)
+# O catálogo de receitas (task 4/02) é a maior resposta do produto — ~1 MB cru, e o cliente
+# baixa o conjunto inteiro de propósito. `minimum_size` deixa as respostas pequenas em paz.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -76,6 +83,9 @@ app.include_router(recipes_router)
 # Rotas estáticas de catálogo precisam vir antes de `prices_router`, cujo prefixo contém
 # parâmetros dinâmicos em `/items/{item_id}/...`.
 app.include_router(items_router)
+app.include_router(catalog_router)
+app.include_router(destiny_router)
+app.include_router(prices_snapshot_router)
 app.include_router(prices_router)
 app.include_router(craft_router)
 app.include_router(opportunities_router)

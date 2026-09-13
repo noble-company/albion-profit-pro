@@ -19,11 +19,15 @@
 | [11-formulas-de-craft.md](11-formulas-de-craft.md) | Contrato numérico da calculadora: produção, retorno, foco, taxas, quatro cenários, resultado financeiro e cadeia de upgrades. |
 | [12-revisao-fase-3.md](12-revisao-fase-3.md) | **Auditoria da Fase 3** — frontend, motor de oportunidades e arquitetura de cálculo. Achados com ID estável (`A01`-`A03`, `B01`-`B11`, `F01`-`F12`, `S01`-`S06`) referenciados pelas tasks da Fase 3.5, e as decisões de arquitetura tomadas em 2026-08-30 (divisão do cálculo, reconstrução do frontend, antifraude adiada). |
 | [13-linguagem-visual.md](13-linguagem-visual.md) | **Linguagem visual do produto** — densidade e leitura de tabela, hierarquia da informação, vocabulário de estado, sinalização de confiança, iconografia/microcópia e layout do shell. Decidido antes do bloco de reconstrução das telas (tasks 20-24 da Fase 3.5); prova viva em `/estilo` no app. |
+| [14-revisao-fase-3-5.md](14-revisao-fase-3-5.md) | **Auditoria da Fase 3.5** — feita a partir da execução real dos gates (suítes, build, aritmética reproduzida), não de leitura de código. Achados com ID estável (`E01`-`E11`, `P01`-`P09`) referenciados pelas tasks da Fase 3.6, e as decisões tomadas em 2026-09-06 (defeito de usuário na frente, task 19 é implementação, Fase 4 não começa aqui). A Fase 4 substituiu a 3.6 em 2026-09-07; o destino de cada task está na [herança da 3.6](tasks/scanner/README.md#herança-da-fase-36). |
+| [15-arquitetura-do-scanner.md](15-arquitetura-do-scanner.md) | **Arquitetura do scanner (Fase 4)** — o servidor serve dado, o navegador calcula: fluxo de preços (nosso client + API pública do Albion Data Project), contratos de `/catalog/recipes`, `/prices/snapshot`, `/prices/sales` e `/craft/simulate`, o engine no navegador, as telas, os limites conhecidos e o índice dos achados `W1`-`W11`. |
 | [tasks/backend/](tasks/backend/README.md) | Microetapas do backend. **Fase 1 (01-22) ✅ completa** e **Fase 1.5 (23-36) ✅ completa** (correções e remodelagem derivadas dos documentos 03 e 04). Uma task por arquivo, com objetivo, racional, o que implementar, dependências e testes. Os checklists de status são a fonte de verdade do que está pronto. |
 | [tasks/client/](tasks/client/README.md) | Microetapas da **Fase 2 (client Go) ✅ completa** — autenticação/destino de ingest, UX de localização e validação com o jogo real. |
 | [tasks/estabilizacao/](tasks/estabilizacao/README.md) | Microetapas da **Fase 2.5 ✅ completa, 14/14** — estabilização transversal concluída. |
 | [tasks/frontend/](tasks/frontend/README.md) | Microetapas da **Fase 3 — 18/19** — entrega o scanner de oportunidades Market Flip, Refino e Craft. A task 18 (resiliência + E2E) foi entregue pela Fase 3.5/27; a 19 é o gate final, executado depois da Fase 3.5. |
 | [tasks/refatoracao/](tasks/refatoracao/README.md) | Microetapas da **Fase 3.5 ✅ 28/29** — refatoração derivada do documento `12`: corrige os motores de oportunidade, instala o design system que nunca foi instalado, move a camada "e se" para o cliente e entrega a suíte E2E. Só a task 10 (antifraude, `S01`) segue aberta, adiada por decisão de produto. |
+| [tasks/correcoes/](tasks/correcoes/README.md) | Microetapas da **Fase 3.6 — substituída pela Fase 4** — correções derivadas do documento `14`. As telas que ela corrigiria foram reescritas; **seguem valendo** 05, 06, 08, 09, 10, 13, 14, 15 e 17, e são o próximo passo — a 13 (serving/deploy do frontend) e a 14 (systray) primeiro, porque destravam o gate final da task 3/19. |
+| [tasks/scanner/](tasks/scanner/README.md) | Microetapas da **Fase 4 (scanner) ✅ 38/38** — o servidor serve dado e o navegador calcula: catálogo inteiro sem depender de preço, topo de livro com a API pública, engine no navegador, telas de Refino, Craft, Comida & Poções e Calculadora. Arquitetura no documento `15`. |
 
 > A extensão transversal [20 — snapshots e preços atuais](tasks/frontend/20-snapshot-precos-atuais.md)
 > adiciona 11 tasks à Fase 3 para garantir que todas as telas usem somente a coleta mais recente.
@@ -37,4 +41,5 @@
   originais das tasks 10, 11, 15, 17 e 18.
 - Achado novo sobre o protocolo do jogo vai pro `03` (se for medido) ou pro `01` (se for sobre o
   funcionamento do client). Achado sobre nosso próprio código vai para a revisão vigente (`04`
-  para Fase 1; `05` para Fases 0-2) e vira task.
+  para Fase 1; `05` para Fases 0-2; `12` para a Fase 3; `14` para a Fase 3.5; a tabela de achados
+  de [tasks/scanner/](tasks/scanner/README.md#achados-da-fase) para a Fase 4) e vira task.

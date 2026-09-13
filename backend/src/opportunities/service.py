@@ -7,10 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.craft import constants
 from src.items.models import Item
 from src.items.normalization import normalize_item_search
-from src.opportunities.ranking_service import read_recipe_ranking
-from src.opportunities.schemas import OpportunityOut, RankingCoverage
+from src.opportunities.schemas import OpportunityOut
 from src.opportunities.sorting import apply_order
-from src.prices.constants import AlbionServer
 from src.prices.models import MarketOrder
 from src.prices.policy import get_market_book_policy
 from src.prices.service import LATEST_OBSERVATION_TOLERANCE
@@ -286,56 +284,3 @@ async def flip_opportunities(
         for row in rows
     ]
     return results, total
-
-
-async def recipe_opportunities(
-    session: AsyncSession,
-    server: AlbionServer,
-    *,
-    kind: str,
-    locations: list[str],
-    tier: int | None,
-    enchantment: int | None,
-    limit: int,
-    offset: int,
-    min_profit: Decimal | None,
-    min_roi: Decimal | None,
-    quality: int | None = None,
-    max_age_hours: int | None = None,
-    require_complete: bool = False,
-    return_rate: Decimal = Decimal("0"),
-    station_cost_per_execution: Decimal = Decimal("0"),
-    use_focus: bool = False,
-    premium: bool = True,
-    item_id: str | None = None,
-    sort: str = "profit",
-    direction: str = "desc",
-) -> tuple[list[OpportunityOut], int, RankingCoverage]:
-    """Serve /opportunities/refining and /crafting from the materialized ranking (B02).
-
-    Filtering, ordering and pagination run in PostgreSQL over ``recipe_ranking``; premium, tax,
-    return and station are a cheap projection over the page. The exact per-item recompute stays
-    in ``POST /craft/simulate``. The ranking is rebuilt by ``opportunities.rebuild_recipe_ranking``.
-    """
-    return await read_recipe_ranking(
-        session,
-        server.value,
-        kind=kind,
-        locations=locations,
-        tier=tier,
-        enchantment=enchantment,
-        limit=limit,
-        offset=offset,
-        min_profit=min_profit,
-        min_roi=min_roi,
-        quality=quality,
-        max_age_hours=max_age_hours,
-        require_complete=require_complete,
-        return_rate=return_rate,
-        station_cost_per_execution=station_cost_per_execution,
-        use_focus=use_focus,
-        premium=premium,
-        item_id=item_id,
-        sort=sort,
-        direction=direction,
-    )

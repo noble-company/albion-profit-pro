@@ -9,12 +9,17 @@ import { expect, test } from 'vitest'
 //
 // Nota: o "e se" do cliente (task 23) reordena localmente por desenho — ali o conjunto em
 // memória é o universo relevante. Não são os arquivos cobertos aqui.
+//
+// Task 4/10: o scanner (`src/scanner/`) também fica de fora, e pelo motivo oposto — lá o
+// conjunto inteiro está em memória e ordenar localmente é o único jeito correto. A regressão
+// perigosa dele é a inversa (reintroduzir paginação), coberta por
+// `src/test/scanner-nao-pagina.test.ts`.
+//
+// Task 4/15: `production-pages.tsx` saiu da lista porque foi apagada com o ranking
+// materializado. As duas que sobraram continuam paginadas pelo servidor, e para elas o
+// invariante é o mesmo de sempre.
 
-const PAGED_FILES = [
-  '/src/opportunities/pages.tsx',
-  '/src/opportunities/production-pages.tsx',
-  '/src/prices/pages.tsx',
-]
+const PAGED_FILES = ['/src/opportunities/pages.tsx', '/src/prices/pages.tsx']
 
 const sources: Record<string, string> = import.meta.glob('/src/**/*.tsx', {
   query: '?raw',

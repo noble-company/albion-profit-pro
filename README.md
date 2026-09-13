@@ -4,31 +4,36 @@ Plataforma própria para calcular lucro de crafting e refino no Albion Online a 
 coletados pelo jogador no mercado do jogo.
 
 > [!WARNING]
-> O projeto está na **Fase 3.5** (refatoração). Backend, coleta e frontend funcionam ponta a
-> ponta; a suíte E2E roda contra a stack real. Falta o gate final (task 19 da Fase 3): a
-> validação integrada em jogo (Albion + Npcap + systray + Swarm/Traefik reais). O client não
-> deve ser distribuído amplamente até lá. `S06` (catálogo sem login) e a antifraude de
-> mercado (`S01`) são decisões conscientemente adiadas para o pré-lançamento.
+> A **Fase 4 (scanner) está concluída, 38/38**: Refino, Craft, Comida & Poções e Calculadora
+> calculam no navegador sobre o catálogo inteiro, com preço do nosso client e da API pública do
+> Albion Data Project ([`docs/15-arquitetura-do-scanner.md`](docs/15-arquitetura-do-scanner.md)).
+> Ela substituiu a Fase 3.6. Falta o que destrava o gate final — serving/deploy do frontend e o
+> item "Abrir Calculadora" no systray (tasks 3.6/13 e 3.6/14) — e então a validação integrada em
+> jogo (task 19 da Fase 3: Albion + Npcap + systray + Swarm/Traefik reais). O client não deve ser
+> distribuído amplamente até lá. `S06` (catálogo sem login) e a antifraude de mercado (`S01`) são
+> decisões conscientemente adiadas para o pré-lançamento.
 
 ## Arquitetura
 
 ```text
-Albion Online
-    │ tráfego local do mercado
+Albion Online                                  Albion Data Project (API pública)
+    │ tráfego local do mercado                     │ poller Celery a cada 10 min
+    ▼                                              │
+albiondata-client (Go + Npcap)                     │
+    │ POST autenticado                             ▼
     ▼
-albiondata-client (Go + Npcap)
-    │ POST autenticado
+FastAPI ──► RabbitMQ ──► Celery worker ──► PostgreSQL ──► Redis (cache descartável)
+    │
+    │ catálogo, topo de livro e volume de vendas (dado, não resposta)
     ▼
-FastAPI ──► RabbitMQ ──► Celery worker ──► PostgreSQL
-                                            │
-                                            └──► Redis (cache descartável)
+Navegador (React) — o engine calcula lucro, ROI e lista de compras de todas as receitas
 ```
 
 | Diretório | Responsabilidade | Estado |
 |---|---|---|
 | `albiondata-client/` | Captura preços do tráfego local e envia ao backend | Fase 2 e estabilização concluídas |
-| `backend/` | Auth, ingest, preços, receitas, filas e persistência | Fases 1, 1.5, 2.5 e o bloco de backend da 3.5 concluídos (350 testes) |
-| `frontend/` | SPA de oportunidades (Market Flip, Refino, Craft, Calculadora, Preços) | Fase 3.5 concluída — 200 testes unitários + suíte E2E Playwright; falta só o gate em jogo |
+| `backend/` | Auth, ingest, catálogo, preços, histórico, poller da API pública, filas e persistência | Fases 1, 1.5, 2.5, o backend da 3.5 e o da Fase 4 concluídos (462 testes) |
+| `frontend/` | Scanner de Refino, Craft, Comida & Poções e Calculadora (engine no navegador), Market Flip, Preços, Painel do Destino | Fase 4 concluída — 565 testes unitários + suíte E2E Playwright; falta o gate em jogo |
 | `docs/` | Decisões, contratos, auditorias e specs executáveis | Fonte de verdade do projeto |
 
 PostgreSQL é a fonte de verdade. Redis é somente cache e pode ser esvaziado sem perda de dados.
@@ -59,7 +64,7 @@ de seed baixa a revisão imutável registrada em `backend/datasets/` e valida ta
 contagens. Para trabalhar offline, obtenha os arquivos antecipadamente:
 
 ```powershell
-$dumpRevision = '5cf2e8e9b7021f98683181fa5b0e3c64575978e4'
+$dumpRevision = '0be6a5e74f30fc1312118be3d017f3832f027cef'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/formatted/items.json" -OutFile 'items.json'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/items.json" -OutFile 'ITEM DUMP.json'
 Invoke-WebRequest "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/$dumpRevision/formatted/world.json" -OutFile 'world.json'
@@ -162,8 +167,18 @@ prejudica comparações futuras. Patches próprios devem continuar marcados com
   o design system foi de fato instalado; a camada "e se" roda no cliente; a suíte E2E Playwright
   roda contra API + PostgreSQL + Redis reais. O desfecho de cada achado da revisão está em
   [`docs/12-revisao-fase-3.md`](docs/12-revisao-fase-3.md#desfecho-dos-achados-2026-09-06).
+- **Fase 4 (scanner): concluída, 38/38 tasks** — o servidor serve dado (catálogo, topo de livro,
+  histórico) e o navegador calcula; nenhuma receita some por falta de preço, todo filtro responde
+  sem requisição, e a API pública do Albion Data Project cobre o que o client não viu. Substituiu
+  a Fase 3.6. Arquitetura em
+  [`docs/15-arquitetura-do-scanner.md`](docs/15-arquitetura-do-scanner.md); tasks em
+  [`docs/tasks/scanner/`](docs/tasks/scanner/README.md).
+- **Próximo:** as tasks da Fase 3.6 que seguem valendo
+  ([`docs/tasks/correcoes/`](docs/tasks/correcoes/README.md)) — a 13 (serving/deploy do frontend,
+  que não existe) e a 14 (item "Abrir Calculadora" no systray) primeiro, depois 05, 06, 08, 09, 10,
+  15 e 17.
 - **Falta o gate final:** o ensaio integrado com Albion/Npcap, systray, domínio e Swarm reais
-  (task 19 da Fase 3), executado após a Fase 3.5 para validar a jornada inteira de uma vez.
+  (task 19 da Fase 3), executado depois delas para validar a jornada inteira de uma vez.
 - **Adiado conscientemente:** antifraude de mercado (`S01`), JWT em cookie `httpOnly` (`S03`),
   catálogo sem login (`S06`) — todos pré-requisitos de lançamento público, não de uso interno.
 - West, East e Europe estão isolados no wire autenticado, persistência, cache e leitura desde a
@@ -176,7 +191,7 @@ prejudica comparações futuras. Patches próprios devem continuar marcados com
   precisa ser adaptado às redes, secrets e labels reais do Swarm/Traefik.
 
 O plano, os contratos medidos e os checklists ficam em [`docs/README.md`](docs/README.md). A
-prioridade atual é o gate final (task 19). O gate automatizado da fase é
+prioridade atual são as tasks 3.6/13 e 3.6/14, que destravam o gate final (task 19). O gate automatizado da fase é
 `python scripts/verify_repository.py` mais os workflows `backend-ci`, `frontend-ci` e
 `frontend-e2e`; o procedimento do fechamento da 2.5 está em
 [`docs/10-gate-final-fase-2-5.md`](docs/10-gate-final-fase-2-5.md).

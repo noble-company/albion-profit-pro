@@ -6,9 +6,7 @@ import type { components } from '@/api/schema'
 import {
   getCategories,
   getFlipOpportunities,
-  getProductionOpportunities,
   type OpportunityQuery,
-  type ProductionKind,
 } from './service'
 
 /**
@@ -44,23 +42,3 @@ export function useFlipOpportunities(
   return { data: data ?? null, loading: isLoading, error }
 }
 
-export function useProductionOpportunities(
-  kind: ProductionKind,
-  server: components['schemas']['AlbionServer'] | null,
-  query: OpportunityQuery,
-  options?: { pausePolling?: boolean },
-) {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['opportunities', kind, server, query] as const,
-    queryFn: ({ signal }) => {
-      if (!server) throw new Error('Selecione um servidor')
-      return getProductionOpportunities(kind, server, query, signal)
-    },
-    enabled: server != null,
-    placeholderData: keepPreviousData,
-    refetchInterval: options?.pausePolling ? false : 30_000,
-    refetchIntervalInBackground: false,
-    ...queryPolicies.market,
-  })
-  return { data: data ?? null, loading: isLoading, error }
-}

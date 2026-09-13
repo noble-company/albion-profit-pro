@@ -80,7 +80,25 @@ arquitetura em [12-revisao-fase-3.md](12-revisao-fase-3.md#decisões-de-arquitet
 o cálculo é dividido por *o que muda* (não *onde roda*), o frontend é reconstruído por cima
 (não recomeçado), e a antifraude é adiada conscientemente para o pré-lançamento.
 
-**Fase 4 — não começou.**
+**Fase 3.6 (correções) — substituída pela Fase 4 (2026-09-07).** Derivada da auditoria
+[14-revisao-fase-3-5.md](14-revisao-fase-3-5.md), feita a partir da execução real dos gates. O
+uso real do produto mostrou que Refino e Craft precisavam de outra arquitetura, e as telas que a
+3.6 corrigiria foram reescritas — o `ErrorBoundary` (`E04`) entrou no shell novo, o formulário
+mudo da Calculadora (`E05`) deixou de existir. O destino de cada task está na
+[herança da 3.6](tasks/scanner/README.md#herança-da-fase-36): **seguem valendo** 05, 06, 08, 09,
+10, 13, 14, 15 e 17, em [tasks/correcoes/](tasks/correcoes/README.md).
+
+**Fase 4 (scanner) — ✅ concluída, 38/38 tasks.** O servidor passou a servir **dado** e o
+navegador a calcular **resposta**: catálogo inteiro sem depender de preço (`X01`), topo de livro
+alimentado pelo nosso client e pela API pública do Albion Data Project (`X06`), engine portado
+para TypeScript e travado por vetores dourados, telas de Refino, Craft, Comida & Poções e
+Calculadora. O ranking materializado foi aposentado. Arquitetura em
+[15-arquitetura-do-scanner.md](15-arquitetura-do-scanner.md); execução em
+[tasks/scanner/](tasks/scanner/README.md).
+
+**Próximo:** as tasks 3.6/13 (serving/deploy do frontend) e 3.6/14 (systray), que destravam o gate
+19; depois as demais tasks da 3.6 que seguem valendo; então o gate. A **Fase 5** (UI embutida no
+client) vem depois.
 
 ## Contexto
 
@@ -174,7 +192,7 @@ Mudanças mínimas em `albiondata-client/`:
 1. ✅ **`client/config.go`**: novo campo `ApiToken` + flag `-token` (ou lido do `config.yaml` via viper, junto dos campos de websocket que já existem) — evita expor o token em texto puro na linha de comando do usuário final. *(task 01)*
 2. ✅ **`client/uploader_http.go`**: anexar header `Authorization: Bearer <ApiToken>` na requisição POST (hoje ela só seta `Content-Type`, ver linhas ~25-57). *(task 02 — o header vai **só** pros destinos marcados com o pseudo-esquema `http+token://`, pra não vazar o token se o `-i` tiver mais de um destino)*
 3. ✅ **Default do `-i`**: o client **deixou de contribuir com o Albion Data Project** — decisão explícita do usuário em 2026-08-23. `http+token://localhost:8000` existe somente no perfil de desenvolvimento; desde a Task 13, release sem URL oficial/config explícita inicia com upload bloqueado. *(tasks 03 e 13)*
-4. **`client/systray/*.go`**: novo item de menu "Abrir Calculadora" que abre a UI embutida (Fase 4) ou, na primeira versão mais simples, só abre o navegador padrão na URL do frontend (`os/exec` + `start`/`open` conforme o SO) — via mais rápida de entregar "interface no client" sem a complexidade de um webview nativo.
+4. **`systray/*.go`** (na raiz do fork, `albiondata-client/systray/`): novo item de menu "Abrir Calculadora" que abre a UI embutida (Fase 5) ou, na primeira versão mais simples, só abre o navegador padrão na URL do frontend (`os/exec` + `start`/`open` conforme o SO) — via mais rápida de entregar "interface no client" sem a complexidade de um webview nativo. Pendente: task 3.6/14.
 
 ### Itens adicionados pela captura ao vivo de 2026-08-22
 
@@ -244,7 +262,27 @@ de performance antes/depois em
 [12-revisao-fase-3.md](12-revisao-fase-3.md#desfecho-dos-achados-2026-09-06). As tasks `10`
 (antifraude, `S01`) e `19` (gate em jogo) ficam abertas por decisão.
 
-## Fase 4 — UI embutida no client (fast-follow, não bloqueia o MVP)
+## Fase 4 — Scanner ✅ 38/38
+
+Criada em 2026-09-07 a partir do uso real de Refino e Craft, e substituiu a Fase 3.6. **O
+servidor serve dado; o navegador calcula resposta** — a decisão nº 1 de
+[12-revisao-fase-3.md](12-revisao-fase-3.md) levada até o fim:
+
+- catálogo estático inteiro numa resposta, sem preço, com `ETag` e cache no IndexedDB;
+- `price_snapshot` com o topo de livro mais recente entre o nosso client e a API pública do
+  Albion Data Project (poller Celery a cada 10 min), servido em formato colunar e por categoria;
+- histórico de vendas das duas fontes, com o volume por dia na tela;
+- engine de craft em TypeScript (`decimal.js`), travado no `simulate_craft` por vetores dourados,
+  rodando em Web Worker no craft;
+- nenhuma receita some por falta de preço; todo filtro responde sem requisição; o "Analisar"
+  continua sendo o número exato, com o livro inteiro.
+
+Arquitetura em [15-arquitetura-do-scanner.md](15-arquitetura-do-scanner.md); ordem, status e
+achados (`X01`-`X06`, `W1`-`W11`) em [tasks/scanner/README.md](tasks/scanner/README.md).
+
+## Fase 5 — UI embutida no client (fast-follow, não bloqueia o MVP)
+
+> Era a "Fase 4" até 2026-09-07, quando o scanner ganhou esse número.
 
 Trocar o "abrir navegador" da Fase 2 por um webview nativo embutido (`github.com/webview/webview` tem bindings Go), carregando a mesma URL do frontend dentro de uma janela própria do client — reaproveita 100% do frontend, sem duplicar UI. Fica pra depois de Fases 1-3 estarem funcionando ponta a ponta.
 
@@ -252,7 +290,7 @@ Trocar o "abrir navegador" da Fase 2 por um webview nativo embutido (`github.com
 - `albiondata-client/client/uploader_http.go` — onde adicionar o header de auth
 - `albiondata-client/client/config.go` — onde adicionar o campo/flag de token
 - `albiondata-client/lib/nats.go`, `lib/market.go`, `lib/marketHistory.go` — contrato exato dos tópicos/JSON que o backend precisa replicar
-- `albiondata-client/client/systray/systray_win.go` (e variantes `_darwin`/`_others`) — onde adicionar o item de menu
+- `albiondata-client/systray/systray_win.go` (e variantes `_darwin`/`_others`) — onde adicionar o item de menu
 - `items.json` (raiz do projeto) — fonte de nomes de item pro frontend/backend
 - `ITEM DUMP.json` (raiz do projeto) — fonte de receitas de craft/refino pro backend
 
@@ -276,11 +314,16 @@ Trocar o "abrir navegador" da Fase 2 por um webview nativo embutido (`github.com
 6. ~~Fase 3 — API de craft + frontend completo~~ ✅ **18/19**, ver
    [tasks/frontend/](tasks/frontend/README.md).
 7. ~~Fase 3.5 — refatoração~~ ✅ **28/29**, ver [tasks/refatoracao/](tasks/refatoracao/README.md).
-8. **Próximo passo:** task 19 — gate integrado em jogo (Albion + Npcap + systray + Swarm/Traefik
-   reais), validando a jornada inteira de uma vez.
-9. Deploy no Swarm é materializado dentro da Fase 2.5 (seed/filas/processos) e finalizado no gate
-   19 com o frontend/Traefik, usando o padrão real do usuário.
-10. (Depois) Fase 4 — webview embutido no client.
+8. ~~Fase 3.6 — correções da revisão da 3.5~~ **substituída pela Fase 4** (2026-09-07); as tasks
+   que seguem valendo continuam em [tasks/correcoes/](tasks/correcoes/README.md).
+9. ~~Fase 4 — scanner~~ ✅ **38/38**, ver [tasks/scanner/](tasks/scanner/README.md).
+10. **Próximo passo:** tasks 3.6/13 (serving/deploy do frontend) e 3.6/14 (item "Abrir
+    Calculadora" no systray) — o gate 19 depende das duas. Depois 05, 06, 08, 09, 10, 15 e 17.
+11. Task 19 — gate integrado em jogo (Albion + Npcap + systray + Swarm/Traefik reais), validando
+    a jornada inteira de uma vez, já sobre o frontend publicado pela task 3.6/13.
+12. Deploy no Swarm é materializado dentro da Fase 2.5 (seed/filas/processos) e finalizado no gate
+    19 com o frontend/Traefik, usando o padrão real do usuário.
+13. (Depois) Fase 5 — webview embutido no client.
 
 ## Próximos passos em aberto (do mapeamento do client)
 Ficaram pendências da investigação de craft/refino em tempo real (fora do MVP, ver [01-mapeamento-albiondata-client.md](01-mapeamento-albiondata-client.md) seção 8) — não bloqueiam o MVP da calculadora baseada em mercado, mas ficam registradas pra quando entrarmos nessa fase:

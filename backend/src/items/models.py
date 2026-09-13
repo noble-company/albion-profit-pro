@@ -1,4 +1,6 @@
-from sqlalchemy import BigInteger, Boolean, String, Text, text
+from decimal import Decimal
+
+from sqlalchemy import BigInteger, Boolean, Numeric, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
@@ -27,6 +29,19 @@ class Item(Base):
     shop_subcategory: Mapped[str | None] = mapped_column(String(64))
     shop_subcategory2: Mapped[str | None] = mapped_column(String(64))
     shop_subcategory3: Mapped[str | None] = mapped_column(String(64))
+    # `@craftingcategory` do ITEM DUMP — o ramo do Painel do Destino (task 4/17). `T5_CLOTH`
+    # tem "fiber", `T5_MAIN_CURSEDSTAFF` tem "cursestaff". É a chave que liga um item ao nó de
+    # especialização que reduz o custo de foco dele. Nulo pra item que não se fabrica.
+    crafting_category: Mapped[str | None] = mapped_column(String(64))
+    # Peso em kg do ITEM DUMP (`@weight`), fonte do "lucro por peso" do scanner (task 4/01).
+    # Decimal, não float: entra na divisão `lucro / peso`, cujo resultado o usuário lê — a
+    # regra F09 vale pra toda aritmética exibida. Nulo pra item sem `@weight` no dump.
+    weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
+    # Valor do item (`@itemvalue` do dump, ou derivado da receita quando o dump não publica —
+    # ver `scripts/_item_values.py`). É a base da taxa da estação: o jogo cobra por nutrição
+    # consumida, e `nutrição = item_value × 0,1125` (task 4/18). Ingrediente sem valor conta zero,
+    # como a estação cobra (task 4/13); nulo só para item sem valor publicado e sem receita.
+    item_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
     busca_normalizada: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))
 
 

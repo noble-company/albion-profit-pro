@@ -26,7 +26,6 @@ celery_app = Celery(
     include=[
         "src.ingest.tasks",  # escrita do caminho quente
         "src.prices.tasks",  # rollups e retenção
-        "src.opportunities.tasks",  # ranking de produção materializado
         "src.quarantine.tasks",  # falhas definitivas persistidas
         "src.operations.tasks",  # observabilidade das filas
     ],
@@ -79,7 +78,6 @@ celery_app.conf.update(
         "prices.rollup_diario": {"soft_time_limit": 1800, "time_limit": 1860},
         "prices.rollup_mensal": {"soft_time_limit": 1800, "time_limit": 1860},
         "prices.poda": {"soft_time_limit": 1800, "time_limit": 1860},
-        "opportunities.rebuild_recipe_ranking": {"soft_time_limit": 540, "time_limit": 600},
     },
 )
 
@@ -99,10 +97,19 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=2, minute=30),  # diário
         "options": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
     },
-    "ranking-de-producao": {
-        "task": "opportunities.rebuild_recipe_ranking",
-        # A cada 10 min. A janela aceitável de obsolescência é 15 min (payload marca `stale`).
+    "sync-aodp": {
+        "task": "prices.sync_aodp",
+        # A cada 10 min. A API pública tem mediana de 7 h de idade, então puxar mais rápido não
+        # traria dado mais novo — traria só request gasto. A regra de precedência do snapshot
+        # garante que isto nunca sobrescreva o dado fresco do nosso client.
         "schedule": crontab(minute="*/10"),
+        "options": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
+    },
+    "sync-aodp-history": {
+        "task": "prices.sync_aodp_history",
+        # A cada 10 min, cinco minutos depois do preço: uma fatia de até 20 pedidos. A própria task
+        # decide se há varredura em andamento ou se espera o próximo bloco de 6 h (task 4/23).
+        "schedule": crontab(minute="5-59/10"),
         "options": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
     },
     "metricas-das-filas": {

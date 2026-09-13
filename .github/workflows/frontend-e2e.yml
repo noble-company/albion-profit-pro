@@ -23,7 +23,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v9
+      # Versão completa: o setup-uv só publica tags `vX.Y.Z`, sem o apelido `v9`.
+      - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: "0.11.10"
           enable-cache: true
@@ -53,7 +54,6 @@ jobs:
           uv run alembic upgrade head
           uv run python -m scripts.seed_static_data
           uv run python -m scripts.seed_e2e_market --realm west --reset
-          uv run python -m scripts.seed_e2e_market --rebuild-ranking --realm west
           docker compose exec -T redis redis-cli FLUSHALL
 
       - name: Start the API

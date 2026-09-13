@@ -25,7 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v9
+      # Versão completa: o setup-uv só publica tags `vX.Y.Z`, sem o apelido `v9` — com ele o job
+      # caía em 3 s no "Set up job" ("unable to find version v9").
+      - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: "0.11.10"
           enable-cache: true
@@ -68,7 +70,9 @@ jobs:
       JWT_SECRET: ci-secret-not-for-production-32-characters
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v9
+      # Versão completa: o setup-uv só publica tags `vX.Y.Z`, sem o apelido `v9` — com ele o job
+      # caía em 3 s no "Set up job" ("unable to find version v9").
+      - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: "0.11.10"
           enable-cache: true

@@ -15,7 +15,7 @@ albiondata-client/*-mac.zip.sha256
 
 # Python (backend)
 backend/.venv/
-backend/**/__pycache__/
+**/__pycache__/
 backend/**/*.pyc
 backend/.pytest_cache/
 backend/.ruff_cache/
@@ -64,3 +64,6 @@ albiondata-client/.secrets
 .idea/
 .DS_Store
 Thumbs.db
+
+# Agenda do Celery beat (shelve) — artefato de execução local
+celerybeat-schedule*

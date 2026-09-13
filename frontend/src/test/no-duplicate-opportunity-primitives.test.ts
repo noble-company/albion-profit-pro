@@ -4,6 +4,10 @@ import { expect, test } from 'vitest'
 // byte a byte em `opportunities/pages.tsx` e `production-pages.tsx` (1.561 linhas fazendo o
 // mesmo). Extraídos para `src/components/opportunities/` + `useOpportunityParams`. Este teste
 // impede a volta da cópia.
+//
+// Task 4/15: `production-pages.tsx` foi apagada com o ranking materializado. O guard **fica** —
+// ele varre o repositório inteiro procurando redeclaração, não só aquelas duas telas; só a
+// última asserção citava a tela por nome.
 
 const sources: Record<string, string> = import.meta.glob('/src/**/*.{ts,tsx}', {
   query: '?raw',
@@ -22,6 +26,14 @@ const CANON: Record<string, string> = {
   FilterToggle: '/src/components/opportunities/FilterPanel.tsx',
   FilterNumber: '/src/components/opportunities/FilterPanel.tsx',
   useOpportunityParams: '/src/opportunities/useOpportunityParams.ts',
+  // Primitivos verticais da sidebar (task 4/09). A família horizontal de `FilterPanel` não
+  // cabe numa coluna de 288 px, e espremer geraria a quarta cópia de `fieldLabel`.
+  FilterSearch: '/src/components/filters/index.tsx',
+  FilterChips: '/src/components/filters/index.tsx',
+  FilterCheckbox: '/src/components/filters/index.tsx',
+  FilterNumberField: '/src/components/filters/index.tsx',
+  FilterSelectField: '/src/components/filters/index.tsx',
+  FilterGroup: '/src/components/filters/index.tsx',
 }
 
 test('cada primitivo compartilhado é declarado uma única vez, no lugar canônico', () => {
@@ -38,6 +50,25 @@ test('cada primitivo compartilhado é declarado uma única vez, no lugar canôni
   expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
 })
 
+// F05 de novo, pela outra ponta: as strings de classe do campo de filtro estavam copiadas à
+// mão em `items/pages.tsx` e `prices/pages.tsx`, além do canônico. Copiar a string é copiar o
+// componente sem o nome — o guard acima não veria.
+test('as classes de campo de filtro não são recopiadas à mão', () => {
+  const offenders: string[] = []
+  const permitido = new Set([
+    '/src/components/filters/index.tsx',
+    '/src/components/opportunities/FilterPanel.tsx',
+  ])
+  for (const [path, raw] of Object.entries(sources)) {
+    if (path.endsWith('.test.ts') || path.endsWith('.test.tsx')) continue
+    if (permitido.has(path)) continue
+    const declara =
+      /\b(const|let)\s+(fieldLabel|fieldControl|filterField|filterControl)\b/
+    if (declara.test(stripComments(raw))) offenders.push(path)
+  }
+  expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
+})
+
 test('nenhum `updateParam` local sobrou nas telas de oportunidade', () => {
   const offenders: string[] = []
   for (const [path, raw] of Object.entries(sources)) {
@@ -49,12 +80,9 @@ test('nenhum `updateParam` local sobrou nas telas de oportunidade', () => {
   expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
 })
 
-test('as telas antigas não redeclaram `Kpi` / `Toggle` / `Select` locais', () => {
+test('a tela de Market Flip não redeclara `Kpi` / `Toggle` / `Select` locais', () => {
   const offenders: string[] = []
-  for (const path of [
-    '/src/opportunities/pages.tsx',
-    '/src/opportunities/production-pages.tsx',
-  ]) {
+  for (const path of ['/src/opportunities/pages.tsx']) {
     const code = stripComments(sources[path] ?? '')
     for (const name of ['Kpi', 'Toggle', 'Select']) {
       if (new RegExp(`\\bfunction\\s+${name}\\s*\\(`).test(code)) {

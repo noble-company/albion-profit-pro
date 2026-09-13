@@ -12,6 +12,7 @@ from src.craft.formulas import (
     calculate_ingredient_requirement,
     calculate_production,
     calculate_sale_revenue,
+    calculate_station_fee,
 )
 from src.craft.quotes import QuoteResult, manual_side, ordered_warnings, quote
 from src.craft.schemas import CraftSimulationRequest
@@ -153,7 +154,12 @@ async def simulate_craft(
     for ingredient in recipe["ingredients"]:
         override = request.ingredient_overrides.get(ingredient["unique_name"])
         quality_level = override.quality_level if override is not None else 1
-        return_eligible = override.return_eligible if override is not None else True
+        # A receita decide quem retorna (task 4/26); o override só vence quando diz algo.
+        return_eligible = (
+            override.return_eligible
+            if override is not None and override.return_eligible is not None
+            else ingredient["return_eligible"]
+        )
         requirement = calculate_ingredient_requirement(
             ingredient["count"],
             production.executions,
@@ -273,7 +279,9 @@ async def simulate_craft(
     )
 
     recipe_silver_cost = Decimal(recipe["silver_cost"] * production.executions)
-    station_cost = request.station_cost_per_execution * production.executions
+    station_cost = calculate_station_fee(
+        recipe["item_value"], request.station_fee_per_100_nutrition, production.executions
+    )
     scenarios = [
         _build_scenario(
             ingredient_rows,

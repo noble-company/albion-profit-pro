@@ -1,5 +1,6 @@
 import uuid
 
+import structlog
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -15,7 +16,11 @@ from src.items.service import upsert_locations
 from src.prices.constants import MarketScanSource
 from src.prices.models import MarketHistoryEntry, MarketOrder
 from src.prices.policy import get_market_book_policy
+from src.prices.rollup import BUCKET_DO_DIARIO, recalcular_diario_da_serie, tentar_lock_do_ingest
 from src.prices.service import recompute_and_cache_book, record_scans
+from src.prices.snapshot import SOURCE_CLIENT, refresh_snapshot_from_orders
+
+log = structlog.get_logger()
 
 
 async def save_market_orders(
@@ -74,13 +79,17 @@ async def save_market_orders(
                 session, server_id, uuid.UUID(user_id), MarketScanSource.BOOK, scan_combos
             )
 
-        await session.commit()
-
         # Recalcular da fonte de verdade evita tratar um lote parcial como livro completo.
         combos = {
             (o["item_id"], o["location_id"], o["quality_level"], o["enchantment_level"])
             for o in orders
         }
+        # Topo de livro para o scanner (task 4/03), na mesma transação do upsert do livro: se o
+        # `market_order` foi gravado, o snapshot que o cliente lê já reflete isso.
+        await refresh_snapshot_from_orders(session, server_id, combos)
+
+        await session.commit()
+
         await recompute_and_cache_book(
             session, redis, server_id, combos, get_market_book_policy().freshness_hours
         )
@@ -113,6 +122,7 @@ async def save_market_history(
             # SilverAmount vem do wire multiplicado por 10.000 (é o total do bucket, não o
             # unitário) — convertido uma única vez na borda do ingest.
             "silver_amount": silver_from_wire(h["silver_amount"]),
+            "source": SOURCE_CLIENT,
         }
     rows = list(rows_by_bucket.values())
     if not rows:
@@ -122,16 +132,39 @@ async def save_market_history(
         # Mantém a mesma descoberta oportunista de localização usada pelo livro.
         await upsert_locations(session, {payload["location_id"]})
 
+        # Task 4/29 (achado `W11`): o diário da série é recalculado aqui, para a tela não esperar
+        # o rollup de hora em hora. Com o lock, o rollup só começa depois deste commit; sem ele, o
+        # rollup está rodando e esta série fica com a próxima rodada — o ingest nunca espera.
+        do_diario = bucket_seconds == BUCKET_DO_DIARIO
+        recalcular = do_diario and await tentar_lock_do_ingest(session)
+
         stmt = pg_insert(MarketHistoryEntry).values(rows)
         stmt = stmt.on_conflict_do_update(
             constraint="uq_market_history_bucket",
             set_={
                 "item_amount": stmt.excluded.item_amount,
                 "silver_amount": stmt.excluded.silver_amount,
+                # O client sempre sobrescreve, inclusive bloco que veio da API pública (task 4/23).
+                "source": stmt.excluded.source,
                 "last_seen_at": func.now(),
             },
         )
         await session.execute(stmt)
+        if recalcular:
+            await recalcular_diario_da_serie(
+                session,
+                server_id=server_id,
+                item_id=payload["albion_id"],
+                location_id=payload["location_id"],
+                quality_level=payload["quality_level"],
+                dias={row["bucket_start"].date() for row in rows},
+            )
+        elif do_diario:
+            log.info(
+                "ingest.diario_adiado_rollup_em_andamento",
+                item_id=payload["albion_id"],
+                location_id=payload["location_id"],
+            )
         await session.commit()
 
         # Resolve AlbionId para ItemTypeId; o cache usa o identificador recebido nas ordens.

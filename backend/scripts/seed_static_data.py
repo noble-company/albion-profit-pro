@@ -31,6 +31,7 @@ from scripts.import_locations import (
 from scripts.import_recipes import RecipeImportPlan, apply_recipe_import, prepare_recipe_import
 from src.database import async_session_maker
 from src.logging_config import configure_logging
+from src.prices.history import remapear_historico_da_api
 from src.static_data.constants import STATIC_TRANSFORM_REVISION
 from src.static_data.models import StaticDatasetVersion
 
@@ -251,6 +252,17 @@ async def apply_dataset(loaded: LoadedManifest, prepared: PreparedDataset) -> Se
 
         # Uma transação cobre itens, receitas e marcador ativo: leitores veem a versão antiga
         # completa ou a nova completa, nunca as tabelas no meio da substituição.
+        # O jogo renumera os itens entre patches (achado `W9`). O histórico da API pública foi
+        # gravado com o número que o dataset anterior dava ao nome: ele muda de número aqui,
+        # antes da troca, enquanto a tabela `item` ainda diz qual era o antigo (task 4/28).
+        await remapear_historico_da_api(
+            session,
+            {
+                row["unique_name"]: row["albion_id"]
+                for row in prepared.items.rows
+                if row.get("albion_id") is not None
+            },
+        )
         await apply_item_import(session, prepared.items, replace=True)
         await apply_recipe_import(session, prepared.recipes)
         await apply_location_import(session, prepared.locations)

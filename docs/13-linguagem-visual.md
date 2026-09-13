@@ -21,7 +21,7 @@ O produto é um scanner de mercado: a tabela **é** a tela principal, não um an
 
 | Decisão | Valor |
 |---|---|
-| Altura de linha | `h-11` (44px) — compacta o bastante pra caber ~15 linhas numa tela de laptop sem parecer espremida; nunca `p-4` (16px) em toda célula como hoje, que empurra a tabela pra fora da dobra com 8 linhas. |
+| Altura de linha | `h-11` (44px) — compacta o bastante pra caber ~15 linhas numa tela de laptop sem parecer espremida; nunca `p-4` (16px) em toda célula como hoje, que empurra a tabela pra fora da dobra com 8 linhas. **Exceção no scanner (2026-09-12, pedido no uso):** a linha tem `3.5rem` (56 px no tamanho normal) — o nome do item quebra em até 2 linhas com o grau (`T4.1`) embaixo, porque colado no fim do nome o grau era cortado junto com ele. A altura acompanha o seletor **Tamanho** da barra (100–220%), que escala **só o conteúdo do centro**: o `main` recebe `--escala`, e `.escala-do-conteudo` (`index.css`) multiplica por ela `--spacing` e `--text-*` do Tailwind. As barras laterais ficam fora. Por isso nenhuma medida do centro é rem fixo — larguras de coluna e altura de linha passam por `emEscala`, e texto pequeno é `text-2xs`, não `text-[0.6875rem]`. O cabeçalho continua em `h-11` × escala. |
 | Padding de célula | `px-3 py-2` (não `p-4`). |
 | Alinhamento | Texto (item, cidade, modo) à **esquerda**. Todo número (preço, taxa, quantidade, lucro, ROI) à **direita**, com `tabular-nums` — dígitos alinham entre linhas, o olho lê a coluna, não a linha. |
 | Largura de coluna | Cada coluna numérica tem `min-width` fixo calculado pelo maior valor plausível (ex.: preço até 8 dígitos + separador), não `auto`. Colunas de texto (`item`, `cidade`) crescem. |
@@ -45,9 +45,18 @@ segundo, e o que pode esperar:
 | **Terciário** (contexto, não decisão) | Taxas, modo de aquisição/venda, cidade em texto pequeno abaixo do preço | `text-foreground-subtle`, `text-xs` |
 
 Isso já é o padrão real do produto hoje (`formatarLocalidade` sob o preço em `text-xs`) — a
-task 14 só nomeia a regra pra ela parar de ser acidental. Lucro é **sempre** `text-profit`,
-nunca cor condicional por valor (positivo/negativo já é uma decisão de produto tomada na task
-04 — o campo é lucro líquido, não uma variação de sentimento).
+task 14 só nomeia a regra pra ela parar de ser acidental.
+
+> **Revisão na Fase 4 (task 11).** A regra original desta seção era: lucro **sempre**
+> `text-profit`, nunca cor condicional por valor. Ela fazia sentido enquanto o produto só
+> mostrava linha lucrativa — o filtro "apenas com lucro" era padrão, e negativo praticamente não
+> aparecia.
+>
+> O scanner inverteu isso: mostrar receita que **não** dá lucro passou a ser o padrão (`X01`,
+> pedido explícito do usuário — "analisando o que dá ou não lucro"). Pintar um prejuízo de verde
+> não é consistência, é induzir a erro num número que a pessoa vai usar pra decidir. **Regra
+> vigente:** lucro e ROI usam `text-profit` quando positivos e `text-danger` quando negativos.
+> A cor não é sentimento — é o sinal do número.
 
 ---
 
@@ -121,29 +130,45 @@ um segundo ícone pro mesmo conceito em telas diferentes:
 
 ---
 
-## 6. Layout do shell
+## 6. Layout do shell — **revisado na Fase 4 (tasks 08 e 11.1, Tamanho do conteúdo)**
 
-Hoje: uma linha de links de texto com dois `<select>` no meio (servidor, tema), que vira um
-bloco solto empilhado no mobile (`AppShell.tsx` atual). Estrutura definitiva — **decidida aqui,
-implementada na task 24** (não nesta task; `AppShell.tsx` real não muda ainda):
+> A decisão original desta seção era **header no topo**. Ela foi revogada em 2026-09-08, depois
+> do uso real do produto: `X05` da [Fase 4](tasks/scanner/README.md). O que segue é a decisão
+> vigente; o histórico fica registrado aqui em vez de sumir.
 
-- **Header fixo** (`sticky top-0`), altura constante, com três zonas: marca (esquerda) · navegação
-  principal (centro, vira menu `Sheet` no mobile em vez de bloco empilhado) · controles de
-  contexto (direita: servidor, tema, sessão).
-- **Navegação principal** vira ícone + rótulo (não só texto) nos itens de tela (Market Flip,
-  Refino, Craft, Itens, Calculadora, Tokens) — consistente com o resto do produto usar ícone por
-  conceito (§5).
-- **Controles de contexto** (servidor/tema) deixam de ser `<select>` nativo solto no meio da
-  navegação e viram o `Select`/`DropdownMenu` do shadcn (task 11), agrupados à direita, sempre
-  visíveis (não somem no menu mobile — servidor errado é um erro de leitura, não deveria exigir
-  abrir o menu pra corrigir).
-- **Mobile**: o menu principal colapsa num `Sheet` lateral (task 11 já instalou o componente);
-  servidor/tema continuam na barra superior.
+**Por que mudou.** O header no topo obrigava os filtros a viverem *acima* da tabela — três
+blocos empilhados que, somados ao cabeçalho e à faixa de KPIs, empurravam a tabela para baixo da
+dobra. E o `max-w-7xl` (1280 px) desperdiçava a tela num produto que é uma tabela densa de 10+
+colunas: em monitor largo sobrava faixa vazia dos dois lados enquanto a tabela rolava
+horizontalmente. A §1 desta mesma página já dizia que "a tabela **é** a tela"; o layout nunca
+honrou isso.
 
-Maquete ilustrativa em `/estilo` (não funcional — não troca de rota nem persiste estado; é
-só a estrutura visual pra aprovação).
+**Estrutura vigente** — três colunas, sem largura máxima:
 
----
+- **Navegação à esquerda** (`w-52`, recolhível para `w-14` só com ícones): marca, navegação (ícone
+  + rótulo por tela) e, no rodapé, servidor, tema, **Tamanho** e conta. Recolhida, o Tamanho
+  continua ao alcance por um ícone de zoom.
+- **Conteúdo no centro**, ocupando toda a largura restante, com rolagem própria.
+- **Filtros à direita** (`w-80`, recolhível), desde a task 11.1: navegação se usa uma vez por
+  sessão, filtro se mexe o tempo todo, e cada pixel que a navegação não gasta é largura para a
+  tabela. A coluna some da largura quando a tela não publica filtro.
+- **Tamanho do conteúdo** (2026-09-12, 100–220%): escala **só o `main`** — `escala-do-conteudo`
+  (`index.css`) multiplica `--spacing` e `--text-*` por `--escala`, e as barras laterais ficam
+  como estão. Por isso nenhuma medida do centro é rem fixo (ver §1).
+- O contêiner é `h-dvh overflow-hidden` e cada coluna rola por si. Isso não é detalhe de
+  implementação: sem ele o flex estica a sidebar até a altura da página e ela sobe junto com a
+  tabela. Como efeito desejado, a tabela ganha região de rolagem própria — o que o cabeçalho
+  fixo da §1 precisa.
+- **Filtros chegam à barra por portal** (`SidebarSection`), não por estado em contexto: um
+  `ReactNode` em `useState` obrigaria a tela a chamar `setState` durante o render do filho.
+- **Mobile** (`< md`): a navegação colapsa no `Sheet`. Servidor e tema ficam numa barra superior
+  fina, **sempre visíveis**: servidor errado é erro de leitura, não deveria exigir abrir menu para
+  corrigir. Esta regra sobreviveu à revisão. A coluna de filtros só existe a partir de `md` —
+  dívida conhecida, que o produto (de desktop, ao lado do jogo) ainda não cobrou.
+- **`ErrorBoundary` dentro do shell**, envolvendo só o conteúdo: uma tela que quebra não apaga a
+  navegação (achado `E04`; antes disso, virava tela branca).
+
+Guard: `frontend/src/test/no-max-width-shell.test.ts` falha se a largura máxima voltar.
 
 ## 7. Página de referência
 

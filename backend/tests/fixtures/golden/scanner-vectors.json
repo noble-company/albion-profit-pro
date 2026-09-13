@@ -1,0 +1,578 @@
+{
+  "_generated_by": "backend/scripts/generate_scanner_vectors.py",
+  "_source": "backend/src/craft/formulas.py, composto como craft/service.py::_build_scenario",
+  "_parity": "tests/craft/test_scanner_vectors.py prova que esta composicao == simulate_craft sobre livro com profundidade sobrando; o teste TS prova que computeScanner == este arquivo. Transitivamente, cliente == servidor.",
+  "rates": {
+    "premium_sales_tax": "0.04",
+    "non_premium_sales_tax": "0.08",
+    "setup_fee": "0.025"
+  },
+  "vectors": [
+    {
+      "recipe": {
+        "output_item": "T4_CLOTH",
+        "production_kind": "refining",
+        "enchantment_level": 0,
+        "silver_cost": 0,
+        "item_value": "16",
+        "crafting_focus": 100,
+        "amount_crafted": 1,
+        "output_weight": "0.51",
+        "ingredients": [
+          {
+            "item": "T4_FIBER",
+            "count": 2,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T3_CLOTH",
+            "count": 1,
+            "enchantment_level": 0
+          }
+        ]
+      },
+      "prices": {
+        "T4_FIBER|1002|1|0": {
+          "sell": "100",
+          "buy": null
+        },
+        "T3_CLOTH|1002|1|0": {
+          "sell": "200",
+          "buy": null
+        },
+        "T4_CLOTH|1002|1|0": {
+          "sell": null,
+          "buy": "1000"
+        }
+      },
+      "params": {
+        "premium": true,
+        "return_rate": "0",
+        "station_fee_per_100_nutrition": "0",
+        "use_focus": false,
+        "output_quality": 1,
+        "quantity": 1,
+        "location": "1002"
+      },
+      "expected": {
+        "state": "priced",
+        "acquisition_mode": "immediate",
+        "sale_mode": "immediate",
+        "total_cost": "400",
+        "gross_revenue": "1000",
+        "sales_tax": "40",
+        "total_fees": "40",
+        "net_revenue": "960",
+        "profit": "560",
+        "roi": "140",
+        "profit_per_weight": "1098.039215686274509803921569",
+        "profit_per_focus": null,
+        "executions": 1,
+        "produced_quantity": 1,
+        "focus_consumed": 0
+      }
+    },
+    {
+      "recipe": {
+        "output_item": "T4_CLOTH",
+        "production_kind": "refining",
+        "enchantment_level": 0,
+        "silver_cost": 0,
+        "item_value": "16",
+        "crafting_focus": 100,
+        "amount_crafted": 1,
+        "output_weight": "0.51",
+        "ingredients": [
+          {
+            "item": "T4_FIBER",
+            "count": 2,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T3_CLOTH",
+            "count": 1,
+            "enchantment_level": 0
+          }
+        ]
+      },
+      "prices": {
+        "T4_FIBER|1002|1|0": {
+          "sell": "100",
+          "buy": "90"
+        },
+        "T3_CLOTH|1002|1|0": {
+          "sell": "200",
+          "buy": "180"
+        },
+        "T4_CLOTH|1002|1|0": {
+          "sell": "1100",
+          "buy": "1000"
+        }
+      },
+      "params": {
+        "premium": true,
+        "return_rate": "0",
+        "station_fee_per_100_nutrition": "0",
+        "use_focus": false,
+        "output_quality": 1,
+        "quantity": 1,
+        "location": "1002"
+      },
+      "expected": {
+        "state": "priced",
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "total_cost": "370",
+        "gross_revenue": "1100",
+        "sales_tax": "44",
+        "total_fees": "82",
+        "net_revenue": "1028",
+        "profit": "658",
+        "roi": "177.8378",
+        "profit_per_weight": "1290.196078431372549019607843",
+        "profit_per_focus": null,
+        "executions": 1,
+        "produced_quantity": 1,
+        "focus_consumed": 0
+      }
+    },
+    {
+      "recipe": {
+        "output_item": "T4_CLOTH",
+        "production_kind": "refining",
+        "enchantment_level": 0,
+        "silver_cost": 0,
+        "item_value": "16",
+        "crafting_focus": 100,
+        "amount_crafted": 1,
+        "output_weight": "0.51",
+        "ingredients": [
+          {
+            "item": "T4_FIBER",
+            "count": 2,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T3_CLOTH",
+            "count": 1,
+            "enchantment_level": 0
+          }
+        ]
+      },
+      "prices": {
+        "T4_FIBER|1002|1|0": {
+          "sell": "100",
+          "buy": "90"
+        },
+        "T3_CLOTH|1002|1|0": {
+          "sell": "200",
+          "buy": "180"
+        },
+        "T4_CLOTH|1002|1|0": {
+          "sell": "1100",
+          "buy": "1000"
+        }
+      },
+      "params": {
+        "premium": false,
+        "return_rate": "0",
+        "station_fee_per_100_nutrition": "0",
+        "use_focus": true,
+        "output_quality": 1,
+        "quantity": 1,
+        "location": "1002"
+      },
+      "expected": {
+        "state": "priced",
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "total_cost": "370",
+        "gross_revenue": "1100",
+        "sales_tax": "88",
+        "total_fees": "126",
+        "net_revenue": "984",
+        "profit": "614",
+        "roi": "165.9459",
+        "profit_per_weight": "1203.921568627450980392156863",
+        "profit_per_focus": "6.14",
+        "executions": 1,
+        "produced_quantity": 1,
+        "focus_consumed": 100
+      }
+    },
+    {
+      "recipe": {
+        "output_item": "T4_CLOTH",
+        "production_kind": "refining",
+        "enchantment_level": 0,
+        "silver_cost": 0,
+        "item_value": "16",
+        "crafting_focus": 100,
+        "amount_crafted": 1,
+        "output_weight": "0.51",
+        "ingredients": [
+          {
+            "item": "T4_FIBER",
+            "count": 2,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T3_CLOTH",
+            "count": 1,
+            "enchantment_level": 0
+          }
+        ]
+      },
+      "prices": {
+        "T4_FIBER|1002|1|0": {
+          "sell": "137",
+          "buy": "121"
+        },
+        "T3_CLOTH|1002|1|0": {
+          "sell": "419",
+          "buy": "377"
+        },
+        "T4_CLOTH|1002|1|0": {
+          "sell": "1187",
+          "buy": "1049"
+        }
+      },
+      "params": {
+        "premium": true,
+        "return_rate": "0.367",
+        "station_fee_per_100_nutrition": "137",
+        "use_focus": true,
+        "output_quality": 1,
+        "quantity": 1,
+        "location": "1002"
+      },
+      "expected": {
+        "state": "priced",
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "total_cost": "638.466",
+        "gross_revenue": "1187",
+        "sales_tax": "48",
+        "total_fees": "95",
+        "net_revenue": "1109",
+        "profit": "470.534",
+        "roi": "73.6976",
+        "profit_per_weight": "922.6156862745098039215686275",
+        "profit_per_focus": "4.70534",
+        "executions": 1,
+        "produced_quantity": 1,
+        "focus_consumed": 100
+      }
+    },
+    {
+      "recipe": {
+        "output_item": "T5_PLANKS",
+        "production_kind": "refining",
+        "enchantment_level": 0,
+        "silver_cost": 37,
+        "item_value": "32",
+        "crafting_focus": 78,
+        "amount_crafted": 5,
+        "output_weight": "0.76",
+        "ingredients": [
+          {
+            "item": "T5_WOOD",
+            "count": 3,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T4_PLANKS",
+            "count": 1,
+            "enchantment_level": 0
+          }
+        ]
+      },
+      "prices": {
+        "T5_WOOD|1002|1|0": {
+          "sell": "311",
+          "buy": "289"
+        },
+        "T4_PLANKS|1002|1|0": {
+          "sell": "173",
+          "buy": "151"
+        },
+        "T5_PLANKS|1002|1|0": {
+          "sell": "866",
+          "buy": "790"
+        }
+      },
+      "params": {
+        "premium": true,
+        "return_rate": "0.248",
+        "station_fee_per_100_nutrition": "53",
+        "use_focus": true,
+        "output_quality": 1,
+        "quantity": 7,
+        "location": "1002"
+      },
+      "expected": {
+        "state": "priced",
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "total_cost": "1869.816",
+        "gross_revenue": "8660",
+        "sales_tax": "347",
+        "total_fees": "609",
+        "net_revenue": "8096",
+        "profit": "6226.184",
+        "roi": "332.9838",
+        "profit_per_weight": "819.2347368421052631578947368",
+        "profit_per_focus": "39.9114358974358974358974359",
+        "executions": 2,
+        "produced_quantity": 10,
+        "focus_consumed": 156
+      }
+    },
+    {
+      "recipe": {
+        "output_item": "T6_CLOTH@2",
+        "production_kind": "refining",
+        "enchantment_level": 2,
+        "silver_cost": 120,
+        "item_value": "256",
+        "crafting_focus": 320,
+        "amount_crafted": 1,
+        "output_weight": "1.14",
+        "ingredients": [
+          {
+            "item": "T6_FIBER",
+            "count": 2,
+            "enchantment_level": 2
+          },
+          {
+            "item": "T5_CLOTH",
+            "count": 1,
+            "enchantment_level": 2
+          }
+        ]
+      },
+      "prices": {
+        "T6_FIBER|1002|1|2": {
+          "sell": "5472",
+          "buy": "4933"
+        },
+        "T5_CLOTH|1002|1|2": {
+          "sell": "2149",
+          "buy": "1912"
+        },
+        "T6_CLOTH@2|1002|3|2": {
+          "sell": "18785",
+          "buy": "17452"
+        }
+      },
+      "params": {
+        "premium": false,
+        "return_rate": "0.088",
+        "station_fee_per_100_nutrition": "1200",
+        "use_focus": true,
+        "output_quality": 3,
+        "quantity": 3,
+        "location": "1002"
+      },
+      "expected": {
+        "state": "priced",
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "total_cost": "37614.8",
+        "gross_revenue": "56355",
+        "sales_tax": "4509",
+        "total_fees": "6802",
+        "net_revenue": "50437",
+        "profit": "12822.2",
+        "roi": "34.0882",
+        "profit_per_weight": "3749.181286549707602339181287",
+        "profit_per_focus": "13.35645833333333333333333333",
+        "executions": 3,
+        "produced_quantity": 3,
+        "focus_consumed": 960
+      }
+    },
+    {
+      "recipe": {
+        "output_item": "T4_CLOTH",
+        "production_kind": "refining",
+        "enchantment_level": 0,
+        "silver_cost": 0,
+        "item_value": "16",
+        "crafting_focus": 100,
+        "amount_crafted": 1,
+        "output_weight": "0.51",
+        "ingredients": [
+          {
+            "item": "T4_FIBER",
+            "count": 2,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T3_CLOTH",
+            "count": 1,
+            "enchantment_level": 0
+          }
+        ]
+      },
+      "prices": {
+        "T4_FIBER|1002|1|0": {
+          "sell": "900",
+          "buy": null
+        },
+        "T3_CLOTH|1002|1|0": {
+          "sell": "900",
+          "buy": null
+        },
+        "T4_CLOTH|1002|1|0": {
+          "sell": null,
+          "buy": "100"
+        }
+      },
+      "params": {
+        "premium": false,
+        "return_rate": "0",
+        "station_fee_per_100_nutrition": "500",
+        "use_focus": false,
+        "output_quality": 1,
+        "quantity": 1,
+        "location": "1002"
+      },
+      "expected": {
+        "state": "priced",
+        "acquisition_mode": "immediate",
+        "sale_mode": "immediate",
+        "total_cost": "2709",
+        "gross_revenue": "100",
+        "sales_tax": "8",
+        "total_fees": "8",
+        "net_revenue": "92",
+        "profit": "-2617",
+        "roi": "-96.6039",
+        "profit_per_weight": "-5131.372549019607843137254902",
+        "profit_per_focus": null,
+        "executions": 1,
+        "produced_quantity": 1,
+        "focus_consumed": 0
+      }
+    },
+    {
+      "recipe": {
+        "output_item": "T4_CLOTH",
+        "production_kind": "refining",
+        "enchantment_level": 0,
+        "silver_cost": 0,
+        "item_value": "16",
+        "crafting_focus": 100,
+        "amount_crafted": 1,
+        "output_weight": "0.51",
+        "ingredients": [
+          {
+            "item": "T4_FIBER",
+            "count": 2,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T3_CLOTH",
+            "count": 1,
+            "enchantment_level": 0
+          }
+        ]
+      },
+      "prices": {
+        "T4_FIBER|1002|1|0": {
+          "sell": "100",
+          "buy": null
+        },
+        "T4_CLOTH|1002|1|0": {
+          "sell": null,
+          "buy": "1000"
+        }
+      },
+      "params": {
+        "premium": true,
+        "return_rate": "0",
+        "station_fee_per_100_nutrition": "0",
+        "use_focus": false,
+        "output_quality": 1,
+        "quantity": 1,
+        "location": "1002"
+      },
+      "expected": null
+    },
+    {
+      "recipe": {
+        "output_item": "T4_2H_ARCANESTAFF_CRYSTAL",
+        "production_kind": "crafting",
+        "enchantment_level": 0,
+        "silver_cost": 0,
+        "item_value": "576",
+        "crafting_focus": 1286,
+        "amount_crafted": 1,
+        "output_weight": "5",
+        "ingredients": [
+          {
+            "item": "T4_PLANKS",
+            "count": 20,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T4_METALBAR",
+            "count": 12,
+            "enchantment_level": 0
+          },
+          {
+            "item": "T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL",
+            "count": 1,
+            "enchantment_level": 0,
+            "return_eligible": false
+          }
+        ]
+      },
+      "prices": {
+        "T4_PLANKS|1002|1|0": {
+          "sell": "180",
+          "buy": "160"
+        },
+        "T4_METALBAR|1002|1|0": {
+          "sell": "210",
+          "buy": "190"
+        },
+        "T4_ARTEFACT_2H_ARCANESTAFF_CRYSTAL|1002|1|0": {
+          "sell": "9500",
+          "buy": "8700"
+        },
+        "T4_2H_ARCANESTAFF_CRYSTAL|1002|1|0": {
+          "sell": "29000",
+          "buy": "26500"
+        }
+      },
+      "params": {
+        "premium": true,
+        "return_rate": "0.367",
+        "station_fee_per_100_nutrition": "0",
+        "use_focus": false,
+        "output_quality": 1,
+        "quantity": 10,
+        "location": "1002"
+      },
+      "expected": {
+        "state": "priced",
+        "acquisition_mode": "buy_order",
+        "sale_mode": "sell_order",
+        "total_cost": "124804",
+        "gross_revenue": "290000",
+        "sales_tax": "11600",
+        "total_fees": "21894",
+        "net_revenue": "271150",
+        "profit": "146346",
+        "roi": "117.2607",
+        "profit_per_weight": "2926.92",
+        "profit_per_focus": null,
+        "executions": 10,
+        "produced_quantity": 10,
+        "focus_consumed": 0
+      }
+    }
+  ]
+}

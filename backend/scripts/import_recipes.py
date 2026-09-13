@@ -56,6 +56,9 @@ def extract_craft_resources(craftingrequirements: dict) -> list[dict]:
             "unique_name": r["@uniquename"],
             "count": int(r["@count"]),
             "enchantment_level": int(r.get("@enchantmentlevel", 0)),
+            # `@maxreturnamount="0"`: o jogo não devolve no retorno de recurso (task 4/26). O
+            # atributo só aparece com esse valor; sem ele, o ingrediente retorna.
+            "return_eligible": r.get("@maxreturnamount") != "0",
         }
         for r in resources
     ]
@@ -81,6 +84,37 @@ def select_standard_refining_requirements(requirements: dict | list[dict]) -> di
         if not uses_faction_token:
             standard_routes.append(candidate)
     return standard_routes[0] if len(standard_routes) == 1 else None
+
+
+ARTIFACT_FAVOR_TOKEN = "_ARTEFACT_TOKEN_FAVOR_"
+
+
+def select_artifact_route(requirements: dict | list[dict]) -> dict | None:
+    """Escolhe a receita do artefato quando o equipamento de facção também aceita token de favor
+    (task 4/27).
+
+    O dump traz as duas como alternativas do mesmo output: uma com o artefato do item, outra que
+    troca o artefato por um token de favor (`T6_ARTEFACT_TOKEN_FAVOR_3`). O catálogo guarda uma
+    receita por output, e a do artefato é a que se compra no mercado.
+
+    Os outros casos de várias receitas não são essa troca e continuam fora (`None`): peça Royal a
+    partir de três sets, peixe picado por tipo de peixe, transmutação de recurso bruto, conversão
+    de alma. Escolher um deles arbitrariamente daria um custo que depende do que o jogador tem.
+    """
+    if isinstance(requirements, dict):
+        return requirements
+
+    def usa(route: dict, fragmento: str) -> bool:
+        return any(fragmento in r["unique_name"] for r in extract_craft_resources(route))
+
+    if not any(usa(route, ARTIFACT_FAVOR_TOKEN) for route in requirements):
+        return None
+    artifact_routes = [
+        route
+        for route in requirements
+        if not usa(route, ARTIFACT_FAVOR_TOKEN) and usa(route, "_ARTEFACT_")
+    ]
+    return artifact_routes[0] if len(artifact_routes) == 1 else None
 
 
 def canonical_item_unique_name(
@@ -139,7 +173,7 @@ def build_recipe(
         selected_requirements = (
             select_standard_refining_requirements(requirements)
             if prefer_standard_refining_route
-            else None
+            else select_artifact_route(requirements)
         )
         if selected_requirements is None:
             skipped_multi_recipe.append(canonical_output)
@@ -177,6 +211,8 @@ def build_recipe(
                 count=resource["count"],
                 enchantment_level=ingredient_level,
                 position=position,
+                # Explícito: o `default` da coluna só entra no flush, e o plano é lido antes.
+                return_eligible=resource["return_eligible"],
             )
         )
     return recipe

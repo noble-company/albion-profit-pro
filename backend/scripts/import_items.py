@@ -10,6 +10,7 @@ são resolvidos a partir do repositório, nunca do CWD (mesmo problema de
 import asyncio
 import os
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import structlog
@@ -18,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scripts._dumps import iter_category_entries, load_item_dump_items, load_items_json
+from scripts._item_values import resolve_item_values
 from src.database import async_session_maker
 from src.items.models import Item
 from src.items.normalization import normalize_item_search
@@ -55,6 +57,17 @@ def _base_name(unique_name: str) -> str:
     return unique_name.split("@", 1)[0]
 
 
+def _weight(raw: str | float | None) -> Decimal | None:
+    """`@weight` vem como string no dump ("0.51"). `Decimal(str(...))` preserva o valor
+    escrito; passar por float introduziria erro logo antes de uma divisão que o usuário lê."""
+    if raw is None:
+        return None
+    try:
+        return Decimal(str(raw))
+    except InvalidOperation:
+        return None
+
+
 def _enchantment_level(unique_name: str) -> int:
     if "@" not in unique_name:
         return 0
@@ -71,16 +84,21 @@ def load_dump_metadata(dump_path: Path) -> dict[str, dict]:
         tier = entry.get("@tier")
         metadata[unique_name] = {
             "tier": int(tier) if tier is not None else None,
+            "weight": _weight(entry.get("@weight")),
             "shop_category": entry.get("@shopcategory"),
             "shop_subcategory": entry.get("@shopsubcategory1"),
             "shop_subcategory2": entry.get("@shopsubcategory2"),
             "shop_subcategory3": entry.get("@shopsubcategory3"),
+            "crafting_category": entry.get("@craftingcategory"),
         }
     return metadata
 
 
 def build_items(
-    items_json_path: Path, dump_metadata: dict[str, dict], skipped_too_long: list[str]
+    items_json_path: Path,
+    dump_metadata: dict[str, dict],
+    skipped_too_long: list[str],
+    item_values: dict[str, Decimal] | None = None,
 ) -> list[dict]:
     data = load_items_json(items_json_path)
     rows = []
@@ -101,11 +119,16 @@ def build_items(
                 "name_pt": localized_names.get("PT-BR"),
                 "name_en": localized_names.get("EN-US"),
                 "tier": meta.get("tier"),
+                "weight": meta.get("weight"),
+                # Pelo nome COMPLETO, não pelo base: o valor dobra a cada nível de encantamento,
+                # e `T4_ARMOR@2` vale quatro vezes `T4_ARMOR` (task 4/18).
+                "item_value": (item_values or {}).get(unique_name),
                 "enchantment_level": _enchantment_level(unique_name),
                 "shop_category": meta.get("shop_category"),
                 "shop_subcategory": meta.get("shop_subcategory"),
                 "shop_subcategory2": meta.get("shop_subcategory2"),
                 "shop_subcategory3": meta.get("shop_subcategory3"),
+                "crafting_category": meta.get("crafting_category"),
                 "busca_normalizada": normalize_item_search(
                     unique_name,
                     localized_names.get("PT-BR"),
@@ -119,10 +142,17 @@ def build_items(
 def prepare_item_import(
     items_json_path: Path = ITEMS_JSON_PATH, item_dump_path: Path = ITEM_DUMP_PATH
 ) -> ItemImportPlan:
-    source_count = len(load_items_json(items_json_path))
+    entries = load_items_json(items_json_path)
+    source_count = len(entries)
     dump_metadata = load_dump_metadata(item_dump_path)
+    # A lista autoritativa de nomes é `items.json`; o dump sozinho não enumera todas as
+    # variantes `@N` (três extratos de alquimia não declaram o nível).
+    item_values = resolve_item_values(
+        load_item_dump_items(item_dump_path),
+        names={e["UniqueName"] for e in entries if e.get("UniqueName")},
+    )
     skipped_too_long: list[str] = []
-    rows = build_items(items_json_path, dump_metadata, skipped_too_long)
+    rows = build_items(items_json_path, dump_metadata, skipped_too_long, item_values)
     return ItemImportPlan(rows, source_count, skipped_too_long)
 
 
@@ -143,11 +173,14 @@ async def apply_item_import(
                     "name_pt": stmt.excluded.name_pt,
                     "name_en": stmt.excluded.name_en,
                     "tier": stmt.excluded.tier,
+                    "weight": stmt.excluded.weight,
+                    "item_value": stmt.excluded.item_value,
                     "enchantment_level": stmt.excluded.enchantment_level,
                     "shop_category": stmt.excluded.shop_category,
                     "shop_subcategory": stmt.excluded.shop_subcategory,
                     "shop_subcategory2": stmt.excluded.shop_subcategory2,
                     "shop_subcategory3": stmt.excluded.shop_subcategory3,
+                    "crafting_category": stmt.excluded.crafting_category,
                     "busca_normalizada": stmt.excluded.busca_normalizada,
                 },
             )

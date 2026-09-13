@@ -21,7 +21,9 @@ class ManualPriceOverride(BaseModel):
 
 class IngredientOverride(BaseModel):
     quality_level: int = Field(default=1, ge=1, le=5)
-    return_eligible: bool = True
+    # `None` = o que a receita diz (task 4/26). O padrão era `True`: mandar só a qualidade de um
+    # ingrediente reescrevia a marca do dump e dava desconto de retorno ao artefato.
+    return_eligible: bool | None = None
 
 
 class CraftRequestBase(BaseModel):
@@ -31,7 +33,10 @@ class CraftRequestBase(BaseModel):
     output_quality: int = Field(default=1, ge=1, le=5)
     scope: Literal["all", "mine"] = "all"
     return_rate: Decimal = Field(default=Decimal("0"), ge=0, le=1)
-    station_cost_per_execution: Decimal = Field(default=Decimal("0"), ge=0)
+    # Taxa de uso da estação **por 100 de nutrição consumida** — como o jogo cobra. Prata fixa
+    # por execução não existe: a nutrição sai do valor do item, e um recurso T4 e uma arma T8
+    # diferem por três ordens de grandeza (task 4/18).
+    station_fee_per_100_nutrition: Decimal = Field(default=Decimal("0"), ge=0)
     use_focus: bool = False
     premium: bool = True
     sales_tax_rate: Decimal | None = Field(default=None, ge=0, le=1)

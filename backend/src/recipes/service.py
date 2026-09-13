@@ -1,3 +1,6 @@
+from collections.abc import Iterable
+from decimal import Decimal
+
 from sqlalchemy import exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
@@ -55,6 +58,24 @@ async def get_recipe_family(session: AsyncSession, unique_name: str) -> dict[int
     return by_level
 
 
+async def get_item_values(
+    session: AsyncSession, unique_names: Iterable[str]
+) -> dict[str, Decimal | None]:
+    """Valor de item de cada nome, para a taxa da estação (task 4/18).
+
+    Uma consulta para a família inteira: a rota direta e a de upgrade produzem itens
+    **diferentes**, e o valor dobra a cada nível de encantamento — cobrar as duas pelo mesmo
+    valor erraria uma delas por um fator de até 16.
+    """
+    names = list(unique_names)
+    if not names:
+        return {}
+    rows = await session.execute(
+        select(Item.unique_name, Item.item_value).where(Item.unique_name.in_(names))
+    )
+    return {unique_name: item_value for unique_name, item_value in rows}
+
+
 async def get_recipe_detail(session: AsyncSession, unique_name: str) -> dict:
     output_row = (
         await session.execute(
@@ -99,6 +120,8 @@ async def get_recipe_detail(session: AsyncSession, unique_name: str) -> dict:
             "name_en": name_en,
             "count": ingredient.count,
             "enchantment_level": ingredient.enchantment_level,
+            # O `simulate_craft` tira daqui quem não retorna (task 4/26).
+            "return_eligible": ingredient.return_eligible,
             "has_own_recipe": has_own_recipe,
         }
         for ingredient, name_pt, name_en, has_own_recipe in ingredient_rows
@@ -138,6 +161,8 @@ async def get_recipe_detail(session: AsyncSession, unique_name: str) -> dict:
         },
         "enchantment_level": recipe.enchantment_level,
         "production_kind": recipe.production_kind,
+        # Base da taxa da estação (task 4/18) — propriedade da SAÍDA, não da receita.
+        "item_value": output_item.item_value,
         "silver_cost": recipe.silver_cost,
         "crafting_focus": recipe.crafting_focus,
         "amount_crafted": recipe.amount_crafted,
