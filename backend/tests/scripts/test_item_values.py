@@ -11,12 +11,41 @@ O caso que este arquivo existe para travar é o **encantamento**: o valor dobra 
 derivar pelo nome base cobraria a taxa do item sem encanto para todo item encantado.
 """
 
+import json
 from decimal import Decimal
 from pathlib import Path
 
-from scripts._item_values import resolve_item_values
+import pytest
 
-ITEM_DUMP_PATH = Path(__file__).resolve().parents[3] / "ITEM DUMP.json"
+from scripts._item_values import resolve_item_values
+from scripts.seed_static_data import (
+    DEFAULT_MANIFEST,
+    DatasetValidationError,
+    download_file,
+    load_manifest,
+    validate_file,
+)
+
+LOCAL_ITEM_DUMP = Path(__file__).resolve().parents[3] / "ITEM DUMP.json"
+
+
+@pytest.fixture(scope="module")
+def dump_real(tmp_path_factory) -> dict:
+    """O dump fixado no manifesto — o mesmo que o seed de produção importa.
+
+    O arquivo fica fora do git (16 MB). Usa a cópia da raiz quando ela bate com o SHA-256 do
+    manifesto; senão baixa da revisão imutável e confere. Ler só a raiz quebrava no CI, que não a
+    tem.
+    """
+    spec = load_manifest(DEFAULT_MANIFEST).manifest.files.item_dump
+    path = LOCAL_ITEM_DUMP
+    try:
+        validate_file(path, spec)
+    except DatasetValidationError:
+        path = tmp_path_factory.mktemp("dataset") / spec.filename
+        download_file(spec, path)
+        validate_file(path, spec)
+    return json.loads(path.read_text(encoding="utf-8"))["items"]
 
 
 def _dump(**secoes) -> dict:
@@ -194,14 +223,11 @@ def test_receita_que_resolve_inteira_continua_vencendo():
     assert valores["DUAS_ROTAS"] == Decimal("120")
 
 
-def test_contra_a_estacao_do_jogo_as_duas_pocoes_medidas():
+def test_contra_a_estacao_do_jogo_as_duas_pocoes_medidas(dump_real):
     """Os dois números lidos na estação do alquimista (2026-09-12, taxa 320 por 100 de nutrição):
     Poção de Cura T4.1 custou 432 de prata e Poção de Fúria T4, 230. Custo = valor × 0,36."""
-    import json
-
-    items = json.loads(ITEM_DUMP_PATH.read_text(encoding="utf-8"))["items"]
     valores = resolve_item_values(
-        items, names={"T4_POTION_HEAL@1", "T4_POTION_BERSERK", "T6_POTION_HEAL"}
+        dump_real, names={"T4_POTION_HEAL@1", "T4_POTION_BERSERK", "T6_POTION_HEAL"}
     )
 
     # 24 bardanas e 6 ovos a 40; o extrato arcano (15) não tem valor e conta zero.
@@ -212,12 +238,9 @@ def test_contra_a_estacao_do_jogo_as_duas_pocoes_medidas():
     assert valores["T6_POTION_HEAL"] == Decimal("4320")
 
 
-def test_contra_o_dump_real_o_derivado_bate_com_o_publicado():
+def test_contra_o_dump_real_o_derivado_bate_com_o_publicado(dump_real):
     """A regra não é postulada: ela é verificada onde o dump publica os dois lados."""
-    import json
-
-    items = json.loads(ITEM_DUMP_PATH.read_text(encoding="utf-8"))["items"]
-    valores = resolve_item_values(items)
+    valores = resolve_item_values(dump_real)
 
     # Refino, onde o dump publica — a derivação tem que reproduzir o número dele.
     assert valores["T8_LEATHER"] == Decimal("256")
