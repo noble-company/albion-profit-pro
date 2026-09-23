@@ -25,6 +25,7 @@ from src.items import models as items_models  # noqa: F401,E402
 from src.prices import models as prices_models  # noqa: F401,E402
 from src.quarantine import models as quarantine_models  # noqa: F401,E402
 from src.recipes import models as recipes_models  # noqa: F401,E402
+from src.saved_crafts import models as saved_crafts_models  # noqa: F401,E402
 from src.static_data import models as static_data_models  # noqa: F401,E402
 
 # this is the Alembic Config object, which provides

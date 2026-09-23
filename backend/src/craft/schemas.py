@@ -90,7 +90,7 @@ class IngredientSimulationOut(BaseModel):
 
 
 class RecipeSimulationOut(BaseModel):
-    silver_cost_per_execution: int
+    silver_cost_per_execution: Decimal
     crafting_focus_per_execution: int
     amount_crafted: int
 

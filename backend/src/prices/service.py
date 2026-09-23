@@ -359,7 +359,7 @@ async def query_executable_book_levels(
     """Load executable price levels for all requested combinations in one query.
 
     Expired orders are excluded. Stale active levels are retained with ``amount=0`` so callers
-    can distinguish ``dado_velho`` from a side that has never had a price. Orders at the same
+    can distinguish ``stale_data`` from a side that has never had a price. Orders at the same
     price are aggregated, but only fresh quantities contribute to an executable fill.
     """
 

@@ -85,3 +85,67 @@ Task 05 (nada técnico, só para não empilhar duas mudanças de contrato com o 
 
 Abrir a busca de itens e a Calculadora com filtro de categoria e confirmar que o filtro continua
 funcionando com o nome novo.
+
+## Estado da implementação
+
+**Concluída** (2026-09-22). `uv run pytest tests/ -v` (487 testes, 1 skip pré-existente) e
+`uv run ruff check .`/`ruff format --check .` verdes no backend; `npm run lint && npm run
+typecheck && npm run test` (595 testes) verdes no frontend depois de `npm run api:types`
+regenerar `schema.d.ts` contra o backend local.
+
+- **Decisão do item 2/3** (traduzir vs. declarar exceção): **traduzir tudo pra inglês, sem
+  período de depreciação nas respostas** — backend e frontend deployam juntos, e o frontend já
+  tem fallback gracioso pra chave de warning desconhecida. Evidência que decidiu: todo outro
+  valor de enum do contrato já era inglês (`immediate`, `top_of_book`, `all`, `west`...);
+  `coverage: Literal["parcial"]` era o único outlier. Só os **query params** (`categoria`,
+  `apenas_craftaveis`) ganharam depreciação (`deprecated=true` no schema, nome antigo ainda
+  aceito com log de aviso) — são entrada, e um bundle de frontend antigo pode estar aberto.
+- **Renomeado para inglês:** `CraftWarning` (`stale_data`, `insufficient_depth`, `no_price`,
+  `no_coverage`, `order_not_guaranteed`), `coverage` (`partial`), `/ready` (`missing`/`error`),
+  as razões de `compare_service.py` (`item_has_no_enchantment`, `base_recipe_unavailable`,
+  `upgrade_recipe_level_N_unavailable`, `upgrade_resource_level_N_unavailable`), os `detail` de
+  `HTTPException` em `items`/`craft`/`recipes`/`api_tokens` (`item_not_found`,
+  `recipe_unavailable`, `invalid_override`, `empty_search_term`, mensagens de token).
+- **Achados além do que a spec listou** (achados durante a implementação, não estavam no "Por
+  que" original): `main.py`'s `"Content-Length inválido"` (400 de qualquer rota, inclusive
+  ingest), `auth/manager.py`'s duas mensagens de `InvalidPasswordException.reason` (aparecem no
+  400 de `/auth/register`), e `ingest/schemas.py`'s validador `_not_blank` (`"não pode ser
+  vazio"` no `msg` de um 422). Todos traduzidos. `quarantine/service.py` tem mensagens em
+  português (`ValueError`/`LookupError`) mas **não é wire** — só `scripts/quarantine.py` (CLI
+  de operador) as chama; fora do escopo desta task de propósito.
+- **Guard reescrito** (`test_api_language.py`): três testes novos —
+  `test_openapi_has_no_portuguese_property_names`, `..._enum_or_const_values`,
+  `..._query_parameters` — varrendo `paths.*.*.parameters`, `enum` e `const`, com **allowlist
+  explícita** (`INGEST_WIRE_SCHEMAS` como lista, não sufixo — `DestinyBoardIn` não é ingest e
+  hoje escapava do scan antigo só pelo nome; `DOCUMENTED_PROPERTY_EXCEPTIONS` para
+  `ApiTokenPublic`/`ClientIdentity`) em vez da denylist de 18 strings legadas. Detecção por
+  diacrítico (`áàâã...`) + lista de raízes portuguesas — não é NLP, é vocabulário mais amplo.
+  **Guard em vermelho antes da correção:** revertido temporariamente só o código-fonte (`git
+  stash` dos arquivos de produção, mantendo o teste novo) e rodado contra o estado antigo —
+  falhou exatamente em `categoria`, `apenas_craftaveis` e os 7 valores de enum PT, confirmando
+  que o guard pega o defeito de verdade antes de restaurar a correção.
+- **`CLAUDE.md:42`/`AGENTS.md:42`** reescritos para descrever as exceções por extenso.
+
+### Desvios da spec
+
+- Os três achados extras (Content-Length, senha, ingest blank) não estavam na seção "Por que" da
+  spec original — encontrados varrendo `src/` por diacríticos durante a implementação. Corrigidos
+  porque são de baixo risco e sem teste externo dependendo do valor antigo; documentados aqui em
+  vez de virarem uma task própria, já que são triviais.
+- O guard novo **não pode** cobrir mensagens de exceção livres como as três acima: o schema
+  OpenAPI não enumera o conteúdo dinâmico de um `detail`/`msg` de erro, só a forma
+  (`{"detail": "string"}`). Isso é um limite estrutural de um guard baseado em schema, não uma
+  lacuna desta implementação — registrado aqui para quem for procurar o próximo vazamento
+  parecido.
+
+### Guard em vermelho (evidência)
+
+```
+AssertionError: Portuguese enum/const values in the HTTP contract: BookOut.coverage const
+'parcial', CraftWarning enum 'dado_velho', CraftWarning enum 'profundidade_insuficiente',
+CraftWarning enum 'sem_preco', CraftWarning enum 'sem_cobertura', CraftWarning enum
+'ordem_nao_garantida', LocationPrice.coverage const 'parcial'
+
+AssertionError: Portuguese query parameters in the HTTP contract: GET /items/search ?categoria,
+GET /items/search ?apenas_craftaveis
+```

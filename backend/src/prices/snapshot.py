@@ -179,6 +179,24 @@ def itens_da_categoria(kind: str, category: str, subcategory: str | None = None)
     )
 
 
+def itens_das_saidas(output_items: list[str]):
+    """Expande saídas explícitas para tudo que o engine precisa cotar.
+
+    A lista vem normalizada pelo router. A expansão fica numa subconsulta única, portanto o
+    número de statements não cresce com a quantidade de crafts salvos (A07).
+    """
+    receitas = select(Recipe.id).where(Recipe.output_item_unique_name.in_(output_items))
+    return union(
+        select(Recipe.output_item_unique_name).where(Recipe.id.in_(receitas)),
+        select(RecipeIngredient.ingredient_unique_name).where(
+            RecipeIngredient.recipe_id.in_(receitas)
+        ),
+        select(Recipe.upgrade_resource_unique_name).where(
+            Recipe.id.in_(receitas), Recipe.upgrade_resource_unique_name.is_not(None)
+        ),
+    )
+
+
 def _na_categoria(stmt, receita, kind: str, category: str, subcategory: str | None):
     """A regra da categoria de uma receita, sobre uma consulta que já junta `receita` e `Item`
     pela saída. Uma cópia só, para o snapshot (task 22) e as vendas (task 23) não divergirem."""
@@ -232,6 +250,7 @@ async def read_snapshot(
     kind: str | None = None,
     category: str | None = None,
     subcategory: str | None = None,
+    output_items: list[str] | None = None,
 ) -> list[PriceSnapshot]:
     """Lê o snapshot do realm. **Sem filtro de frescor** — a idade viaja em `observed_at` e
     quem decide o que esconder é a tela.
@@ -245,6 +264,8 @@ async def read_snapshot(
         stmt = stmt.where(
             PriceSnapshot.item_id.in_(itens_da_categoria(kind, category, subcategory))
         )
+    if output_items is not None:
+        stmt = stmt.where(PriceSnapshot.item_id.in_(itens_das_saidas(output_items)))
     stmt = stmt.order_by(PriceSnapshot.location_id, PriceSnapshot.item_id)
     return list((await session.scalars(stmt)).all())
 

@@ -28,21 +28,37 @@ Decimal.set({
   toExpPos: 9e15,
 })
 
+/**
+ * Entrada de uma fórmula (task 3.6/10, P07): nunca `number`. `Decimal` para um valor que já
+ * nasceu decimal no próprio cálculo; `string` para o que atravessou o contrato (sempre decimal
+ * string, `F09`) ou veio de digitação de usuário (já normalizada por `percentageToRate`).
+ * `number` só é seguro em apresentação — em ponto flutuante, sem os dígitos de lixo que a
+ * task 3.6/01 (`E01`) já corrigiu uma vez.
+ */
+export type FormulaInput = string | Decimal
+/** Entrada de apresentação (`formatSilver`/`formatQuantity`/`formatPercent`) — aceita `number`
+ * porque formatar não é calcular; o valor não volta pra fórmula nenhuma. */
 export type MoneyInput = string | number | Decimal
 export type Money = Decimal
 
-export function money(value: MoneyInput): Money {
+export function money(value: FormulaInput): Money {
   return value instanceof Decimal ? value : new Decimal(value)
 }
 
-export function add(...values: MoneyInput[]): Money {
+/** Conversão só para apresentação — nunca para uma fórmula. Exportada porque outros módulos
+ * (ex: `craft-formulas.ts`) também têm funções de exibição que precisam da mesma regra. */
+export function moneyForDisplay(value: MoneyInput): Money {
+  return value instanceof Decimal ? value : new Decimal(value)
+}
+
+export function add(...values: FormulaInput[]): Money {
   return values.reduce<Decimal>(
     (sum, value) => sum.plus(money(value)),
     new Decimal(0),
   )
 }
 
-export function subtract(a: MoneyInput, b: MoneyInput): Money {
+export function subtract(a: FormulaInput, b: FormulaInput): Money {
   return money(a).minus(money(b))
 }
 
@@ -55,7 +71,7 @@ export function subtract(a: MoneyInput, b: MoneyInput): Money {
  * Não protege contra `b == 0` (devolve `Infinity`, como o `.div()` solto já fazia); quem
  * calcula ROI checa `isZero` antes.
  */
-export function divide(a: MoneyInput, b: MoneyInput): Money {
+export function divide(a: FormulaInput, b: FormulaInput): Money {
   return money(a).div(money(b))
 }
 
@@ -75,13 +91,13 @@ export function percentageToRate(value: string): string {
   if (!value) return '0'
   const normalized = value.replace(',', '.')
   try {
-    return divide(normalized, 100).toString()
+    return divide(normalized, '100').toString()
   } catch {
     return '0'
   }
 }
 
-export function multiplyByQuantity(value: MoneyInput, quantity: number): Money {
+export function multiplyByQuantity(value: FormulaInput, quantity: number): Money {
   if (!Number.isInteger(quantity) || quantity < 0) {
     throw new RangeError('quantity deve ser inteiro não-negativo')
   }
@@ -93,7 +109,7 @@ export function multiplyByQuantity(value: MoneyInput, quantity: number): Money {
  * isoladamente. Idêntico a `calculate_percentage_charge` do Python (imposto e setup nunca
  * são somados antes de arredondar).
  */
-export function percentageCharge(base: MoneyInput, rate: MoneyInput): Money {
+export function percentageCharge(base: FormulaInput, rate: FormulaInput): Money {
   const b = money(base)
   const r = money(rate)
   if (b.isNegative()) throw new RangeError('base deve ser não-negativa')
@@ -104,21 +120,21 @@ export function percentageCharge(base: MoneyInput, rate: MoneyInput): Money {
 }
 
 /** Arredonda uma Decimal não-negativa para cima até a unidade inteira (comprável). */
-export function ceilToInteger(value: MoneyInput): Money {
+export function ceilToInteger(value: FormulaInput): Money {
   const v = money(value)
   if (v.isNegative()) throw new RangeError('valor deve ser não-negativo')
   return v.toDecimalPlaces(0, Decimal.ROUND_CEIL)
 }
 
-export function compare(a: MoneyInput, b: MoneyInput): -1 | 0 | 1 {
+export function compare(a: FormulaInput, b: FormulaInput): -1 | 0 | 1 {
   return money(a).comparedTo(money(b)) as -1 | 0 | 1
 }
 
-export function isPositive(value: MoneyInput): boolean {
+export function isPositive(value: FormulaInput): boolean {
   return money(value).greaterThan(0)
 }
 
-export function isZero(value: MoneyInput): boolean {
+export function isZero(value: FormulaInput): boolean {
   return money(value).isZero()
 }
 
@@ -130,14 +146,14 @@ export function roundDownForDisplay(
   value: MoneyInput,
   decimalPlaces = 1,
 ): Money {
-  return money(value).toDecimalPlaces(decimalPlaces, Decimal.ROUND_FLOOR)
+  return moneyForDisplay(value).toDecimalPlaces(decimalPlaces, Decimal.ROUND_FLOOR)
 }
 
 export function formatSilver(value: MoneyInput | null | undefined): string {
   if (value == null || value === '') return '—'
   let parsed: Decimal
   try {
-    parsed = money(value)
+    parsed = moneyForDisplay(value)
   } catch {
     return '—'
   }
@@ -162,7 +178,7 @@ export function formatQuantity(
   if (value == null || value === '') return '—'
   let parsed: Decimal
   try {
-    parsed = money(value)
+    parsed = moneyForDisplay(value)
   } catch {
     return '—'
   }
@@ -182,7 +198,7 @@ export function formatPercent(value: MoneyInput | null | undefined): string {
   if (value == null || value === '') return '—'
   let parsed: Decimal
   try {
-    parsed = money(value)
+    parsed = moneyForDisplay(value)
   } catch {
     return '—'
   }

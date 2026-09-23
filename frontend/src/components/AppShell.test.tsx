@@ -21,6 +21,24 @@ function renderShell() {
   )
 }
 
+test('a marca aparece na navegação expandida e recolhida', () => {
+  const expanded = renderShell()
+  const expandedSidebar = document.querySelector('aside')!
+  const expandedBrand = within(expandedSidebar).getByRole('link', {
+    name: 'Albion Profit Pro',
+  })
+  expect(expandedBrand.querySelector('img')).toHaveAttribute('alt', '')
+
+  expanded.unmount()
+  localStorage.setItem('albion-profit-pro:nav-collapsed', 'true')
+  renderShell()
+  const collapsedSidebar = document.querySelector('aside')!
+  const collapsedBrand = within(collapsedSidebar).getByRole('link', {
+    name: 'Albion Profit Pro',
+  })
+  expect(collapsedBrand.querySelector('img')).toHaveAttribute('alt', '')
+})
+
 test('a navegação principal tem ícone + rótulo por tela', () => {
   renderShell()
   const nav = screen.getByRole('navigation', { name: 'Navegação principal' })
@@ -30,6 +48,7 @@ test('a navegação principal tem ícone + rótulo por tela', () => {
     'Craft',
     // Task 4/13: comida, poção e os insumos da cozinha saíram do Craft para uma aba própria.
     'Comida & Poções',
+    'Meus Crafts',
     'Itens',
     'Calculadora',
     'Tokens',
@@ -48,10 +67,16 @@ test('servidor e tema são alcançáveis nos dois breakpoints', () => {
   renderShell()
 
   const sidebar = document.querySelector('aside')!
-  expect(within(sidebar).getByRole('combobox', { name: 'Servidor' })).toBeInTheDocument()
-  expect(within(sidebar).getByRole('combobox', { name: 'Tema' })).toBeInTheDocument()
+  expect(
+    within(sidebar).getByRole('combobox', { name: 'Servidor' }),
+  ).toBeInTheDocument()
+  expect(
+    within(sidebar).getByRole('combobox', { name: 'Tema' }),
+  ).toBeInTheDocument()
   // Pedido no uso (2026-09-12): aumentar a interface inteira fica junto do tema.
-  expect(within(sidebar).getByRole('combobox', { name: 'Tamanho' })).toBeInTheDocument()
+  expect(
+    within(sidebar).getByRole('combobox', { name: 'Tamanho' }),
+  ).toBeInTheDocument()
 
   // Fora da sidebar (barra mobile), sem depender de abrir o Sheet.
   expect(screen.getAllByRole('combobox', { name: 'Servidor' })).toHaveLength(2)
@@ -80,7 +105,9 @@ test('com a navegação recolhida, o Tamanho continua ao alcance', () => {
   renderShell()
 
   const sidebar = document.querySelector('aside')!
-  expect(within(sidebar).getByRole('combobox', { name: 'Tamanho' })).toBeInTheDocument()
+  expect(
+    within(sidebar).getByRole('combobox', { name: 'Tamanho' }),
+  ).toBeInTheDocument()
 })
 
 test('no mobile a navegação abre num Sheet lateral', async () => {

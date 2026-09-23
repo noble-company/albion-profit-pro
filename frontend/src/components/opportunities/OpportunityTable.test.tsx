@@ -3,162 +3,111 @@ import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 
 import type { Opportunity } from '@/opportunities/service'
+import { ALTURA_DA_LINHA_REM, emEscala } from '@/scanner/altura'
 
 import { OpportunityTable, type OpportunityColumn } from './OpportunityTable'
 
 const rows: Opportunity[] = [
-  {
-    kind: 'flip',
-    item: 'T4_BAG',
-    item_name: 'Bolsa T4',
-    quantity: 1,
-    profit: '120',
-  },
-  {
-    kind: 'flip',
-    item: 'T5_BAG',
-    item_name: 'Bolsa T5',
-    quantity: 1,
-    profit: '340',
-  },
+  { kind: 'flip', item: 'T4_BAG', item_name: 'Bolsa T4', quantity: 1, profit: '120' },
+  { kind: 'flip', item: 'T5_BAG', item_name: 'Bolsa T5', quantity: 1, profit: '340' },
 ]
 
 const columns: OpportunityColumn[] = [
-  { header: 'Item', cell: (row) => row.item_name },
-  { header: 'Lucro', cell: (row) => row.profit },
+  { key: 'item', header: 'Item', width: emEscala(12), cell: (row) => row.item_name },
+  {
+    key: 'profit',
+    header: 'Lucro',
+    width: emEscala(7),
+    sortField: 'profit',
+    numeric: true,
+    cell: (row) => row.profit,
+  },
 ]
 
-test('renderiza cabeçalhos, linhas e a contagem da página', () => {
-  render(
+function table(overrides: Partial<Parameters<typeof OpportunityTable>[0]> = {}) {
+  return (
     <OpportunityTable
-      title="Ranking atual"
-      description="mais lucrativo por receita"
       rows={rows}
       columns={columns}
       rowKey={(row) => row.item}
-    />,
+      sort="profit"
+      direction="desc"
+      onSortChange={vi.fn()}
+      {...overrides}
+    />
   )
-  expect(screen.getByRole('columnheader', { name: 'Item' })).toBeInTheDocument()
+}
+
+test('renderiza cabeçalhos e as linhas paginadas recebidas', () => {
+  render(table())
+  expect(screen.getByRole('columnheader', { name: /Item/ })).toBeInTheDocument()
   expect(screen.getByText('Bolsa T4')).toBeInTheDocument()
   expect(screen.getByText('Bolsa T5')).toBeInTheDocument()
-  expect(screen.getByText('2 nesta página')).toBeInTheDocument()
-  expect(screen.getAllByRole('row')).toHaveLength(3) // 1 head + 2 body
+  expect(screen.getAllByRole('row')).toHaveLength(3)
 })
 
-test('a coluna é definida pelo chamador — um cell interativo funciona', async () => {
+test('cabeçalho ordenável alterna a direção e delega ao servidor', async () => {
   const user = userEvent.setup()
-  const onOpen = vi.fn()
-  render(
-    <OpportunityTable
-      title="Ranking"
-      description="x"
-      rows={rows}
-      columns={[
-        { header: 'Item', cell: (row) => row.item_name },
-        {
-          header: 'Detalhes',
-          cell: (row) => (
-            <button
-              type="button"
-              onClick={() => {
-                onOpen(row.item)
-              }}
-            >
-              Analisar
-            </button>
-          ),
-        },
-      ]}
-      rowKey={(row) => row.item}
-    />,
-  )
-  const firstRow = screen.getByText('Bolsa T4').closest('tr')!
-  await user.click(within(firstRow).getByRole('button', { name: 'Analisar' }))
-  expect(onOpen).toHaveBeenCalledWith('T4_BAG')
+  const onSortChange = vi.fn()
+  render(table({ onSortChange }))
+
+  const header = screen.getByRole('columnheader', { name: /Lucro/ })
+  expect(header).toHaveAttribute('aria-sort', 'descending')
+  await user.click(within(header).getByRole('button', { name: /Lucro/ }))
+  expect(onSortChange).toHaveBeenCalledWith('profit', 'asc')
 })
 
-test('coluna numérica alinha à direita com tabular-nums (task 14 §1)', () => {
-  render(
-    <OpportunityTable
-      title="x"
-      description="y"
-      rows={rows}
-      columns={[
-        { header: 'Item', cell: (row) => row.item_name },
-        { header: 'Lucro', numeric: true, cell: (row) => row.profit },
-      ]}
-      rowKey={(row) => row.item}
-    />,
-  )
+test('campo novo começa pela direção descendente', async () => {
+  const user = userEvent.setup()
+  const onSortChange = vi.fn()
+  const age: OpportunityColumn = {
+    key: 'age',
+    header: 'Idade',
+    width: emEscala(6),
+    sortField: 'freshness',
+    cell: () => 'agora',
+  }
+  render(table({ columns: [...columns, age], onSortChange }))
+  await user.click(screen.getByRole('button', { name: /Idade/ }))
+  expect(onSortChange).toHaveBeenCalledWith('freshness', 'desc')
+})
+
+test('coluna numérica alinha à direita com tabular-nums', () => {
+  render(table())
   const lucro = screen.getByText('120').closest('td')!
-  expect(lucro.className).toContain('text-right')
-  expect(lucro.className).toContain('tabular-nums')
-  const item = screen.getByText('Bolsa T4').closest('td')!
-  expect(item.className).toContain('text-left')
+  expect(lucro).toHaveClass('text-right', 'tabular-nums')
 })
 
-test('coluna sticky recebe position:sticky e um deslocamento de borda', () => {
-  render(
-    <OpportunityTable
-      title="x"
-      description="y"
-      rows={rows}
-      columns={[
-        {
-          header: 'Item',
-          sticky: 'left',
-          width: '13rem',
-          cell: (r) => r.item_name,
-        },
-        {
-          header: 'Lucro',
-          sticky: 'right',
-          width: '7rem',
-          cell: (r) => r.profit,
-        },
-        { header: 'ROI', sticky: 'right', width: '5rem', cell: () => '10%' },
-      ]}
-      rowKey={(row) => row.item}
-    />,
-  )
+test('colunas fixas recebem os deslocamentos corretos', () => {
+  const fixed: OpportunityColumn[] = [
+    { ...columns[0]!, sticky: 'left' },
+    { ...columns[1]!, sticky: 'right' },
+    {
+      key: 'roi',
+      header: 'ROI',
+      width: emEscala(5),
+      sticky: 'right',
+      cell: () => '10%',
+    },
+  ]
+  render(table({ columns: fixed }))
   const item = screen.getByText('Bolsa T4').closest('td')!
-  expect(item.className).toContain('sticky')
-  expect(item.style.left).toBe('0px')
-  // ROI é a última sticky-right → cola em right:0; Lucro fica deslocada pela largura da ROI.
   const roi = screen.getAllByText('10%')[0]!.closest('td')!
   const lucro = screen.getByText('120').closest('td')!
+  expect(item).toHaveClass('sticky')
+  expect(item.style.left).toBe('0px')
   expect(roi.style.right).toBe('0px')
-  expect(lucro.style.right).toBe('calc(5rem)')
+  expect(lucro.style.right).toBe(`calc(${emEscala(5)})`)
 })
 
-test('linhas têm a densidade da §1 (h-11, px-3)', () => {
-  render(
-    <OpportunityTable
-      title="x"
-      description="y"
-      rows={rows}
-      columns={columns}
-      rowKey={(row) => row.item}
-    />,
-  )
-  const cell = screen.getByText('Bolsa T4').closest('td')!
-  expect(cell.className).toContain('h-11')
-  expect(cell.className).toContain('px-3')
-  expect(cell.className).not.toContain('p-4')
+test('altura da linha acompanha o seletor Tamanho', () => {
+  render(table())
+  const row = screen.getByText('Bolsa T4').closest('tr')!
+  expect(row.style.height).toBe(emEscala(ALTURA_DA_LINHA_REM))
 })
 
-test('loading mostra o skeleton no formato da tabela, não as linhas', () => {
-  render(
-    <OpportunityTable
-      title="x"
-      description="y"
-      rows={[]}
-      columns={columns}
-      rowKey={(row) => row.item}
-      loading
-    />,
-  )
+test('loading mostra o skeleton no formato da tabela', () => {
+  render(table({ rows: [], loading: true }))
   expect(screen.getByRole('status')).toBeInTheDocument()
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
-  expect(screen.getByText('…')).toBeInTheDocument() // contagem não finge um número
 })

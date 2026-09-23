@@ -58,15 +58,17 @@ test('ler os params da URL é reversível — ida e volta preserva o estado', ()
     wrapper: wrapperAt(search),
   })
   expect(result.current.query).toMatchObject({
-    tier: 5,
-    quality: 3,
+    tiers: [5],
+    enchantments: [],
+    qualities: [3],
     maxAgeHours: 12,
     requireComplete: true,
     minProfit: '1000',
     minRoi: '8',
     premium: false,
     profitOnly: false,
-    locations: ['1002', '3005'],
+    buyLocations: ['1002', '3005'],
+    sellLocations: ['1002', '3005'],
     sort: 'roi',
     direction: 'asc',
     offset: 50,
@@ -74,12 +76,12 @@ test('ler os params da URL é reversível — ida e volta preserva o estado', ()
   expect(result.current.sortParam).toBe('roi_asc')
 })
 
-test('mudar um filtro volta pra primeira página', () => {
+test('mudar uma lista de filtro volta pra primeira página', () => {
   const { result } = renderHook(() => useOpportunityParams(noExtra), {
     wrapper: wrapperAt('?offset=50&tier=4'),
   })
-  act(() => result.current.setFilter('tier', '6'))
-  expect(result.current.query.tier).toBe(6)
+  act(() => result.current.setListFilter('tier', [4, 6]))
+  expect(result.current.query.tiers).toEqual([4, 6])
   expect(result.current.query.offset).toBe(0)
 })
 
@@ -89,19 +91,30 @@ test('paginar preserva os outros filtros (o updateParam antigo apagava offset em
   })
   act(() => result.current.setOffset(25))
   expect(result.current.query.offset).toBe(25)
-  expect(result.current.query.tier).toBe(4)
-  expect(result.current.query.quality).toBe(2)
+  expect(result.current.query.tiers).toEqual([4])
+  expect(result.current.query.qualities).toEqual([2])
   act(() => result.current.setOffset(0))
   expect(result.current.query.offset).toBe(0)
 })
 
-test('setLocations troca a seleção de cidades e zera a paginação', () => {
+test('listas de compra e venda são independentes', () => {
   const { result } = renderHook(() => useOpportunityParams(noExtra), {
-    wrapper: wrapperAt('?offset=25&location_id=1002'),
+    wrapper: wrapperAt('?offset=25&buy_in=1002&sell_in=3005'),
   })
-  act(() => result.current.setLocations(['3005', '4002']))
-  expect(result.current.query.locations).toEqual(['3005', '4002'])
+  act(() => result.current.setListFilter('buy_in', ['3008', '4002']))
+  expect(result.current.query.buyLocations).toEqual(['3008', '4002'])
+  expect(result.current.query.sellLocations).toEqual(['3005'])
   expect(result.current.query.offset).toBe(0)
+})
+
+test('editar link antigo materializa as duas pontas antes de remover location_id', () => {
+  const { result } = renderHook(() => useOpportunityParams(noExtra), {
+    wrapper: wrapperAt('?location_id=1002&location_id=1301'),
+  })
+  act(() => result.current.setListFilter('buy_in', ['3008']))
+  expect(result.current.query.buyLocations).toEqual(['3008'])
+  expect(result.current.query.sellLocations).toEqual(['1002', '1301'])
+  expect(result.current.params.getAll('location_id')).toEqual([])
 })
 
 test('reset limpa tudo', () => {
@@ -109,7 +122,7 @@ test('reset limpa tudo', () => {
     wrapper: wrapperAt('?tier=4&offset=50&sort=roi_desc'),
   })
   act(() => result.current.reset())
-  expect(result.current.query.tier).toBeUndefined()
+  expect(result.current.query.tiers).toEqual([])
   expect(result.current.query.offset).toBe(0)
   expect(result.current.sortParam).toBe('profit_desc')
 })

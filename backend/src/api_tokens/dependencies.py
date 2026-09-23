@@ -15,11 +15,11 @@ async def require_api_token(
     session: AsyncSession = Depends(get_session),
 ) -> ApiToken:
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Token ausente")
+        raise HTTPException(status_code=401, detail="Missing token")
     raw_token = authorization.removeprefix("Bearer ")
     token = await get_valid_token(session, raw_token)
     if token is None:
-        raise HTTPException(status_code=401, detail="Token inválido ou revogado")
+        raise HTTPException(status_code=401, detail="Invalid or revoked token")
     return token
 
 
@@ -36,11 +36,11 @@ def rate_limited_api_token(bucket_key: str, limit: int, seconds: int):
         session: AsyncSession = Depends(get_session),
     ) -> ApiToken:
         token: ApiToken | None = None
-        detail = "Token ausente"
+        detail = "Missing token"
         if authorization and authorization.startswith("Bearer "):
             raw_token = authorization.removeprefix("Bearer ")
             token = await get_valid_token(session, raw_token)
-            detail = "Token invalido ou revogado"
+            detail = "Invalid or revoked token"
 
         if token is None:
             await enforce_rate_limit(

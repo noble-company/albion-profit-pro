@@ -40,7 +40,7 @@ async def test_ready_returns_503_before_static_seed(client):
     resp = await client.get("/ready")
 
     assert resp.status_code == 503
-    assert resp.json()["dataset"] == "ausente"
+    assert resp.json()["dataset"] == "missing"
 
 
 async def test_ready_returns_503_without_leaking_dsn_when_postgres_fails(client, monkeypatch):
@@ -59,7 +59,7 @@ async def test_ready_returns_503_without_leaking_dsn_when_postgres_fails(client,
     resp = await client.get("/ready")
     assert resp.status_code == 503
     body = resp.json()
-    assert body["postgres"] == "erro"
+    assert body["postgres"] == "error"
     assert settings.database_url not in resp.text
     assert "connection refused" not in resp.text
 
@@ -80,7 +80,7 @@ async def test_ready_returns_503_without_leaking_details_when_redis_fails(
     resp = await client.get("/ready")
     assert resp.status_code == 503
     body = resp.json()
-    assert body["redis"] == "erro"
+    assert body["redis"] == "error"
     assert body["postgres"] == "ok"
     assert body["dataset"] == "ok"
     assert "segredo" not in resp.text
@@ -100,7 +100,7 @@ async def test_ready_returns_503_without_leaking_details_when_rabbitmq_fails(
     resp = await client.get("/ready")
 
     assert resp.status_code == 503
-    assert resp.json()["rabbitmq"] == "erro"
+    assert resp.json()["rabbitmq"] == "error"
     assert "segredo" not in resp.text
 
 

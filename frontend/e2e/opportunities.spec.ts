@@ -8,25 +8,71 @@ test.beforeEach(async ({ page }) => {
 })
 
 function offersFound(page: Page) {
-  // KPI "Ofertas encontradas" — o total do servidor
-  return page
-    .locator('article', { hasText: 'Ofertas encontradas' })
-    .locator('p')
-    .last()
+  return page.locator('header').getByText(/oportunidades · página/)
 }
 
-test('filtrar por tier reduz o conjunto e limpar restaura', async ({ page }) => {
-  await expect(page.getByText(/Encontre o próximo lucro/i)).toBeVisible()
-  await expect(offersFound(page)).toHaveText(/^\d+$/)
-  const inicial = await offersFound(page).innerText()
-  expect(Number(inicial)).toBeGreaterThanOrEqual(25)
+async function totalOffers(page: Page): Promise<number> {
+  const text = await offersFound(page).innerText()
+  return Number(
+    text.match(/([\d.]+) oportunidades/)?.[1]?.replaceAll('.', '') ?? 0,
+  )
+}
 
-  await page.getByLabel('Tier', { exact: true }).selectOption('5')
-  await expect(offersFound(page)).toHaveText('5')
+test('filtrar por tier reduz o conjunto e limpar restaura', async ({
+  page,
+}) => {
+  await expect(page.getByRole('heading', { name: 'Market Flip' })).toBeVisible()
+  await expect(offersFound(page)).toContainText('oportunidades')
+  const inicial = await totalOffers(page)
+  expect(inicial).toBeGreaterThanOrEqual(25)
+
+  await page
+    .getByRole('group', { name: 'Tier' })
+    .getByRole('button', { name: 'T5' })
+    .click()
+  await expect(offersFound(page)).toContainText('5 oportunidades')
   expect(await page.locator('tbody tr').count()).toBe(5)
 
   await page.getByRole('button', { name: 'Limpar filtros' }).click()
-  await expect(offersFound(page)).toHaveText(inicial)
+  await expect(offersFound(page)).toContainText(`${inicial} oportunidades`)
+})
+
+test('combina cidades independentes e múltiplos tiers no contrato novo', async ({
+  page,
+}) => {
+  await page
+    .getByRole('group', { name: 'Comprar em' })
+    .getByRole('button', { name: 'Martlock' })
+    .click()
+  await page
+    .getByRole('group', { name: 'Vender em' })
+    .getByRole('button', { name: 'Caerleon' })
+    .click()
+  await page
+    .getByRole('group', { name: 'Tier' })
+    .getByRole('button', { name: 'T4' })
+    .click()
+
+  const responsePromise = page.waitForResponse((response) => {
+    if (!response.url().includes('/opportunities/flips')) return false
+    const params = new URL(response.url()).searchParams
+    return (
+      params.getAll('buy_location_id').includes('3008') &&
+      params.getAll('sell_location_id').includes('3005') &&
+      params.getAll('tier').includes('4') &&
+      params.getAll('tier').includes('5')
+    )
+  })
+  await page
+    .getByRole('group', { name: 'Tier' })
+    .getByRole('button', { name: 'T5' })
+    .click()
+  expect((await responsePromise).status()).toBe(200)
+
+  const params = new URL(page.url()).searchParams
+  expect(params.getAll('buy_in')).toEqual(['3008'])
+  expect(params.getAll('sell_in')).toEqual(['3005'])
+  expect(params.getAll('tier')).toEqual(['4', '5'])
 })
 
 test('paginar mantém a ordenação estável entre páginas (F08)', async ({
@@ -49,9 +95,9 @@ test('paginar mantém a ordenação estável entre páginas (F08)', async ({
         u.searchParams.get('sort') === 'roi' &&
         (u.searchParams.get('offset') ?? '0') === '0',
     ),
-    page.getByLabel('Ordenar por').selectOption('roi_desc'),
+    page.getByRole('button', { name: /^ROI/ }).click(),
   ])
-  const total = Number(await offersFound(page).innerText())
+  const total = await totalOffers(page)
   expect(total).toBeGreaterThan(25)
   const rest = total - 25
 

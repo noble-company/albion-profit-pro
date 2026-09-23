@@ -31,10 +31,25 @@ def test_iter_category_entries_flattens_relevant_categories(tmp_path):
     items = {
         "simpleitem": {"@uniquename": "A"},
         "weapon": [{"@uniquename": "B"}, {"@uniquename": "C"}],
-        "mount": [{"@uniquename": "IGNORADO"}],  # fora de RELEVANT_CATEGORIES
+        # fora de RELEVANT_CATEGORIES -- diferente de `mount`/`furnitureitem` (task 3.6/17,
+        # W11), `trashitem` não tem relevância nenhuma pra calculadora de crafting/refino
+        # (docs/02-dados-de-receita.md).
+        "trashitem": [{"@uniquename": "IGNORADO"}],
     }
     names = {e["@uniquename"] for e in iter_category_entries(items)}
     assert names == {"A", "B", "C"}
+
+
+def test_mount_and_furnitureitem_are_relevant_categories():
+    """Guarda de regressão do W11 (task 3.6/17): estas duas categorias têm
+    `craftingrequirements` no dump real (109 montarias + 199 móveis) e o importer as ignorava
+    por completo antes desta task."""
+    items = {
+        "mount": [{"@uniquename": "MOUNT_X"}],
+        "furnitureitem": [{"@uniquename": "FURNITURE_Y"}],
+    }
+    names = {e["@uniquename"] for e in iter_category_entries(items)}
+    assert names == {"MOUNT_X", "FURNITURE_Y"}
 
 
 def test_load_item_dump_items_returns_only_items_block(tmp_path):

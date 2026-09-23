@@ -1,5 +1,6 @@
 import { ItemImage } from '@/components/ItemImage'
 import { partesDoNomeCurto } from '@/lib/formatters'
+import type { ReactNode } from 'react'
 
 import { emEscala } from './altura'
 import { formatPercent, formatQuantity, formatSilver, type Money } from '@/lib/money'
@@ -53,12 +54,14 @@ export interface OpcoesDeColuna {
    * dado, e a célula não mostra nada; `null` = sem histórico, e ela mostra traço — nunca zero.
    */
   volume?: (row: ScannerRow) => Money | null
+  /** Ação opcional ao lado do item — usada por Craft/Consumíveis para salvar a receita. */
+  savedCraftAction?: (row: ScannerRow) => ReactNode
 }
 
 export function buildColumns(
   locationName: (id: string) => string,
   nomeItem: NomeItem,
-  { agora = new Date(), maxIngredientes = 2, volume }: OpcoesDeColuna = {},
+  { agora = new Date(), maxIngredientes = 2, volume, savedCraftAction }: OpcoesDeColuna = {},
 ): ScannerColumn[] {
   return [
     {
@@ -83,6 +86,7 @@ export function buildColumns(
                 <span className="text-xs tabular-nums text-foreground-subtle">{grau}</span>
               )}
             </span>
+            {savedCraftAction?.(row)}
           </span>
         )
       },

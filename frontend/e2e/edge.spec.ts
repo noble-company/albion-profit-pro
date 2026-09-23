@@ -9,7 +9,7 @@ test('conjunto vazio: filtro sem resultado mostra o estado vazio honesto', async
 }) => {
   await registerAndLogin(page)
   await chooseRealm(page, 'West')
-  await expect(page.getByText(/Encontre o próximo lucro/i)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Market Flip' })).toBeVisible()
 
   await page.getByLabel('Lucro mínimo').fill('999999999999')
 
@@ -27,7 +27,7 @@ test('backend fora do ar: a tela mostra erro, não uma página em branco', async
 }) => {
   await registerAndLogin(page)
   await chooseRealm(page, 'West')
-  await expect(page.getByText(/Encontre o próximo lucro/i)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Market Flip' })).toBeVisible()
 
   await page.route('**/opportunities/**', (route) => route.abort('failed'))
   await page.reload()
@@ -42,7 +42,7 @@ test('sessão expira no meio da navegação: redireciona pro login com aviso', a
 }) => {
   await registerAndLogin(page)
   await chooseRealm(page, 'West')
-  await expect(page.getByText(/Encontre o próximo lucro/i)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Market Flip' })).toBeVisible()
 
   // A partir de agora o servidor "não reconhece mais" a sessão.
   await page.route('**/opportunities/**', (route) =>

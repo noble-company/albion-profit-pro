@@ -152,3 +152,48 @@ async def test_categoria_sem_kind_e_rejeitada(cliente_autenticado):
 
 async def test_exige_autenticacao(client):
     assert (await client.get("/prices/sales?server=west")).status_code == 401
+
+
+async def test_output_item_traz_so_as_saidas_pedidas_e_normaliza_ordem(
+    cliente_autenticado, db_session
+):
+    await _seed(db_session)
+
+    primeira = (
+        await cliente_autenticado.get(
+            "/prices/sales",
+            params=[
+                ("server", "west"),
+                ("output_item", "T4_2H_BOW"),
+                ("output_item", "T4_MAIN_SWORD"),
+            ],
+        )
+    ).json()
+    segunda = (
+        await cliente_autenticado.get(
+            "/prices/sales",
+            params=[
+                ("server", "west"),
+                ("output_item", "T4_MAIN_SWORD"),
+                ("output_item", "T4_2H_BOW"),
+                ("output_item", "T4_MAIN_SWORD"),
+            ],
+        )
+    ).json()
+
+    assert _linhas(primeira) == _linhas(segunda)
+    assert {item for item, _, _ in _linhas(primeira)} == {"T4_MAIN_SWORD", "T4_2H_BOW"}
+
+
+async def test_sales_output_item_rejeita_categoria_e_excesso(cliente_autenticado):
+    conflito = await cliente_autenticado.get(
+        "/prices/sales",
+        params={"server": "west", "category": "weapons", "output_item": "T4_MAIN_SWORD"},
+    )
+    excesso = await cliente_autenticado.get(
+        "/prices/sales",
+        params=[("server", "west"), *(("output_item", f"T4_{i}") for i in range(201))],
+    )
+
+    assert conflito.status_code == 422
+    assert excesso.status_code == 422

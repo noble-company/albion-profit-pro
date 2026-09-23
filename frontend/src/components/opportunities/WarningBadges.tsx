@@ -8,15 +8,17 @@ import { ConfidenceBadge } from '@/design/ConfidenceBadge'
 export function WarningBadges({
   warnings,
   className,
+  compact = false,
 }: {
   warnings: readonly string[] | null | undefined
   className?: string
+  compact?: boolean
 }) {
   if (!warnings || warnings.length === 0) return null
   return (
     <div className={`flex flex-wrap gap-1 ${className ?? ''}`}>
       {warnings.map((warning) => (
-        <ConfidenceBadge key={warning} warning={warning} />
+        <ConfidenceBadge key={warning} warning={warning} compact={compact} />
       ))}
     </div>
   )

@@ -86,3 +86,48 @@ No caminho B: teste de que a UI exibe a ressalva de frescor onde o usuário deci
 `20.11`, no gate da task 3/19: mapear um mercado, comprar ou cancelar uma ordem, mapear de novo —
 a ordem removida não pode aparecer em nenhuma das quatro telas, e o preço novo tem que aparecer
 em todas, inclusive em cidade diferente e no Black Market.
+
+## Estado da implementação
+
+**Concluída** (2026-09-22) — **Caminho B, decisão do responsável do produto** (perguntado
+explicitamente antes de qualquer implementação, dado o tamanho e o risco bem diferentes dos dois
+caminhos). Decisão completa registrada em
+[14-revisao-fase-3-5.md, "Decisões desta revisão" §5](../../14-revisao-fase-3-5.md#decisões-desta-revisão).
+
+- **A decisão** — não implementar a reconciliação transacional agora. Mexer de novo no client Go
+  recém-estabilizado, logo depois da 3.6/14, por um ganho que a mitigação já em produção
+  (expiração + janela de frescor + projeção da última observação) cobre parcialmente, não se
+  paga no momento. Reavaliável se o volume de reclamação sobre preço errado justificar.
+- **`frontend/src/scanner/ExactAnalysis.tsx`** — ressalva permanente ("Este preço é da última
+  coleta, não do livro agora. Uma ordem pode já ter sido comprada ou cancelada antes de sumir da
+  tela.") com ícone `Clock`, sempre visível, **não condicionada a nenhum `warning` do backend**
+  — é limite estrutural do sistema, não uma condição pontual de uma resposta. Este componente é
+  o extrato "Analisar com o livro real", compartilhado por Market Flip, Refino, Craft e
+  Calculadora via `DetalheDaLinha.tsx` — é "onde o jogador decide" que a spec pede, num lugar só.
+- **`frontend/src/scanner/ExactAnalysis.test.tsx`** — teste novo confirmando que a ressalva
+  aparece **antes** de qualquer chamada de rede (é permanente, não depende do resultado da
+  análise).
+- `20.4` permanece formalmente aberta como pendência técnica conhecida — a decisão fecha o
+  "sem decisão de quando" do achado `P03`, não o achado em si.
+
+### Desvios da spec
+
+- **Não reaproveitei o warning `ordem_nao_garantida` já existente.** Ele significa outra coisa:
+  dispara quando o cenário **cria** uma ordem nova (`creates_order`, `craft/service.py:99` e
+  `compare_service.py:233`) — "sua ordem pode não ser preenchida", não "a ordem que você está
+  vendo pode já ter sumido". Reusar o mesmo texto pros dois casos misturaria dois avisos
+  diferentes sob um rótulo que já tem sentido fixado e testado. A ressalva nova é texto estático
+  sem chave de warning, exatamente porque é incondicional (§4 de `13-linguagem-visual.md` é pra
+  avisos **do backend**, condicionais por resposta — este não é).
+
+### Testes automatizados
+
+`npm run lint` (0 erros, mesmos 8 warnings pré-existentes), `npm run typecheck` (limpo),
+`npm run test` (595/595, era 594 antes). `python scripts/verify_repository.py` verde.
+
+### Pendente pra você testar
+
+- Nenhum — a decisão foi tomada por você mesmo (Caminho B), e a mudança de UI é puramente
+  textual/visual, coberta pelo teste automatizado. Se quiser conferir visualmente: abrir
+  qualquer linha do scanner com "Analisar com o livro real" disponível e confirmar que a
+  ressalva aparece assim que o painel abre, antes de clicar no botão.

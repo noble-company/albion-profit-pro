@@ -316,7 +316,8 @@ async def simulate_craft(
         "sales_tax_rate": sales_tax_rate,
         "setup_fee_rate": setup_fee_rate,
         "recipe": {
-            "silver_cost_per_execution": recipe["silver_cost"],
+            # F09 (task 3.6/10, P07): dinheiro é decimal string ponta a ponta.
+            "silver_cost_per_execution": Decimal(recipe["silver_cost"]),
             "crafting_focus_per_execution": recipe["crafting_focus"],
             "amount_crafted": recipe["amount_crafted"],
         },

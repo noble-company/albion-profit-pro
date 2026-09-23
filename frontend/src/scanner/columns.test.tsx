@@ -179,6 +179,16 @@ describe('item (pedido no uso, 2026-09-12)', () => {
     // Se passar de 2 linhas, o nome inteiro continua no hover.
     expect(nome).toHaveAttribute('title', 'Elmo de Soldado T4.1')
   })
+
+  test('aceita a estrela de salvar ao lado do item sem acoplar a coluna ao backend', () => {
+    const itemColumn = buildColumns(locationName, nomeItem, {
+      savedCraftAction: () => <button type="button">Salvar receita</button>,
+    }).find((column) => column.key === 'item')!
+
+    render(<>{itemColumn.cell(row(), item)}</>)
+
+    expect(screen.getByRole('button', { name: 'Salvar receita' })).toBeInTheDocument()
+  })
 })
 
 describe('lucro', () => {

@@ -27,16 +27,25 @@ const LEVEL_STYLE: Record<
   },
 }
 
-export function ConfidenceBadge({ warning }: { warning: string }) {
+export function ConfidenceBadge({
+  warning,
+  compact = false,
+}: {
+  warning: string
+  compact?: boolean
+}) {
   const level = confidenceLevelFor(warning)
   const { icon: Icon, className } = LEVEL_STYLE[level]
   const label = WARNING_LABELS[warning] ?? warning
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${className}`}
+      title={compact ? label : undefined}
+      className={`inline-flex items-center rounded-full border text-xs font-medium ${
+        compact ? 'p-1' : 'gap-1.5 px-2 py-0.5'
+      } ${className}`}
     >
       <Icon className="size-3.5" aria-hidden="true" />
-      {label}
+      <span className={compact ? 'sr-only' : undefined}>{label}</span>
     </span>
   )
 }

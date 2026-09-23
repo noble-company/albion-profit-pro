@@ -163,7 +163,9 @@ async def get_recipe_detail(session: AsyncSession, unique_name: str) -> dict:
         "production_kind": recipe.production_kind,
         # Base da taxa da estação (task 4/18) — propriedade da SAÍDA, não da receita.
         "item_value": output_item.item_value,
-        "silver_cost": recipe.silver_cost,
+        # F09: dinheiro é decimal string ponta a ponta (task 3.6/10, P07) -- a coluna é `int`
+        # de propósito (silver do dump sempre é inteiro), mas o contrato não pode expor isso.
+        "silver_cost": Decimal(recipe.silver_cost),
         "crafting_focus": recipe.crafting_focus,
         "amount_crafted": recipe.amount_crafted,
         "craft_time": recipe.craft_time,

@@ -97,19 +97,19 @@ o estado real e receber confirmação explícita antes de alterar código.
 - [ ] 02 — Entrada de filtro à prova de queda
 - [ ] 03 — ErrorBoundary de verdade
 - [ ] 04 — Erros de formulário na Calculadora
-- [ ] 05 — Formatação do client e gate verde
-- [ ] 06 — Contrato inglês completo
+- [x] 05 — Formatação do client e gate verde
+- [x] 06 — Contrato inglês completo
 - [ ] 07 — Guards de frontend que guardam
-- [ ] 08 — Baseline Git verificado
-- [ ] 09 — Índice trigram no modelo
-- [ ] 10 — Tipo único de dinheiro
+- [x] 08 — Baseline Git verificado
+- [x] 09 — Índice trigram no modelo
+- [x] 10 — Tipo único de dinheiro
 - [ ] 11 — Retry real e erro visível
 - [ ] 12 — E2E do núcleo do produto
-- [ ] 13 — Serving e deploy do frontend
-- [ ] 14 — "Abrir Calculadora" no systray
-- [ ] 15 — Decisão sobre a 20.4
+- [x] 13 — Serving e deploy do frontend
+- [x] 14 — "Abrir Calculadora" no systray
+- [x] 15 — Decisão sobre a 20.4
 - [ ] 16 — Documentos reconciliados
-- [ ] 17 — Higiene de repositório e imagem
+- [x] 17 — Higiene de repositório e imagem
 
 ## Achados sem task própria
 
@@ -135,4 +135,4 @@ o estado real e receber confirmação explícita antes de alterar código.
 
 | # | Achado | Corrigido em |
 |---|---|---|
-| — | *(nenhum ainda — registrar aqui os achados vizinhos que surgirem durante a execução)* | — |
+| `W14` | `go vet` só roda em `ubuntu-latest` no `client-ci`, então nunca compila/analisa os arquivos `_win.go` — a plataforma real de produção. Achado localmente (`go vet ./client/` no Windows): `client/net_interface_filter_win.go:75: possible misuse of unsafe.Pointer`, herdado do upstream, sem `PATCH LOCAL`. Decisão da task 05: não adicionar job `windows-latest` sem antes triar esse achado — nasceria vermelho. | Aberto — sem task própria ainda |

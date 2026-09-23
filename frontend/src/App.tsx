@@ -35,21 +35,34 @@ const ConsumablesScannerPage = lazy(() =>
     default: m.ConsumablesScannerPage,
   })),
 )
+const SavedCraftsPage = lazy(() =>
+  import('./saved-crafts/SavedCraftsPage').then((m) => ({ default: m.SavedCraftsPage })),
+)
 const DestinyBoardPage = lazy(() =>
   import('./destiny/DestinyBoardPage').then((m) => ({ default: m.DestinyBoardPage })),
 )
 const TokensPage = lazy(() =>
   import('@/tokens/pages').then((m) => ({ default: m.TokensPage })),
 )
-// Rotas de desenvolvimento (tasks 3.5/11 e 3.5/14).
-const UiPreview = lazy(() =>
-  import('@/components/ui/Preview').then((m) => ({ default: m.UiPreview })),
-)
-const LinguagemVisualPage = lazy(() =>
-  import('@/design/LinguagemVisualPage').then((m) => ({
-    default: m.LinguagemVisualPage,
-  })),
-)
+// Rotas de desenvolvimento (tasks 3.5/11 e 3.5/14). `import.meta.env.DEV` é substituído por um
+// literal em build de produção (Vite/Rollup) — o ternário fora do `lazy` faz o branch (e o
+// `import()` dinâmico dentro dele) virar código morto comprovadamente inalcançável, então o
+// bundle de produção não inclui `Preview-*.js`/`LinguagemVisualPage-*.js` nem os componentes
+// shadcn que só eles usavam (task 3.6/17, P09). Um `lazy(() => import(...))` incondicional
+// continuaria sendo um ponto de split mesmo atrás de uma rota condicional — o `import()` em si
+// precisa estar em código morto, não só nunca-renderizado.
+const UiPreview = import.meta.env.DEV
+  ? lazy(() =>
+      import('@/components/ui/Preview').then((m) => ({ default: m.UiPreview })),
+    )
+  : null
+const LinguagemVisualPage = import.meta.env.DEV
+  ? lazy(() =>
+      import('@/design/LinguagemVisualPage').then((m) => ({
+        default: m.LinguagemVisualPage,
+      })),
+    )
+  : null
 
 function Boundary({ children }: { children: ReactNode }) {
   return (
@@ -132,6 +145,14 @@ export function App() {
             }
           />
           <Route
+            path="/meus-crafts"
+            element={
+              <Boundary>
+                <SavedCraftsPage />
+              </Boundary>
+            }
+          />
+          <Route
             path="/tokens"
             element={
               <Boundary>
@@ -139,22 +160,26 @@ export function App() {
               </Boundary>
             }
           />
-          <Route
-            path="/ui"
-            element={
-              <Boundary>
-                <UiPreview />
-              </Boundary>
-            }
-          />
-          <Route
-            path="/estilo"
-            element={
-              <Boundary>
-                <LinguagemVisualPage />
-              </Boundary>
-            }
-          />
+          {UiPreview && (
+            <Route
+              path="/ui"
+              element={
+                <Boundary>
+                  <UiPreview />
+                </Boundary>
+              }
+            />
+          )}
+          {LinguagemVisualPage && (
+            <Route
+              path="/estilo"
+              element={
+                <Boundary>
+                  <LinguagemVisualPage />
+                </Boundary>
+              }
+            />
+          )}
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

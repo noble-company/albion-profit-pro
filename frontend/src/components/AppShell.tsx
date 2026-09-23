@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Bookmark,
   Calculator,
   CookingPot,
   Hammer,
@@ -22,6 +23,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { ESCALAS, useEscala, type Escala } from '@/app/escala'
 import { REALMS, useServer, type Realm } from '@/app/ServerContext'
 import { useTheme, type Theme } from '@/app/ThemeContext'
+import brandShield from '@/assets/marca/escudo-ap.webp'
 import { useAuth } from '@/auth/useAuth'
 import { ErrorBoundary } from '@/components/shell/ErrorBoundary'
 import {
@@ -61,6 +63,7 @@ const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/refino', label: 'Refino', icon: Recycle },
   { to: '/craft', label: 'Craft', icon: Hammer },
   { to: '/consumiveis', label: 'Comida & Poções', icon: CookingPot },
+  { to: '/meus-crafts', label: 'Meus Crafts', icon: Bookmark },
   { to: '/item', label: 'Itens', icon: Search },
   { to: '/painel', label: 'Painel do Destino', icon: Sparkles },
   { to: '/calculadora', label: 'Calculadora', icon: Calculator },
@@ -122,8 +125,14 @@ function NavItems({
 function RealmSelect({ className }: { className?: string }) {
   const { realm, setRealm } = useServer()
   return (
-    <Select value={realm ?? ''} onValueChange={(value) => setRealm(value as Realm)}>
-      <SelectTrigger aria-label="Servidor" className={className ?? 'h-9 w-full'}>
+    <Select
+      value={realm ?? ''}
+      onValueChange={(value) => setRealm(value as Realm)}
+    >
+      <SelectTrigger
+        aria-label="Servidor"
+        className={className ?? 'h-9 w-full'}
+      >
         <SelectValue placeholder="Servidor" />
       </SelectTrigger>
       <SelectContent>
@@ -164,15 +173,24 @@ function ThemeSelect({ className }: { className?: string }) {
 function EscalaSelect({ compacto = false }: { compacto?: boolean }) {
   const { escala, setEscala } = useEscala()
   return (
-    <Select value={String(escala)} onValueChange={(value) => setEscala(Number(value) as Escala)}>
+    <Select
+      value={String(escala)}
+      onValueChange={(value) => setEscala(Number(value) as Escala)}
+    >
       <SelectTrigger
         aria-label="Tamanho"
         title={compacto ? `Tamanho do conteúdo: ${escala}%` : undefined}
         className={
-          compacto ? 'h-9 w-full justify-center px-0 [&>svg:last-child]:hidden' : 'h-9 w-full'
+          compacto
+            ? 'h-9 w-full justify-center px-0 [&>svg:last-child]:hidden'
+            : 'h-9 w-full'
         }
       >
-        {compacto ? <ZoomIn className="size-4" aria-hidden="true" /> : <SelectValue />}
+        {compacto ? (
+          <ZoomIn className="size-4" aria-hidden="true" />
+        ) : (
+          <SelectValue />
+        )}
       </SelectTrigger>
       <SelectContent>
         {ESCALAS.map((opcao) => (
@@ -279,23 +297,37 @@ export function AppShell() {
           }`}
         >
           <div
-            className={`flex shrink-0 items-center gap-1 px-2 py-3 ${
-              collapsed ? 'justify-center' : 'justify-between'
+            className={`flex shrink-0 gap-1 px-2 ${
+              collapsed
+                ? 'flex-col items-center py-2'
+                : 'items-center justify-between py-3'
             }`}
           >
-            {!collapsed && (
-              <Link
-                to="/"
-                className="truncate px-1 text-base font-black tracking-tight text-primary"
-              >
-                Albion Profit Pro
-              </Link>
-            )}
+            <Link
+              to="/"
+              aria-label={collapsed ? 'Albion Profit Pro' : undefined}
+              className={`flex min-w-0 items-center text-primary ${
+                collapsed ? 'justify-center' : 'gap-2 px-1'
+              }`}
+            >
+              <img
+                src={brandShield}
+                alt=""
+                className="size-7 shrink-0 object-contain"
+              />
+              {!collapsed && (
+                <span className="truncate text-base font-black tracking-tight">
+                  Albion Profit Pro
+                </span>
+              )}
+            </Link>
             <Button
               variant="ghost"
               size="icon"
               className="size-8 shrink-0"
-              aria-label={collapsed ? 'Expandir navegação' : 'Colapsar navegação'}
+              aria-label={
+                collapsed ? 'Expandir navegação' : 'Colapsar navegação'
+              }
               aria-expanded={!collapsed}
               onClick={() => setCollapsed((value) => !value)}
             >
@@ -306,7 +338,11 @@ export function AppShell() {
               )}
             </Button>
           </div>
-          <NavColumn collapsed={collapsed} onSignOut={signOut} email={user?.email} />
+          <NavColumn
+            collapsed={collapsed}
+            onSignOut={signOut}
+            email={user?.email}
+          />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -321,7 +357,16 @@ export function AppShell() {
               </SheetTrigger>
               <SheetContent side="left" className="w-80 p-0">
                 <SheetHeader className="px-4 py-4">
-                  <SheetTitle className="text-primary">Albion Profit Pro</SheetTitle>
+                  <SheetTitle className="text-primary">
+                    <Link to="/" className="flex items-center gap-2">
+                      <img
+                        src={brandShield}
+                        alt=""
+                        className="size-7 shrink-0 object-contain"
+                      />
+                      <span>Albion Profit Pro</span>
+                    </Link>
+                  </SheetTitle>
                 </SheetHeader>
                 <NavColumn
                   collapsed={false}
@@ -374,7 +419,9 @@ export function AppShell() {
                 variant="ghost"
                 size="icon"
                 className="size-8 shrink-0"
-                aria-label={filtersCollapsed ? 'Expandir filtros' : 'Recolher filtros'}
+                aria-label={
+                  filtersCollapsed ? 'Expandir filtros' : 'Recolher filtros'
+                }
                 aria-expanded={!filtersCollapsed}
                 onClick={() => setFiltersCollapsed((value) => !value)}
               >
@@ -403,7 +450,8 @@ export function RequireRealm({ children }: { children: ReactNode }) {
     <section className="max-w-lg rounded-2xl border border-primary/30 bg-primary/10 p-8">
       <h1 className="text-2xl font-bold">Escolha um servidor</h1>
       <p className="mt-2 text-foreground">
-        Selecione West, East ou Europa no menu para consultar preços e simulações.
+        Selecione West, East ou Europa no menu para consultar preços e
+        simulações.
       </p>
     </section>
   )

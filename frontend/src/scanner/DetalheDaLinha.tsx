@@ -1,11 +1,21 @@
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import type { Realm } from '@/app/ServerContext'
+import { FilterSelectField } from '@/components/filters'
+import { formatarQualidade } from '@/lib/formatters'
 import type { Cidade } from '@/lib/locations'
 import { money } from '@/lib/money'
 
 import { motivoSemPreco } from './columns'
-import { explainRow, type ScannerCatalog, type ScannerParams, type ScannerRow } from './engine'
+import {
+  bestPerRecipe,
+  computeScanner,
+  explainRow,
+  type ScannerCatalog,
+  type ScannerParams,
+  type ScannerRow,
+} from './engine'
 import { ExactAnalysis } from './ExactAnalysis'
 import { priceKey, type PriceIndex } from './prices'
 import { origemDoItem, origemPadrao, type Origem, type PricingPolicy } from './pricing'
@@ -35,6 +45,10 @@ export function DetalheDaLinha({
   onOrigem,
   indiceDeVendas,
   linkDaCalculadora,
+  rotuloDoLinkDaCalculadora = 'Abrir na Calculadora',
+  comSeletorDeQualidade = false,
+  savedCraftAction,
+  readOnly = false,
 }: {
   row: ScannerRow
   catalog: ScannerCatalog
@@ -50,28 +64,81 @@ export function DetalheDaLinha({
   indiceDeVendas: SalesIndex | null
   /** "Abrir na Calculadora" (task 14) — ausente na própria Calculadora */
   linkDaCalculadora?: string
+  /** Meus Crafts troca o rótulo quando uma receita refinada retorna à aba Refino. */
+  rotuloDoLinkDaCalculadora?: string
+  /** No Craft, permite comparar outra qualidade sem recalcular ou reordenar a tabela inteira. */
+  comSeletorDeQualidade?: boolean
+  /** Botão de salvar recebe a qualidade que está sendo analisada neste painel. */
+  savedCraftAction?: (quality: number) => ReactNode
+  /** Meus Crafts A07 reaproveita o extrato sem oferecer edição antes da A08. */
+  readOnly?: boolean
 }) {
+  const [qualidadeAnalisada, setQualidadeAnalisada] = useState(scenario.outputQuality)
+  const paramsDoDetalhe =
+    qualidadeAnalisada === params.outputQuality
+      ? params
+      : { ...params, outputQuality: qualidadeAnalisada }
   const receita = catalog.recipes.find((r) => r.output_item === row.outputItem)
-  const detail = explainRow(catalog, indice, params, {
+  const rowDaQualidade =
+    qualidadeAnalisada === params.outputQuality || !receita
+      ? row
+      : (bestPerRecipe(
+          computeScanner({ items: catalog.items, recipes: [receita] }, indice, paramsDoDetalhe),
+        )[0] ?? row)
+  const detail = explainRow(catalog, indice, paramsDoDetalhe, {
     outputItem: row.outputItem,
-    locationId: row.locationId,
+    locationId: rowDaQualidade.locationId,
   })
 
-  const link = linkDaCalculadora ? (
+  const seletorDeQualidade = comSeletorDeQualidade ? (
+    <div className="max-w-xs">
+      <FilterSelectField
+        label="Qualidade analisada"
+        value={String(qualidadeAnalisada)}
+        onChange={(valor) => setQualidadeAnalisada(Number(valor))}
+        options={[1, 2, 3, 4, 5].map((qualidade) => ({
+          value: String(qualidade),
+          label: formatarQualidade(qualidade) ?? String(qualidade),
+        }))}
+        allLabel={null}
+      />
+      <p className="mt-1 text-xs text-foreground-subtle">
+        Altera somente esta análise; a tabela continua na qualidade escolhida nos filtros.
+      </p>
+    </div>
+  ) : null
+  const acaoDeSalvar = savedCraftAction?.(qualidadeAnalisada)
+
+  const destinoDaCalculadora = (() => {
+    if (!linkDaCalculadora) return null
+    const [caminho, busca = ''] = linkDaCalculadora.split('?')
+    const parametros = new URLSearchParams(busca)
+    if (qualidadeAnalisada === 1) parametros.delete('quality')
+    else parametros.set('quality', String(qualidadeAnalisada))
+    return `${caminho}?${parametros.toString()}`
+  })()
+
+  const link = destinoDaCalculadora ? (
     <Link
-      to={linkDaCalculadora}
+      to={destinoDaCalculadora}
       className="block text-center text-xs font-medium text-primary underline-offset-2 hover:underline"
     >
-      Abrir na Calculadora
+      {rotuloDoLinkDaCalculadora}
     </Link>
   ) : null
 
   if (!detail || !receita) {
     return (
       <div className="space-y-2">
+        {(seletorDeQualidade || acaoDeSalvar) && (
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            {seletorDeQualidade}
+            {acaoDeSalvar}
+          </div>
+        )}
         <p className="text-xs text-foreground-subtle">
           Sem cotação suficiente para abrir o extrato desta receita — falta{' '}
-          {motivoSemPreco(row) ?? 'preço'}. A lista de compras continua na linha.
+          {motivoSemPreco(rowDaQualidade) ?? 'preço'}. A lista de compras continua na linha.
         </p>
         {link}
       </div>
@@ -84,9 +151,9 @@ export function DetalheDaLinha({
         request={{
           server: realm,
           output_item: row.outputItem,
-          location_id: row.locationId,
+          location_id: detail.row.locationId,
           quantity: scenario.quantity,
-          output_quality: scenario.outputQuality,
+          output_quality: qualidadeAnalisada,
           scope: 'all',
           return_rate: scenario.returnRate,
           station_fee_per_100_nutrition: scenario.stationFeePer100Nutrition,
@@ -108,35 +175,44 @@ export function DetalheDaLinha({
     ) : null
 
   return (
-    <RowDetails
-      detail={detail}
-      nomeItem={nomeItem}
-      locationName={locationName}
-      precoPorCidade={cidades.map((cidade) => {
-        const entrada = indice.get(
-          priceKey(row.outputItem, cidade.id, scenario.outputQuality, receita.enchantment_level),
-        )
-        return {
-          locationId: cidade.id,
-          sell: entrada?.sell ? money(entrada.sell.price) : null,
-          buy: entrada?.buy ? money(entrada.buy.price) : null,
-          unitsPerDay:
-            indiceDeVendas?.get(chaveDeVenda(row.outputItem, cidade.id, scenario.outputQuality)) ??
-            null,
+    <div className="space-y-4">
+      {(seletorDeQualidade || acaoDeSalvar) && (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          {seletorDeQualidade}
+          {acaoDeSalvar}
+        </div>
+      )}
+      <RowDetails
+        detail={detail}
+        nomeItem={nomeItem}
+        locationName={locationName}
+        precoPorCidade={cidades.map((cidade) => {
+          const entrada = indice.get(
+            priceKey(row.outputItem, cidade.id, qualidadeAnalisada, receita.enchantment_level),
+          )
+          return {
+            locationId: cidade.id,
+            sell: entrada?.sell ? money(entrada.sell.price) : null,
+            buy: entrada?.buy ? money(entrada.buy.price) : null,
+            unitsPerDay:
+              indiceDeVendas?.get(chaveDeVenda(row.outputItem, cidade.id, qualidadeAnalisada)) ??
+              null,
+          }
+        })}
+        cidades={cidades}
+        origemDe={(lado, item) => origemDoItem(pricing, lado, item)}
+        padraoDe={(lado) => origemPadrao(pricing, lado)}
+        onOrigem={onOrigem}
+        readOnly={readOnly}
+        analise={
+          analiseExata || link ? (
+            <div className="space-y-2">
+              {analiseExata}
+              {link}
+            </div>
+          ) : undefined
         }
-      })}
-      cidades={cidades}
-      origemDe={(lado, item) => origemDoItem(pricing, lado, item)}
-      padraoDe={(lado) => origemPadrao(pricing, lado)}
-      onOrigem={onOrigem}
-      analise={
-        analiseExata || link ? (
-          <div className="space-y-2">
-            {analiseExata}
-            {link}
-          </div>
-        ) : undefined
-      }
-    />
+      />
+    </div>
   )
 }

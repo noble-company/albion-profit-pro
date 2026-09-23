@@ -83,7 +83,7 @@ async def test_api_token_cap_per_user(client):
 
     over = await client.post("/auth/tokens", headers=headers)
     assert over.status_code == 409
-    assert "Revogue" in over.json()["detail"]
+    assert "Revoke" in over.json()["detail"]
 
     # Os tokens existentes continuam listados e ativos.
     listed = (await client.get("/auth/tokens", headers=headers)).json()

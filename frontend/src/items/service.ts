@@ -5,8 +5,8 @@ export type CatalogItem = components['schemas']['ItemCatalogOut']
 export type SearchFilters = {
   tier?: number
   enchantment_level?: number
-  categoria?: string
-  apenas_craftaveis?: boolean
+  category?: string
+  craftable_only?: boolean
 }
 export async function searchItems(
   q: string,

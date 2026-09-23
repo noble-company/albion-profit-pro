@@ -19,7 +19,7 @@ _EXPIRES_PATTERN = re.compile(
 
 def _not_blank(value: str) -> str:
     if not value.strip():
-        raise ValueError("não pode ser vazio")
+        raise ValueError("must not be blank")
     return value
 
 

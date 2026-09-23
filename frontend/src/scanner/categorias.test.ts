@@ -37,7 +37,7 @@ const receita = (output_item: string, production_kind = 'crafting') =>
     output_item,
     production_kind,
     enchantment_level: 0,
-    silver_cost: 0,
+    silver_cost: '0',
     crafting_focus: 0,
     amount_crafted: 1,
     ingredients: [],

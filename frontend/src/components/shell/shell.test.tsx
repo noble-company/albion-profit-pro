@@ -181,7 +181,7 @@ describe('ErrorBoundary', () => {
     renderNoShell(<TelaQueQuebra />)
     await screen.findByText('Esta tela não pôde ser exibida')
 
-    await user.click(screen.getByRole('link', { name: /Craft/ }))
+    await user.click(screen.getByRole('link', { name: 'Craft' }))
 
     await waitFor(() =>
       expect(screen.getByText('Tela de craft')).toBeInTheDocument(),

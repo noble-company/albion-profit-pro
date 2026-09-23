@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js'
 
 import { roundDownForDisplay } from '@/lib/craft-formulas'
-import { divide, formatQuantity, money, type MoneyInput } from '@/lib/money'
+import { divide, formatQuantity, money, type FormulaInput } from '@/lib/money'
 
 /**
  * As taxas de retorno de recurso que o jogo pratica (task 4/11.4).
@@ -66,8 +66,8 @@ export const RETORNOS_PADRAO: RetornoPadrao[] = [
  * lança nessa divisão, o que derrubaria a tela inteira por causa de um número digitado num
  * campo de filtro.
  */
-export function rendimentoPorCemRecursos(taxa: MoneyInput): string | null {
+export function rendimentoPorCemRecursos(taxa: FormulaInput): string | null {
   const valor = money(taxa)
   if (!valor.greaterThan(0) || valor.greaterThanOrEqualTo(1)) return null
-  return formatQuantity(divide(100, new Decimal(1).minus(valor)), 0)
+  return formatQuantity(divide('100', new Decimal(1).minus(valor)), 0)
 }

@@ -315,7 +315,7 @@ function producaoDaSessao(
 ): ReturnType<typeof calculateProduction> {
   const sobra = new Decimal(1).minus(money(returnRate))
   const executions = sobra.greaterThan(0)
-    ? divide(receitasIniciais, sobra).floor().toNumber()
+    ? divide(String(receitasIniciais), sobra).floor().toNumber()
     : receitasIniciais
   return {
     executions,
@@ -495,7 +495,7 @@ function breakEven(
       : salesTaxRateFor(params.premium)
   const sobra = new Decimal(1).minus(retido)
   if (!sobra.greaterThan(0)) return null
-  return divide(divide(vencedor.totalCost, sobra), row.producedQuantity)
+  return divide(divide(vencedor.totalCost, sobra), String(row.producedQuantity))
 }
 
 /**
@@ -836,7 +836,7 @@ function evaluate(input: EvaluateInput): ScannerRow {
         // produzir mais com a mesma compra. As duas leituras dão o mesmo custo por item.
         averageUnitCost:
           input.production.producedQuantity > 0
-            ? divide(totalCost, input.production.producedQuantity)
+            ? divide(totalCost, String(input.production.producedQuantity))
             : null,
         grossRevenue,
         salesTax: sale.salesTax,
@@ -849,7 +849,7 @@ function evaluate(input: EvaluateInput): ScannerRow {
             ? divide(profit, totalWeight)
             : null,
         profitPerFocus:
-          input.focusConsumed > 0 ? divide(profit, input.focusConsumed) : null,
+          input.focusConsumed > 0 ? divide(profit, String(input.focusConsumed)) : null,
         // A célula de Venda precisa do preço e da procedência dele. Preço digitado chega com
         // `observedAt` nulo, e a tela diz "preço fixo" em vez de inventar uma idade.
         saleUnitPrice: quote.price,

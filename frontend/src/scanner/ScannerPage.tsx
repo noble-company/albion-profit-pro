@@ -14,10 +14,14 @@ import {
 import { SidebarSection } from '@/components/shell/SidebarSlot'
 import { Button } from '@/components/ui/button'
 import { Carregando, EstadoErro, EstadoVazio } from '@/components/ui/states'
+import { useToast } from '@/components/ui/ToastProvider'
 import { useRecipeCatalog } from '@/catalog/hooks'
-import { formatarNomeCurto } from '@/lib/formatters'
+import { formatarNomeCurto, formatarQualidade } from '@/lib/formatters'
 import { useDestinyBoard } from '@/destiny/hooks'
 import { useCidades, useLocationName } from '@/lib/locations'
+import { useCreateSavedCraft, useSavedCrafts } from '@/saved-crafts/hooks'
+import { SavedCraftButton } from '@/saved-crafts/SavedCraftButton'
+import { savedCraftFromScenario } from '@/saved-crafts/service'
 
 import {
   arvoreDeCategorias,
@@ -34,6 +38,7 @@ import { buildColumns } from './columns'
 import { DetalheDaLinha } from './DetalheDaLinha'
 import { bestPerRecipe, computeScanner, type ScannerRow } from './engine'
 import { applyFilters, filtrarPorVolume, type VolumeDaLinha } from './filters'
+import { podeSalvarEmMeusCrafts } from './meusCrafts'
 import { buildPriceIndex } from './prices'
 import { ScannerTable } from './ScannerTable'
 import { cidadesFiltradas, estadoDaTela, hrefDaCalculadora } from './tela'
@@ -73,8 +78,13 @@ export function ScannerPage({
   /** O catálogo que a tela lê — Comida & Poções usa o de craft (task 13). */
   const kind = catalogoDaTela(tela)
   const { realm } = useServer()
+  const { toast } = useToast()
   const locationName = useLocationName()
   const cidades = useCidades()
+  const podeSalvar = podeSalvarEmMeusCrafts(tela)
+  const salvos = useSavedCrafts(realm, podeSalvar)
+  const criarSalvo = useCreateSavedCraft()
+  const [itensSalvando, setItensSalvando] = useState<Set<string>>(() => new Set())
   const {
     params,
     filters,
@@ -267,6 +277,48 @@ export function ScannerPage({
       )
   }, [itemsByName])
 
+  const itensSalvos = useMemo(
+    () => new Set(salvos.crafts.map((craft) => craft.output_item)),
+    [salvos.crafts],
+  )
+
+  const salvarCraft = useCallback(
+    async (outputItem: string, outputQuality: number) => {
+      if (!realm || itensSalvos.has(outputItem) || itensSalvando.has(outputItem)) return
+      setItensSalvando((current) => new Set(current).add(outputItem))
+      try {
+        await criarSalvo.mutateAsync(
+          savedCraftFromScenario(realm, outputItem, {
+            quantity: scenario.quantity,
+            outputQuality,
+          }),
+        )
+        toast('Receita salva em Meus Crafts.')
+      } catch {
+        toast('Não foi possível salvar a receita em Meus Crafts.')
+      } finally {
+        setItensSalvando((current) => {
+          const next = new Set(current)
+          next.delete(outputItem)
+          return next
+        })
+      }
+    }, [realm, itensSalvos, itensSalvando, criarSalvo, scenario.quantity, toast],
+  )
+
+  const controleDeSalvo = useCallback(
+    (outputItem: string, outputQuality: number, compact = false) => (
+      <SavedCraftButton
+        saved={itensSalvos.has(outputItem)}
+        pending={itensSalvando.has(outputItem)}
+        unavailable={salvos.isError}
+        compact={compact}
+        onSave={() => void salvarCraft(outputItem, outputQuality)}
+      />
+    ),
+    [itensSalvos, itensSalvando, salvos.isError, salvarCraft],
+  )
+
   /**
    * O volume de uma linha — **uma** função para a coluna Vende/dia e para o filtro, senão os dois
    * poderiam discordar sobre a mesma linha. Nula enquanto as vendas não chegam.
@@ -307,8 +359,19 @@ export function ScannerPage({
         maxIngredientes,
         // Sem o dado ainda, a célula não mostra a linha; com ele, item sem histórico é traço.
         volume: volumeDaLinha ?? undefined,
+        savedCraftAction: podeSalvar
+          ? (row) => controleDeSalvo(row.outputItem, scenario.outputQuality, true)
+          : undefined,
       }),
-    [locationName, nomeItem, maxIngredientes, volumeDaLinha],
+    [
+      locationName,
+      nomeItem,
+      maxIngredientes,
+      volumeDaLinha,
+      podeSalvar,
+      controleDeSalvo,
+      scenario.outputQuality,
+    ],
   )
 
   /**
@@ -320,6 +383,7 @@ export function ScannerPage({
     (row: ScannerRow) =>
       catalogo.catalog && indice ? (
         <DetalheDaLinha
+          key={`${row.outputItem}|${row.locationId}|${scenario.outputQuality}`}
           row={row}
           catalog={catalogo.catalog}
           indice={indice}
@@ -333,6 +397,12 @@ export function ScannerPage({
           onOrigem={definirOrigem}
           indiceDeVendas={indiceDeVendas}
           linkDaCalculadora={hrefDaCalculadora(params, row.outputItem)}
+          comSeletorDeQualidade={tela === 'crafting'}
+          savedCraftAction={
+            podeSalvar
+              ? (quality) => controleDeSalvo(row.outputItem, quality)
+              : undefined
+          }
         />
       ) : null,
     [
@@ -348,6 +418,9 @@ export function ScannerPage({
       definirOrigem,
       indiceDeVendas,
       params,
+      tela,
+      podeSalvar,
+      controleDeSalvo,
     ],
   )
 
@@ -462,6 +535,18 @@ export function ScannerPage({
               onToggle={(v) => toggleNumber('ench', v)}
               formatOption={(e) => `.${e}`}
             />
+            {tela === 'crafting' && (
+              <FilterSelectField
+                label="Qualidade"
+                value={scenario.outputQuality === 1 ? '' : String(scenario.outputQuality)}
+                onChange={(v) => setParam('quality', v)}
+                options={[2, 3, 4, 5].map((qualidade) => ({
+                  value: String(qualidade),
+                  label: formatarQualidade(qualidade) ?? String(qualidade),
+                }))}
+                allLabel={formatarQualidade(1) ?? 'Normal'}
+              />
+            )}
           </FilterGroup>
 
           <FilterGroup legend="Resultado">

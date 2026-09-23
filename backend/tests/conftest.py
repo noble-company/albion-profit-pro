@@ -191,6 +191,7 @@ async def _limpa_tabelas_apos_teste():
     import src.prices.models  # noqa: F401
     import src.quarantine.models  # noqa: F401
     import src.recipes.models  # noqa: F401
+    import src.saved_crafts.models  # noqa: F401
     import src.static_data.models  # noqa: F401
     from src.database import Base, async_session_maker
 

@@ -72,3 +72,51 @@ Nada.
 ## Testes manuais
 
 Nenhum — é verificável inteiramente por automação.
+
+## Estado da implementação
+
+**Concluída** (2026-09-22). `uv run pytest tests/` — **489 passed, 1 skipped** (era 487).
+`uv run ruff check .` e `ruff format --check .` limpos.
+
+- **`backend/src/items/models.py`** — `Item.__table_args__` (índice novo no módulo; o modelo
+  não tinha nenhum) com `Index("ix_item_busca_normalizada_trgm", "busca_normalizada",
+  postgresql_using="gin", postgresql_ops={"busca_normalizada": "gin_trgm_ops"})`, batendo
+  exatamente com `alembic/versions/f1c6d7e8f9a0_...py`.
+- **`backend/tests/test_migrations_match_models.py`** (novo) — sobe uma engine contra o banco
+  já migrado a `head` (mesmo DSN que `conftest.py` usa) e roda
+  `alembic.autogenerate.compare_metadata` contra `Base.metadata`, com todos os módulos de
+  modelo importados (mesma lista que `alembic/env.py` usa, pelo mesmo motivo: autogenerate só
+  enxerga o que foi importado). Fecha a categoria inteira (item 3), não só este índice — calquer
+  outro drift entre metadata e banco apareceria aqui.
+- **`backend/tests/items/test_search_trigram_index.py`** (novo) — prova que o índice é **usado**
+  de verdade pela consulta de busca (`EXPLAIN`, sem `enable_seqscan = off`), não só que ele
+  existe. Precisou de 500 mil linhas sintéticas geradas server-side (`generate_series`) — ver
+  desvio abaixo.
+- **`CLAUDE.md`/`AGENTS.md`** — linha de DB/ORM agora registra `pg_trgm` como extensão em uso
+  (não só `pgvector`, que segue "disponível, não usado"), apontando pra
+  `docs/06-fontes-de-dados-estaticos.md`, que já tinha a nota operacional completa sobre
+  permissão de `CREATE EXTENSION` em produção (item 2 — já estava documentado ali, só não no
+  nível arquitetural do `CLAUDE.md`).
+
+### Decisão sobre o item 4 (CI)
+
+**Não criei um step novo no `migrations-and-image`.** `test_migrations_match_models.py` já
+roda dentro de `uv run pytest tests/` no job `quality` do `backend-ci.yml`, que já é executado
+contra Postgres real (`services: postgres` do próprio job). Um segundo mecanismo fazendo
+`alembic revision --autogenerate` de verdade no job `migrations-and-image` verificaria a mesma
+coisa por outro caminho — checar duas vezes a mesma invariante não fecha uma porta a mais, só
+duplica manutenção. A "porta fechada" que o item 4 pede já está fechada pelo teste novo.
+
+### Desvios da spec
+
+- **A tabela de teste (item da spec "EXPLAIN... sem varredura sequencial") precisou de 500 mil
+  linhas, não só "dados de teste".** Tentativas com volume comparável a produção (12 mil,
+  depois 120 mil linhas com texto curto/aleatório) continuaram perdendo pra seq scan — o custo
+  por linha de um filtro `LIKE` num seq scan é baixo demais numa tabela estreita para o
+  planner do Postgres preferir um bitmap index scan abaixo de um certo volume. Gerar as linhas
+  em Python (`executemany`) nesse volume também se provou impraticavelmente lento (>180 s);
+  reescrevi para gerar tudo server-side com `generate_series`, que roda em segundos.
+- **Item 2 já estava parcialmente feito.** `docs/06-fontes-de-dados-estaticos.md:105-107` já
+  documentava a permissão de `CREATE EXTENSION pg_trgm` em produção antes desta task — só
+  adicionei a referência no nível arquitetural (`CLAUDE.md`/`AGENTS.md`), que não mencionava
+  `pg_trgm` nenhuma vez.

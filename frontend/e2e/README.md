@@ -13,6 +13,7 @@
 | `opportunities.spec.ts` | Filtrar, paginar, ordenação estável entre páginas (`F08`); premium/retorno não dispara requisição (task 23); detalhe com os quatro cenários |
 | `tokens.spec.ts` | Criar e revogar um token do client |
 | `edge.spec.ts` | Sem cobertura, backend fora do ar, sessão expirando na navegação |
+| `saved-crafts.spec.ts` | Criar um craft salvo, acompanhar em Meus Crafts, remover e confirmar persistência após recarregar |
 
 ## Pré-requisitos
 

@@ -199,7 +199,7 @@ export function CalculadoraPage() {
               // O autocomplete escreve o código ao escolher; o campo mostra o nome do jogo.
               setTexto(formatarNomeItem(escolhido.name_pt ?? escolhido.name_en, escolhido.unique_name))
             }}
-            filters={{ apenas_craftaveis: true }}
+            filters={{ craftable_only: true }}
             autoFocus={!item}
           />
         </div>

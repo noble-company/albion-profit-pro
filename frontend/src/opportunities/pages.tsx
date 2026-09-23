@@ -1,43 +1,49 @@
 import { ArrowLeftRight } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
 import { useServer } from '@/app/ServerContext'
 import { RequireRealm } from '@/components/AppShell'
-import { EstadoErro, EstadoVazio } from '@/components/ui/states'
 import {
-  fieldControl,
-  fieldLabel,
-  FilterFieldset,
-  FilterNumber,
-  FilterPanel,
-  FilterSelect,
-  FilterSortSelect,
-  FilterToggle,
-} from '@/components/opportunities/FilterPanel'
-import { KpiCard } from '@/components/opportunities/KpiCard'
+  FilterCheckbox,
+  FilterChips,
+  FilterGroup,
+  FilterNumberField,
+  FilterSearch,
+  FilterSelectField,
+} from '@/components/filters'
+import { ItemImage } from '@/components/ItemImage'
 import {
   OpportunityTable,
   type OpportunityColumn,
 } from '@/components/opportunities/OpportunityTable'
 import { Pagination } from '@/components/opportunities/Pagination'
 import { WarningBadges } from '@/components/opportunities/WarningBadges'
+import { SidebarSection } from '@/components/shell/SidebarSlot'
+import { Button } from '@/components/ui/button'
+import { EstadoErro, EstadoVazio } from '@/components/ui/states'
 import { traduzirCategoria } from '@/i18n/categories'
 import {
   formatarIdade,
-  formatarNomeItem,
   formatarPct,
   formatarQualidade,
   formatarSilver,
+  partesDoNomeCurto,
 } from '@/lib/formatters'
 import { useLocationName, useMarketToggles } from '@/lib/locations'
 import * as money from '@/lib/money'
 import { usePageVisible } from '@/lib/usePageVisible'
+import { emEscala } from '@/scanner/altura'
+import { MIN_LETRAS_DA_BUSCA } from '@/scanner/categorias'
 
 import { useCategories, useFlipOpportunities } from './hooks'
 import { useOpportunityParams } from './useOpportunityParams'
 
+const SEARCH_DEBOUNCE_MS = 300
+
 function readFlipExtra(params: URLSearchParams) {
   return {
+    item: params.get('item_id') || undefined,
     category: params.get('category') || undefined,
     subcategory: params.get('subcategory') || undefined,
     subcategory2: params.get('subcategory2') || undefined,
@@ -47,343 +53,381 @@ function readFlipExtra(params: URLSearchParams) {
   }
 }
 
+function selectOptions(values: Array<string | null | undefined>) {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))]
+    .sort()
+    .map((value) => ({ value, label: traduzirCategoria(value) }))
+}
+
+function moneyTone(value: string | null | undefined): string {
+  if (value == null || money.isZero(value)) return 'text-foreground'
+  return money.isPositive(value) ? 'text-profit' : 'text-danger'
+}
+
 function DashboardContent() {
   const { realm } = useServer()
   const categories = useCategories()
   const marketToggles = useMarketToggles()
   const locationName = useLocationName()
-  const {
-    params,
-    query,
-    sortParam,
-    setFilter,
-    setOffset,
-    setLocations,
-    reset,
-  } = useOpportunityParams(readFlipExtra)
-
+  const { params, query, setFilter, setListFilter, setOffset, reset } =
+    useOpportunityParams(readFlipExtra)
+  const [searchText, setSearchText] = useState(params.get('item_id') ?? '')
   const pageVisible = usePageVisible()
   const result = useFlipOpportunities(realm, query)
-  // O servidor já ordena e pagina sobre o conjunto completo (F08) — nada de reordenar a
-  // página aqui.
   const rows = result.data?.opportunities ?? []
-  if (!realm)
+
+  useEffect(() => {
+    const value = searchText.trim()
+    const current = params.get('item_id') ?? ''
+    if (value === current || value === '' || value.length < MIN_LETRAS_DA_BUSCA)
+      return
+
+    const timer = window.setTimeout(
+      () => setFilter('item_id', value),
+      SEARCH_DEBOUNCE_MS,
+    )
+    return () => window.clearTimeout(timer)
+  }, [params, searchText, setFilter])
+
+  const categoryOptions = useMemo(
+    () => selectOptions(categories.map((item) => item.category)),
+    [categories],
+  )
+  const subcategoryOptions = useMemo(
+    () =>
+      selectOptions(
+        categories
+          .filter((item) => !query.category || item.category === query.category)
+          .map((item) => item.subcategory),
+      ),
+    [categories, query.category],
+  )
+  const typeOptions = useMemo(
+    () =>
+      selectOptions(
+        categories
+          .filter(
+            (item) =>
+              (!query.category || item.category === query.category) &&
+              (!query.subcategory || item.subcategory === query.subcategory),
+          )
+          .map((item) => item.subcategory2),
+      ),
+    [categories, query.category, query.subcategory],
+  )
+
+  if (!realm) {
     return (
       <RequireRealm>
-        <DashboardIntro />
+        <span />
       </RequireRealm>
     )
-  const totalProfit = money
-    .add(...rows.map((row) => row.profit ?? '0'))
-    .toString()
+  }
 
-  const toggleCity = (cityIds: readonly string[]) => {
-    const selected = query.locations
+  const toggleCity = (
+    key: 'buy_in' | 'sell_in',
+    selected: readonly string[],
+    cityIds: readonly string[],
+  ) => {
     const allSelected = cityIds.every((id) => selected.includes(id))
-    setLocations(
+    setListFilter(
+      key,
       allSelected
         ? selected.filter((value) => !cityIds.includes(value))
         : [...selected, ...cityIds.filter((id) => !selected.includes(id))],
     )
   }
 
-  // Hierarquia da task 14 §2: item + rota + lucro + ROI decidem em meio segundo; preço,
-  // qtd e investimento são secundários; taxas é contexto. As colunas de dinheiro ficam
-  // TODAS visíveis de propósito — dá pra reconciliar `faturamento − taxas − investimento =
-  // lucro` linha a linha e conferir o cálculo do servidor.
+  const toggleNumber = (
+    key: 'tier' | 'enchantment' | 'quality',
+    selected: readonly number[],
+    value: number,
+  ) =>
+    setListFilter(
+      key,
+      selected.includes(value)
+        ? selected.filter((candidate) => candidate !== value)
+        : [...selected, value],
+    )
+
   const columns: OpportunityColumn[] = [
     {
+      key: 'item',
       header: 'Item',
       sticky: 'left',
-      width: '13rem',
+      width: emEscala(14),
       className: 'whitespace-normal',
-      cell: (row) => (
-        <>
-          <Link
-            className="font-semibold text-foreground transition hover:text-primary"
-            to={`/calculadora?item=${encodeURIComponent(row.item)}`}
-          >
-            {formatarNomeItem(row.item_name, row.item)}
-            <span className="mt-0.5 block text-xs font-normal text-foreground-subtle">
-              {formatarQualidade(row.quality_level)}
-            </span>
-          </Link>
-          <WarningBadges warnings={row.warnings} className="mt-1" />
-        </>
-      ),
+      cell: (row) => {
+        const { nome, grau } = partesDoNomeCurto(row.item_name, row.item)
+        return (
+          <span className="flex min-w-0 items-center gap-2">
+            <ItemImage
+              uniqueName={row.item}
+              quality={row.quality_level ?? undefined}
+              size={64}
+              className="size-9"
+            />
+            <Link
+              className="flex min-w-0 flex-1 flex-col leading-tight transition hover:text-primary"
+              title={grau ? `${nome} ${grau}` : nome}
+              to={`/calculadora?item=${encodeURIComponent(row.item)}`}
+            >
+              <span className="line-clamp-2 font-medium">{nome}</span>
+              <span className="text-2xs font-normal text-foreground-subtle">
+                {[grau, formatarQualidade(row.quality_level)]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </Link>
+            <WarningBadges
+              warnings={row.warnings}
+              compact
+              className="shrink-0 flex-nowrap"
+            />
+          </span>
+        )
+      },
     },
     {
+      key: 'route',
       header: 'Rota',
-      width: '11rem',
+      width: emEscala(11),
       cell: (row) => (
         <span className="flex items-center gap-1.5 text-foreground">
-          <span className="text-buy-side">
+          <span className="truncate text-buy-side">
             {locationName(row.buy_location)}
           </span>
           <ArrowLeftRight
             className="size-3.5 shrink-0 text-foreground-subtle"
             aria-hidden="true"
           />
-          <span className="text-sell-side">
+          <span className="truncate text-sell-side">
             {locationName(row.sell_location)}
           </span>
         </span>
       ),
     },
     {
+      key: 'buy-price',
       header: 'Compra unit.',
+      width: emEscala(7),
       numeric: true,
       cell: (row) => formatarSilver(row.buy_price),
     },
     {
+      key: 'sell-price',
       header: 'Venda unit.',
+      width: emEscala(7),
       numeric: true,
       cell: (row) => formatarSilver(row.sell_price),
     },
     {
+      key: 'quantity',
       header: 'Qtd.',
+      width: emEscala(4),
       numeric: true,
       cell: (row) => row.quantity,
     },
     {
+      key: 'investment',
       header: 'Investimento',
+      width: emEscala(8),
       numeric: true,
       cell: (row) => formatarSilver(row.total_cost),
     },
     {
+      key: 'revenue',
       header: 'Faturamento',
+      width: emEscala(8),
       numeric: true,
       cell: (row) => formatarSilver(row.gross_revenue),
     },
     {
+      key: 'fees',
       header: 'Taxas',
+      width: emEscala(6),
       numeric: true,
       weight: 'tertiary',
       cell: (row) => formatarSilver(row.total_fees),
     },
     {
-      header: 'Lucro',
+      key: 'age',
+      header: 'Idade',
+      width: emEscala(7),
       numeric: true,
-      weight: 'primary',
-      sticky: 'right',
-      width: '7rem',
-      className: 'text-profit',
-      cell: (row) => formatarSilver(row.profit),
+      sortField: 'freshness',
+      cell: (row) => formatarIdade(row.oldest_observed_at),
     },
     {
-      header: 'ROI',
+      key: 'profit',
+      header: 'Lucro',
+      width: emEscala(7.5),
       numeric: true,
       weight: 'primary',
       sticky: 'right',
-      width: '5.5rem',
-      className: 'text-profit',
-      cell: (row) => formatarPct(row.roi),
+      sortField: 'profit',
+      cell: (row) => (
+        <span className={moneyTone(row.profit)}>
+          {formatarSilver(row.profit)}
+        </span>
+      ),
+    },
+    {
+      key: 'roi',
+      header: 'ROI',
+      width: emEscala(5.5),
+      numeric: true,
+      weight: 'primary',
+      sticky: 'right',
+      sortField: 'roi',
+      cell: (row) => (
+        <span className={moneyTone(row.roi)}>{formatarPct(row.roi)}</span>
+      ),
     },
   ]
 
+  const total = result.data?.total ?? 0
+  const page = Math.floor(query.offset / query.limit) + 1
+  const totalPages = Math.max(1, Math.ceil(total / query.limit))
+  const selectedBuyCities = marketToggles
+    .filter(({ ids }) => ids.every((id) => query.buyLocations.includes(id)))
+    .map(({ id }) => id)
+  const selectedSellCities = marketToggles
+    .filter(({ ids }) => ids.every((id) => query.sellLocations.includes(id)))
+    .map(({ id }) => id)
+
+  const changeSearch = (value: string) => {
+    setSearchText(value)
+    if (value.trim() === '') setFilter('item_id', '')
+  }
+
+  const clearFilters = () => {
+    setSearchText('')
+    reset()
+  }
+
   return (
-    <section className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary">
-            Market Flip · {realm}
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-            Encontre o próximo lucro
-          </h1>
-          <p className="mt-2 text-foreground-muted">
-            Compre barato em uma cidade. Venda caro em outra.
-          </p>
-        </div>
-        {pageVisible && (
-          <div className="flex items-center gap-2 rounded-full border border-profit/20 bg-profit/5 px-3 py-1.5 text-xs font-medium text-profit shadow-lg shadow-black/20">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-profit opacity-50" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-profit" />
-            </span>
-            Atualização automática · 30s
-          </div>
-        )}
-      </header>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <KpiCard
-          label="Lucro na página"
-          value={formatarSilver(totalProfit)}
-          tone="profit"
-        />
-        <KpiCard
-          label="Ofertas encontradas"
-          value={String(result.data?.total ?? '—')}
-          tone="primary"
-        />
-        <KpiCard
-          label="Última observação"
-          value={
-            rows[0]?.oldest_observed_at
-              ? formatarIdade(rows[0].oldest_observed_at)
-              : '—'
-          }
-          tone="info"
-        />
-      </div>
-      <FilterPanel
-        title="Encontre sua rota de lucro"
-        description="Filtre o mercado e compare compra, venda, taxas e volume disponível."
-        onClear={reset}
-      >
-        <FilterFieldset accent="primary" legend="Item">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <CategorySelect
+    <div className="flex h-full flex-col gap-3">
+      <SidebarSection title="Filtros">
+        <div className="space-y-5">
+          <FilterSearch
+            value={searchText}
+            onChange={changeSearch}
+            placeholder="Buscar item…"
+          />
+
+          <FilterGroup legend="O que analisar">
+            <FilterSelectField
               label="Categoria"
               value={params.get('category') ?? ''}
-              onChange={(v) => setFilter('category', v)}
-              options={[...new Set(categories.map((item) => item.category))]}
+              onChange={(value) => setFilter('category', value)}
+              options={categoryOptions}
+              allLabel="Todas"
             />
-            <CategorySelect
+            <FilterSelectField
               label="Subcategoria"
               value={params.get('subcategory') ?? ''}
-              onChange={(v) => setFilter('subcategory', v)}
-              options={[
-                ...new Set(
-                  categories
-                    .filter(
-                      (item) =>
-                        !query.category || item.category === query.category,
-                    )
-                    .map((item) => item.subcategory)
-                    .filter(Boolean) as string[],
-                ),
-              ]}
+              onChange={(value) => setFilter('subcategory', value)}
+              options={subcategoryOptions}
+              allLabel="Todas"
             />
-            <CategorySelect
+            <FilterSelectField
               label="Tipo"
               value={params.get('subcategory2') ?? ''}
-              onChange={(v) => setFilter('subcategory2', v)}
-              options={[
-                ...new Set(
-                  categories
-                    .filter(
-                      (item) =>
-                        (!query.category || item.category === query.category) &&
-                        (!query.subcategory ||
-                          item.subcategory === query.subcategory),
-                    )
-                    .map((item) => item.subcategory2)
-                    .filter(Boolean) as string[],
-                ),
-              ]}
+              onChange={(value) => setFilter('subcategory2', value)}
+              options={typeOptions}
+              allLabel="Todos"
             />
-            <FilterSelect
+          </FilterGroup>
+
+          <FilterGroup legend="Item">
+            <FilterChips
               label="Tier"
-              value={params.get('tier') ?? ''}
-              onChange={(v) => setFilter('tier', v)}
-              options={['1', '2', '3', '4', '5', '6', '7', '8']}
+              options={Array.from({ length: 8 }, (_, index) => index + 1)}
+              selected={query.tiers}
+              onToggle={(value) => toggleNumber('tier', query.tiers, value)}
+              formatOption={(value) => `T${value}`}
             />
-            <FilterSelect
-              label="Qualidade"
-              value={params.get('quality') ?? ''}
-              onChange={(v) => setFilter('quality', v)}
-              options={['1', '2', '3', '4', '5']}
-              labels={[
-                'Normal',
-                'Bom',
-                'Excelente',
-                'Excepcional',
-                'Obra-prima',
-              ]}
-            />
-            <FilterSelect
+            <FilterChips
               label="Encantamento"
-              value={params.get('enchantment') ?? ''}
-              onChange={(v) => setFilter('enchantment', v)}
-              options={['0', '1', '2', '3', '4']}
+              options={Array.from({ length: 5 }, (_, index) => index)}
+              selected={query.enchantments}
+              onToggle={(value) =>
+                toggleNumber('enchantment', query.enchantments, value)
+              }
+              formatOption={(value) => `.${value}`}
             />
-            <FilterSelect
-              label="Frescor máximo"
-              value={params.get('freshness') ?? '6'}
-              onChange={(v) => setFilter('freshness', v)}
-              options={['1', '2', '6', '12', '24']}
-              suffix="h"
+            <FilterChips
+              label="Qualidade"
+              options={Array.from({ length: 5 }, (_, index) => index + 1)}
+              selected={query.qualities}
+              onToggle={(value) =>
+                toggleNumber('quality', query.qualities, value)
+              }
+              formatOption={(value) =>
+                formatarQualidade(value) ?? String(value)
+              }
             />
-          </div>
-        </FilterFieldset>
-        <FilterFieldset accent="buy-side" legend="Mercado e resultado">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <FilterNumber
+          </FilterGroup>
+
+          <FilterGroup legend="Mercado">
+            <FilterChips
+              label="Comprar em"
+              options={marketToggles.map(({ id }) => id)}
+              selected={selectedBuyCities}
+              onToggle={(id) => {
+                const city = marketToggles.find(
+                  (candidate) => candidate.id === id,
+                )
+                if (city) toggleCity('buy_in', query.buyLocations, city.ids)
+              }}
+              formatOption={(id) =>
+                marketToggles.find((candidate) => candidate.id === id)?.name ??
+                id
+              }
+            />
+            <FilterChips
+              label="Vender em"
+              options={marketToggles.map(({ id }) => id)}
+              selected={selectedSellCities}
+              onToggle={(id) => {
+                const city = marketToggles.find(
+                  (candidate) => candidate.id === id,
+                )
+                if (city) toggleCity('sell_in', query.sellLocations, city.ids)
+              }}
+              formatOption={(id) =>
+                marketToggles.find((candidate) => candidate.id === id)?.name ??
+                id
+              }
+            />
+          </FilterGroup>
+
+          <FilterGroup legend="Resultado">
+            <FilterNumberField
               label="Lucro mínimo"
               value={params.get('min_profit') ?? ''}
-              onChange={(v) => setFilter('min_profit', v)}
-              placeholder="0"
+              onChange={(value) => setFilter('min_profit', value)}
+              placeholder="qualquer"
             />
-            <FilterNumber
+            <FilterNumberField
               label="ROI mínimo"
               value={params.get('min_roi') ?? ''}
-              onChange={(v) => setFilter('min_roi', v)}
-              placeholder="0%"
+              onChange={(value) => setFilter('min_roi', value)}
+              placeholder="qualquer"
+              suffix="%"
             />
-            <FilterSortSelect
-              value={sortParam}
-              onChange={(v) => setFilter('sort', v)}
-              className="sm:col-span-2"
+            <FilterSelectField
+              label="Frescor máximo"
+              value={String(query.maxAgeHours)}
+              onChange={(value) => setFilter('freshness', value)}
+              options={[1, 2, 6, 12, 24].map((hours) => ({
+                value: String(hours),
+                label: `${hours} h`,
+              }))}
+              allLabel={null}
             />
-          </div>
-          <div className="mt-5">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-foreground-subtle">
-              Cidades observadas
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {marketToggles.map(({ ids, name }) => {
-                const selected = ids.every((id) => query.locations.includes(id))
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => toggleCity(ids)}
-                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${selected ? 'border-primary bg-primary text-on-primary shadow-lg shadow-black/20' : 'border-border-strong bg-background/50 text-foreground hover:border-primary/70 hover:text-primary'}`}
-                  >
-                    {name}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </FilterFieldset>
-        <FilterFieldset accent="sell-side" legend="Estratégia">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <FilterToggle
-              label="Conta Premium"
-              description="Imposto de venda reduzido para 4%"
-              checked={query.premium}
-              onChange={(checked) =>
-                setFilter('premium', checked ? '' : 'false')
-              }
-            />
-            <FilterToggle
-              label="Pedido de compra"
-              description="Inclui 2,5% para criar a ordem"
-              checked={query.buyOrder}
-              onChange={(checked) =>
-                setFilter('buy_order', checked ? 'true' : '')
-              }
-            />
-            <FilterToggle
-              label="Pedido de venda"
-              description="Inclui 2,5% para criar a ordem"
-              checked={query.sellOrder}
-              onChange={(checked) =>
-                setFilter('sell_order', checked ? 'true' : '')
-              }
-            />
-            <FilterToggle
-              label="Cobertura completa"
-              description="Oculta livros observados parcialmente"
-              checked={query.requireComplete}
-              onChange={(checked) =>
-                setFilter('coverage', checked ? 'complete' : '')
-              }
-            />
-            <FilterToggle
+            <FilterCheckbox
               label="Apenas com lucro"
               description="Remove oportunidades negativas"
               checked={query.profitOnly}
@@ -391,88 +435,108 @@ function DashboardContent() {
                 setFilter('profit_only', checked ? '' : 'false')
               }
             />
+            <FilterCheckbox
+              label="Cobertura completa"
+              description="Oculta livros observados parcialmente"
+              checked={query.requireComplete}
+              onChange={(checked) =>
+                setFilter('coverage', checked ? 'complete' : '')
+              }
+            />
+          </FilterGroup>
+
+          <FilterGroup legend="Estratégia">
+            <FilterCheckbox
+              label="Conta Premium"
+              description="Imposto de venda reduzido para 4%"
+              checked={query.premium}
+              onChange={(checked) =>
+                setFilter('premium', checked ? '' : 'false')
+              }
+            />
+            <FilterCheckbox
+              label="Pedido de compra"
+              description="Inclui 2,5% para criar a ordem"
+              checked={query.buyOrder}
+              onChange={(checked) =>
+                setFilter('buy_order', checked ? 'true' : '')
+              }
+            />
+            <FilterCheckbox
+              label="Pedido de venda"
+              description="Inclui 2,5% para criar a ordem"
+              checked={query.sellOrder}
+              onChange={(checked) =>
+                setFilter('sell_order', checked ? 'true' : '')
+              }
+            />
+          </FilterGroup>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={clearFilters}
+          >
+            Limpar filtros
+          </Button>
+        </div>
+      </SidebarSection>
+
+      <header className="shrink-0">
+        <h1 className="text-2xl font-black tracking-tight">Market Flip</h1>
+        <p className="mt-1 text-sm text-foreground-muted">
+          Compre barato em uma cidade e venda caro em outra.
+        </p>
+        <p className="mt-2 text-xs text-foreground-subtle">
+          {result.loading && !result.data ? (
+            'Carregando oportunidades…'
+          ) : (
+            <>
+              <strong className="text-foreground">{total}</strong> oportunidades
+              · página {page} de {totalPages}
+              {pageVisible && ' · atualização a cada 30 s'}
+            </>
+          )}
+        </p>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        {Boolean(result.error) && !result.data ? (
+          <EstadoErro title="Não foi possível carregar o Market Flip" />
+        ) : !result.loading && rows.length === 0 ? (
+          <EstadoVazio
+            title="Nenhuma oportunidade encontrada"
+            icon={<ArrowLeftRight className="size-6" />}
+          >
+            A ausência de dados não representa lucro zero. Ajuste os filtros ao
+            lado, aumente o frescor ou aguarde novas coletas.
+          </EstadoVazio>
+        ) : (
+          <div className="min-h-0 flex-1">
+            <OpportunityTable
+              rows={rows}
+              columns={columns}
+              loading={result.loading && !result.data}
+              sort={query.sort}
+              direction={query.direction}
+              onSortChange={(field, direction) =>
+                setFilter('sort', `${field}_${direction}`)
+              }
+              rowKey={(row) =>
+                `${row.item}-${row.quality_level}-${row.buy_location}-${row.sell_location}`
+              }
+            />
           </div>
-        </FilterFieldset>
-      </FilterPanel>
-      {Boolean(result.error) && !result.data ? (
-        <EstadoErro title="Não foi possível carregar o Market Flip" />
-      ) : !result.loading && rows.length === 0 ? (
-        <EstadoVazio
-          title="Nenhuma oportunidade encontrada"
-          icon={<ArrowLeftRight className="size-6" />}
-        >
-          A ausência de dados não representa lucro zero. Ajuste os filtros,
-          aumente o frescor ou aguarde novas coletas.
-        </EstadoVazio>
-      ) : (
-        <OpportunityTable
-          title="Melhores oportunidades"
-          description="Compra e venda calculadas com as taxas da estratégia selecionada"
-          caption="Oportunidades de Market Flip"
-          rows={rows}
-          columns={columns}
-          loading={result.loading && !result.data}
-          minWidth="72rem"
-          rowKey={(row) =>
-            `${row.item}-${row.quality_level}-${row.buy_location}-${row.sell_location}`
-          }
+        )}
+        <Pagination
+          offset={query.offset}
+          limit={query.limit}
+          total={total}
+          onOffsetChange={setOffset}
         />
-      )}
-      <Pagination
-        offset={query.offset}
-        limit={query.limit}
-        total={result.data?.total ?? 0}
-        onOffsetChange={setOffset}
-      />
-    </section>
-  )
-}
-
-function DashboardIntro() {
-  return (
-    <section className="rounded-2xl border border-primary/20 bg-surface p-8">
-      <p className="text-sm uppercase tracking-widest text-primary">
-        Market Flip
-      </p>
-      <h1 className="mt-2 text-3xl font-bold">
-        Escolha um servidor para começar
-      </h1>
-      <p className="mt-3 text-foreground-muted">
-        Selecione West, East ou Europa no menu superior para buscar
-        oportunidades.
-      </p>
-    </section>
-  )
-}
-
-function CategorySelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: string[]
-}) {
-  return (
-    <label className={fieldLabel}>
-      {label}
-      <select
-        aria-label={label}
-        className={fieldControl}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">Todos</option>
-        {[...options].sort().map((option) => (
-          <option key={option} value={option}>
-            {traduzirCategoria(option)}
-          </option>
-        ))}
-      </select>
-    </label>
+      </div>
+    </div>
   )
 }
 

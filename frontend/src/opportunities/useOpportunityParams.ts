@@ -22,11 +22,16 @@ function numeric(params: URLSearchParams, key: string): number | undefined {
   return raw ? Number(raw) : undefined
 }
 
+function numericList(params: URLSearchParams, key: string): number[] {
+  return params.getAll(key).map(Number).filter(Number.isFinite)
+}
+
 export type SharedOpportunityQuery = {
-  locations: string[]
-  tier?: number
-  enchantment?: number
-  quality?: number
+  buyLocations: string[]
+  sellLocations: string[]
+  tiers: number[]
+  enchantments: number[]
+  qualities: number[]
   maxAgeHours: number
   requireComplete: boolean
   limit: number
@@ -40,11 +45,17 @@ export type SharedOpportunityQuery = {
 }
 
 function readShared(params: URLSearchParams): SharedOpportunityQuery {
+  const legacyLocations = params.getAll('location_id')
   return {
-    locations: params.getAll('location_id'),
-    tier: numeric(params, 'tier'),
-    enchantment: numeric(params, 'enchantment'),
-    quality: numeric(params, 'quality'),
+    buyLocations: params.has('buy_in')
+      ? params.getAll('buy_in')
+      : legacyLocations,
+    sellLocations: params.has('sell_in')
+      ? params.getAll('sell_in')
+      : legacyLocations,
+    tiers: numericList(params, 'tier'),
+    enchantments: numericList(params, 'enchantment'),
+    qualities: numericList(params, 'quality'),
     maxAgeHours:
       numeric(params, 'freshness') ?? OPPORTUNITY_DEFAULTS.freshnessHours,
     requireComplete: params.get('coverage') === 'complete',
@@ -99,11 +110,25 @@ export function useOpportunityParams<Extra extends object>(
     [params, setParams],
   )
 
-  const setLocations = useCallback(
-    (ids: string[]) => {
+  const setListFilter = useCallback(
+    (
+      key: 'buy_in' | 'sell_in' | 'tier' | 'enchantment' | 'quality',
+      values: readonly (string | number)[],
+    ) => {
       const next = new URLSearchParams(params)
-      next.delete('location_id')
-      ids.forEach((id) => next.append('location_id', id))
+      if (
+        (key === 'buy_in' || key === 'sell_in') &&
+        params.has('location_id')
+      ) {
+        const legacy = params.getAll('location_id')
+        next.delete('location_id')
+        if (!params.has('buy_in'))
+          legacy.forEach((id) => next.append('buy_in', id))
+        if (!params.has('sell_in'))
+          legacy.forEach((id) => next.append('sell_in', id))
+      }
+      next.delete(key)
+      values.forEach((value) => next.append(key, String(value)))
       next.delete('offset')
       setParams(next)
     },
@@ -112,5 +137,13 @@ export function useOpportunityParams<Extra extends object>(
 
   const reset = useCallback(() => setParams(new URLSearchParams()), [setParams])
 
-  return { params, query, sortParam, setFilter, setOffset, setLocations, reset }
+  return {
+    params,
+    query,
+    sortParam,
+    setFilter,
+    setListFilter,
+    setOffset,
+    reset,
+  }
 }

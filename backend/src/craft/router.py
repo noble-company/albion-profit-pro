@@ -30,11 +30,11 @@ async def simulate(
     try:
         return await simulate_craft(session, request, user.id)
     except ItemNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="item_nao_encontrado") from exc
+        raise HTTPException(status_code=404, detail="item_not_found") from exc
     except RecipeUnavailableError as exc:
-        raise HTTPException(status_code=404, detail="receita_indisponivel") from exc
+        raise HTTPException(status_code=404, detail="recipe_unavailable") from exc
     except InvalidOverrideError as exc:
-        raise HTTPException(status_code=422, detail="override_invalido") from exc
+        raise HTTPException(status_code=422, detail="invalid_override") from exc
 
 
 @router.post("/compare", response_model=CraftCompareOut)
@@ -46,8 +46,8 @@ async def compare(
     try:
         return await compare_craft(session, request, user.id)
     except ItemNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="item_nao_encontrado") from exc
+        raise HTTPException(status_code=404, detail="item_not_found") from exc
     except RecipeUnavailableError as exc:
-        raise HTTPException(status_code=404, detail="receita_indisponivel") from exc
+        raise HTTPException(status_code=404, detail="recipe_unavailable") from exc
     except InvalidOverrideError as exc:
-        raise HTTPException(status_code=422, detail="override_invalido") from exc
+        raise HTTPException(status_code=422, detail="invalid_override") from exc

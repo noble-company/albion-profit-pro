@@ -32,6 +32,7 @@ async def read_sales(
     kind: str | None = None,
     category: str | None = None,
     subcategory: str | None = None,
+    output_items: list[str] | None = None,
     days: int = JANELA_DE_VENDAS_DIAS,
     today: date | None = None,
 ) -> dict:
@@ -63,6 +64,8 @@ async def read_sales(
     )
     if kind is not None and category is not None:
         stmt = stmt.where(Item.unique_name.in_(saidas_da_categoria(kind, category, subcategory)))
+    if output_items is not None:
+        stmt = stmt.where(Item.unique_name.in_(output_items))
 
     items: list[str] = []
     locations: list[str] = []

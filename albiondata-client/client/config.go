@@ -28,9 +28,15 @@ const (
 // release inicia fail-closed e nunca tenta localhost silenciosamente.
 const developmentPublicIngestBaseURL = "http+token://localhost:8000"
 
+// PATCH LOCAL (Albion Profit Pro): mesma logica do destino de ingest acima, task 3.6/14 --
+// "Abrir Calculadora" no systray. Release sem URL injetada fica com o item desabilitado em vez
+// de abrir um host arbitrario ou cair silenciosamente em localhost.
+const developmentCalculatorURL = "http://localhost:5173"
+
 var (
 	buildProfile               = "development"
 	releasePublicIngestBaseURL string
+	releaseCalculatorURL       string
 )
 
 // ansiStripWriter wraps an io.Writer and strips ANSI escape codes before writing
@@ -62,11 +68,15 @@ type config struct {
 	// que fica no disco do usuario. Usar tokenSufixo() para diagnostico.
 	ApiToken string
 	// origem do token ("flag -token" / "config.yaml"), so para diagnostico no log
-	apiTokenOrigem                 string
-	publicIngestOrigem             string
-	apiTokenFlag                   string
-	publicIngestFlag               string
-	disableUploadFlag              bool
+	apiTokenOrigem     string
+	publicIngestOrigem string
+	apiTokenFlag       string
+	publicIngestFlag   string
+	disableUploadFlag  bool
+	// PATCH LOCAL (Albion Profit Pro): URL do calculadora web, task 3.6/14.
+	CalculatorUrl                  string
+	calculatorUrlOrigem            string
+	calculatorUrlFlag              string
 	Debug                          bool
 	Trace                          bool
 	DebugEvents                    map[int]bool
@@ -105,6 +115,7 @@ func (config *config) SetupFlags() {
 	config.apiTokenFlag = config.ApiToken
 	config.publicIngestFlag = config.PublicIngestBaseUrls
 	config.disableUploadFlag = config.DisableUpload
+	config.calculatorUrlFlag = config.CalculatorUrl
 
 	// PATCH LOCAL (Albion Profit Pro): resolucao do token tem que acontecer AQUI, depois
 	// do flag.Parse(). setupWebsocketFlags() le o viper la em cima, antes das flags sequer
@@ -120,6 +131,12 @@ func (config *config) SetupFlags() {
 	if strings.EqualFold(buildProfile, "release") && config.PublicIngestBaseUrls == "" {
 		config.DisableUpload = true
 	}
+	config.CalculatorUrl, config.calculatorUrlOrigem = resolveCalculatorURL(
+		config.CalculatorUrl,
+		viper.GetString("CalculatorUrl"),
+		buildProfile,
+		releaseCalculatorURL,
+	)
 
 	if config.OfflinePath != "" {
 		config.Offline = true
@@ -151,12 +168,28 @@ func (config *config) SetupFlags() {
 	} else if strings.EqualFold(buildProfile, "release") {
 		log.Warn("Albion Profit Pro: release sem destino de ingest; uploads permanecem desabilitados ate configurar PublicIngestBaseUrls ou -i.")
 	}
+	if config.CalculatorUrl != "" {
+		log.Infof("Albion Profit Pro: URL da calculadora carregada de %v (%v)",
+			config.calculatorUrlOrigem, config.CalculatorUrl)
+	} else if strings.EqualFold(buildProfile, "release") {
+		log.Warn("Albion Profit Pro: release sem URL da calculadora; o item 'Abrir Calculadora' do systray fica desabilitado ate configurar CalculatorUrl ou -calculator-url.")
+	}
 }
 
 func configuredConnection() (targets, token string, disabled bool) {
 	connectionConfigMu.RLock()
 	defer connectionConfigMu.RUnlock()
 	return ConfigGlobal.PublicIngestBaseUrls, ConfigGlobal.ApiToken, ConfigGlobal.DisableUpload
+}
+
+// CalculatorURL retorna a URL resolvida da calculadora web, ou vazio se nenhuma estiver
+// configurada. PATCH LOCAL (Albion Profit Pro, task 3.6/14): o systray usa isto para decidir se
+// o item "Abrir Calculadora" fica habilitado -- release sem URL explicita nunca abre um destino
+// arbitrario.
+func CalculatorURL() string {
+	connectionConfigMu.RLock()
+	defer connectionConfigMu.RUnlock()
+	return ConfigGlobal.CalculatorUrl
 }
 
 func reloadConnectionConfigFromFile() error {
@@ -172,6 +205,12 @@ func reloadConnectionConfigFromFile() error {
 	)
 	disabled := ConfigGlobal.disableUploadFlag ||
 		(strings.EqualFold(buildProfile, "release") && targets == "")
+	calculatorURL, calculatorOrigin := resolveCalculatorURL(
+		ConfigGlobal.calculatorUrlFlag,
+		viper.GetString("CalculatorUrl"),
+		buildProfile,
+		releaseCalculatorURL,
+	)
 
 	connectionConfigMu.Lock()
 	ConfigGlobal.ApiToken = token
@@ -179,6 +218,8 @@ func reloadConnectionConfigFromFile() error {
 	ConfigGlobal.PublicIngestBaseUrls = targets
 	ConfigGlobal.publicIngestOrigem = targetOrigin
 	ConfigGlobal.DisableUpload = disabled
+	ConfigGlobal.CalculatorUrl = calculatorURL
+	ConfigGlobal.calculatorUrlOrigem = calculatorOrigin
 	connectionConfigMu.Unlock()
 	return nil
 }
@@ -209,6 +250,25 @@ func resolvePublicIngestBaseURLs(fromFlag, fromFile, profile, releaseDefault str
 		return "", "release sem destino"
 	}
 	return developmentPublicIngestBaseURL, "default de desenvolvimento"
+}
+
+// resolveCalculatorURL espelha resolvePublicIngestBaseURLs: flag vence config.yaml, config.yaml
+// vence o default do perfil, e release sem nada explicito fica vazio -- nunca herda o default de
+// desenvolvimento silenciosamente.
+func resolveCalculatorURL(fromFlag, fromFile, profile, releaseDefault string) (string, string) {
+	if strings.TrimSpace(fromFlag) != "" {
+		return strings.TrimSpace(fromFlag), "flag -calculator-url"
+	}
+	if strings.TrimSpace(fromFile) != "" {
+		return strings.TrimSpace(fromFile), "config.yaml"
+	}
+	if strings.EqualFold(profile, "release") {
+		if strings.TrimSpace(releaseDefault) != "" {
+			return strings.TrimSpace(releaseDefault), "build de release"
+		}
+		return "", "release sem URL configurada"
+	}
+	return developmentCalculatorURL, "default de desenvolvimento"
 }
 
 func sanitizeTargetsForLog(targets string) string {
@@ -376,6 +436,15 @@ func (config *config) setupCommonFlags() {
 		"record",
 		"",
 		"Enable recording commands to a file for debugging later.",
+	)
+
+	// PATCH LOCAL (Albion Profit Pro): URL da calculadora web pro item "Abrir Calculadora" do
+	// systray. Prefer setting CalculatorUrl in config.yaml, mesma razao do -token.
+	flag.StringVar(
+		&config.CalculatorUrl,
+		"calculator-url",
+		"",
+		"URL of the Albion Profit Pro web calculator to open from the systray. Prefer setting CalculatorUrl in config.yaml.",
 	)
 }
 

@@ -18,7 +18,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         """Exige comprimento mínimo e impede que o e-mail componha a senha."""
         if len(password) < SENHA_MIN_LENGTH:
             raise exceptions.InvalidPasswordException(
-                reason=f"A senha precisa ter pelo menos {SENHA_MIN_LENGTH} caracteres."
+                reason=f"Password must be at least {SENHA_MIN_LENGTH} characters long."
             )
         if user.email and user.email.lower() in password.lower():
-            raise exceptions.InvalidPasswordException(reason="A senha não pode conter o e-mail.")
+            raise exceptions.InvalidPasswordException(
+                reason="Password must not contain the e-mail."
+            )

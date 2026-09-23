@@ -69,3 +69,61 @@ conflito).
 
 Comparar uma linha do ranking de refino com o `POST /craft/simulate` da mesma receita: o custo de
 receita tem que ser idêntico nas duas telas.
+
+## Estado da implementação
+
+**Concluída** (2026-09-22). Backend: `uv run pytest tests/` — **489 passed, 1 skipped**;
+`ruff check .`/`ruff format --check .` limpos. Frontend: `npm run lint` (0 erros),
+`npm run typecheck` (limpo, `schema.d.ts` regenerado), `npm run test` — **596 passed** (era 595).
+
+- **Item 1 — divergência real vs. spec.** `opportunities/schemas.py` **não tem mais**
+  `recipe_silver_cost` — o campo saiu de vez quando a Fase 4 reescreveu o flip em SQL (ranking
+  materializado aposentado, task 4/15). O achado original da spec ficou obsoleto por outra
+  task, não por esta. `recipes/schemas.py` (`RecipeOut.silver_cost`) era o único campo real
+  ainda `int`, corrigido para `Decimal`.
+- **Item 3 — achado além da spec.** Varrendo "o resto dos schemas" achei `catalog/schemas.py`
+  (`CatalogRecipeOut.silver_cost`) também `int` — **não estava na lista original**, mas é o
+  campo que `GET /catalog/recipes` expõe pro scanner inteiro (client-side, task 4). Era o de
+  maior alcance real: todo o motor de cálculo do navegador (`frontend/src/scanner/engine.ts`)
+  lê esse valor. Corrigido junto. `craft/schemas.py` (`silver_cost_per_execution`) também
+  corrigido, como a spec já cogitava.
+- **Item 5 — já estava resolvido.** `opportunities/models.py` (que a spec cita) **não existe
+  mais** (mesma reescrita da Fase 4). `recipes/models.py:56` hoje é `production_kind: Mapped[str]`
+  — não é o campo float que a spec descrevia; a referência de linha ficou desatualizada. Varri
+  **todo** `Mapped[float]`/`Numeric(...)` do backend: o único `Mapped[float]` sobre `Numeric` é
+  `craft_time` (`recipes/models.py:57`), que é tempo, não prata — a própria spec já excluía
+  ("a questão é só o que é prata"). Nenhuma mudança necessária.
+- **Item 4 — `money.ts` endurecido.** Novo tipo `FormulaInput = string | Decimal`, usado em
+  `money`, `add`, `subtract`, `divide`, `compare`, `isZero`, `isPositive`, `percentageCharge`,
+  `ceilToInteger`, `multiplyByQuantity` (só o lado do valor — `quantity` continua `number`, é
+  contagem). `MoneyInput` (com `number`) ficou só para as três funções de apresentação
+  (`formatSilver`/`formatQuantity`/`formatPercent`) e `roundDownForDisplay`, agora usando uma
+  `moneyForDisplay()` interna (exportada) em vez de `money()`. `craft-formulas.ts` (porte das
+  fórmulas do Python) recebeu o mesmo tratamento.
+- **Regenerar `schema.d.ts` surfaceou 9 call sites reais** passando `number` pro lado do
+  dinheiro em `divide`/`multiplyByQuantity` — todos eram contagem (`producedQuantity`,
+  `focusConsumed`, `partes.length`) dividindo/multiplicando um valor monetário, não dinheiro
+  em si. Corrigidos com `String(contagem)` no call site — a fronteira fica exatamente onde a
+  spec pedia: sem `number` no lado do valor, contagem continua `number`.
+
+### Desvios da spec
+
+- Escopo do item 1 mudou (opportunities/ não tem mais o campo; catalog/ tinha o mesmo problema
+  e não estava listado) — documentado acima, não é uma omissão desta implementação.
+- Item 5 não exigiu nenhuma mudança de código — a spec descrevia um estado que duas reescritas
+  da Fase 4 já haviam resolvido antes desta task existir.
+
+### Guard em vermelho (prova de que o teste novo morde)
+
+Alarguei `FormulaInput` de volta para `string | number | Decimal` temporariamente e rodei
+`npm run typecheck`: os 9 `@ts-expect-error` do teste novo em `money.test.ts` viraram
+`TS2578: Unused '@ts-expect-error' directive` — a marca de que, sem a restrição, aquelas
+chamadas deixariam de ser erro. Revertido em seguida; `npm run typecheck` voltou a ficar limpo.
+
+### Pendente pra você testar
+
+- **Comparação visual Refino × `/craft/simulate`** (teste manual da spec): os vetores dourados
+  já provam que os dois motores (Python e o port TypeScript) concordam número a número, mas ver
+  a mesma receita nas duas telas do produto real é verificação visual — abrir uma receita no
+  ranking de Refino, anotar o custo de receita mostrado, abrir "Analisar com o livro real" da
+  mesma linha e comparar com `recipe.silver_cost_per_execution × executions` da resposta.

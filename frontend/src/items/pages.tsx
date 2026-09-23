@@ -24,8 +24,8 @@ export function BuscaItem() {
     () => ({
       tier: tier ? Number(tier) : undefined,
       enchantment_level: enchantment ? Number(enchantment) : undefined,
-      categoria: category || undefined,
-      apenas_craftaveis: craftable || undefined,
+      category: category || undefined,
+      craftable_only: craftable || undefined,
     }),
     [category, craftable, enchantment, tier],
   )

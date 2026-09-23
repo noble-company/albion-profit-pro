@@ -90,8 +90,8 @@ async def test_search_filters_and_limit(cliente_autenticado, db_session):
             "q": "t",
             "tier": 4,
             "enchantment_level": 0,
-            "categoria": "resources",
-            "apenas_craftaveis": True,
+            "category": "resources",
+            "craftable_only": True,
             "limit": 1,
         },
     )
@@ -104,11 +104,31 @@ async def test_search_filters_and_limit(cliente_autenticado, db_session):
 
     blank = await cliente_autenticado.get("/items/search", params={"q": "   "})
     assert blank.status_code == 422
-    assert blank.json()["detail"] == "termo_de_busca_vazio"
+    assert blank.json()["detail"] == "empty_search_term"
 
     wildcard = await cliente_autenticado.get("/items/search", params={"q": "%"})
     assert wildcard.status_code == 200
     assert wildcard.json() == []
+
+
+async def test_search_accepts_deprecated_portuguese_param_names(cliente_autenticado, db_session):
+    """Task 3.6/06: `categoria`/`apenas_craftaveis` seguem aceitos por um ciclo de depreciação
+    -- a SPA está no ar e uma aba com o bundle anterior pode mandar o nome velho."""
+    await _seed_catalog(db_session)
+
+    response = await cliente_autenticado.get(
+        "/items/search",
+        params={
+            "q": "t",
+            "tier": 4,
+            "enchantment_level": 0,
+            "categoria": "resources",
+            "apenas_craftaveis": True,
+            "limit": 1,
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert [item["unique_name"] for item in response.json()] == ["T4_CLOTH"]
 
 
 async def test_item_detail_and_semantic_not_found(cliente_autenticado, db_session):
@@ -120,7 +140,7 @@ async def test_item_detail_and_semantic_not_found(cliente_autenticado, db_sessio
 
     missing = await cliente_autenticado.get("/items/DOES_NOT_EXIST")
     assert missing.status_code == 404
-    assert missing.json()["detail"] == "item_nao_encontrado"
+    assert missing.json()["detail"] == "item_not_found"
 
 
 async def test_locations_use_name_or_id_fallback(cliente_autenticado, db_session):

@@ -41,6 +41,14 @@ func onReady() {
 	// PATCH LOCAL (Albion Profit Pro): make the build and updater state inspectable.
 	systray.SetTooltip("Albion Profit Pro Client | " + buildInfoLabel())
 
+	// PATCH LOCAL (Albion Profit Pro, task 3.6/14): entry point to the product comes first.
+	// Disabled instead of hidden when no URL is configured -- fail-closed, never an arbitrary
+	// destination, but still visible so the user knows the feature exists.
+	mOpenCalculator := systray.AddMenuItem("Abrir Calculadora", "Open the Albion Profit Pro web calculator")
+	if client.CalculatorURL() == "" {
+		mOpenCalculator.Disable()
+	}
+	systray.AddSeparator()
 	mBuildInfo := systray.AddMenuItem(buildInfoLabel(), "Compiled release and updater state")
 	mBuildInfo.Disable()
 	mConnection := systray.AddMenuItem("Connection: "+client.ConnectionStatusLabel(), "Backend authentication and realm state")
@@ -57,6 +65,10 @@ func onReady() {
 			case status := <-client.ConnectionStatusChanges():
 				mConnection.SetTitle("Connection: " + status)
 				systray.SetTooltip("Albion Profit Pro Client | " + status)
+			case <-mOpenCalculator.ClickedCh:
+				if url := client.CalculatorURL(); url != "" {
+					openBrowser(url)
+				}
 			case <-mReloadConfig.ClickedCh:
 				go client.RevalidateConnectionConfiguration()
 			case <-mOpenLog.ClickedCh:
@@ -88,4 +100,13 @@ func openLogFile() {
 
 	// If no log file exists, show a message
 	log.Info("No log file found yet.")
+}
+
+// openBrowser opens the default browser at url. PATCH LOCAL (Albion Profit Pro, task 3.6/14):
+// url comes from resolved config (flag/config.yaml/release ldflags), never from user input.
+func openBrowser(url string) {
+	cmd := exec.Command("open", url)
+	if err := cmd.Start(); err != nil {
+		log.Errorf("Failed to open calculator URL: %v", err)
+	}
 }

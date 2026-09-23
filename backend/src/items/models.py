@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, Numeric, String, Text, text
+from sqlalchemy import BigInteger, Boolean, Index, Numeric, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
@@ -15,6 +15,19 @@ class Item(Base):
     """
 
     __tablename__ = "item"
+    # Índice trigram (task 3.6/09, E08) -- tem que bater exatamente com
+    # alembic/versions/f1c6d7e8f9a0_adicionar_busca_normalizada_de_itens.py. Sem isto, o
+    # `Base.metadata` que `alembic/env.py` usa como `target_metadata` não sabe que o índice
+    # existe, e o próximo `--autogenerate` propõe dropá-lo -- a extensão `pg_trgm` que ele
+    # depende é criada pela migração (não expressa em metadata), ver docs/06.
+    __table_args__ = (
+        Index(
+            "ix_item_busca_normalizada_trgm",
+            "busca_normalizada",
+            postgresql_using="gin",
+            postgresql_ops={"busca_normalizada": "gin_trgm_ops"},
+        ),
+    )
 
     # UniqueName exato do items.json — já inclui o sufixo "@N" pra variantes encantadas
     # (ex: "T4_HEAD_CLOTH_SET1@1"), mesma convenção usada em Recipe.output_item_unique_name.

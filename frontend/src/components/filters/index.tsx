@@ -6,10 +6,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 /**
  * Primitivos de filtro para a **coluna** (task 4/09).
  *
- * A família de `components/opportunities/FilterPanel.tsx` foi desenhada para grade horizontal
- * acima da tabela — três fieldsets de 4 a 6 colunas. Numa sidebar de 288 px aquilo não cabe, e
- * espremer geraria a quarta cópia de `fieldLabel`/`fieldControl` que a `F05` já combateu uma
- * vez.
+ * A família horizontal antiga de filtros foi removida na task A01, quando o Market Flip virou
+ * a última tela a publicar seus controles nesta sidebar.
  *
  * Aqui tudo empilha, o rótulo fica acima do controle, e a altura mínima de 44 px do alvo de
  * toque é preservada (`13-linguagem-visual.md` §1).
@@ -196,7 +194,7 @@ export function FilterSelectField({
   value: string
   onChange: (value: string) => void
   options: Array<{ value: string; label: string }>
-  allLabel?: string
+  allLabel?: string | null
 }) {
   return (
     <label className={filterLabel}>
@@ -207,7 +205,7 @@ export function FilterSelectField({
         onChange={(event) => onChange(event.target.value)}
         className={filterControl}
       >
-        <option value="">{allLabel}</option>
+        {allLabel !== null && <option value="">{allLabel}</option>}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}

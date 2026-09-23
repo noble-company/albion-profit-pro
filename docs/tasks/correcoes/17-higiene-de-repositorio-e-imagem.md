@@ -94,3 +94,81 @@ remoção das funções mortas) e 16 (as correções documentais devem entrar co
 
 Rodar o worker de ingest no Windows conforme a documentação corrigida e confirmar que ele
 processa uma task sem `PermissionError`.
+
+## Estado da implementação
+
+**Concluída** (2026-09-22). Backend: `uv run pytest tests/` — **490 passed, 1 skipped**
+(era 489); `ruff check .` limpo, `ruff format --check .` só acusa 11 arquivos pré-existentes
+não relacionados a esta task (trabalho de sessões anteriores, não tocado aqui). Frontend:
+`npm run lint` (0 erros), `npm run typecheck` (limpo), `npm run test` — **596 passed**.
+
+### Divergência da spec confirmada antes de implementar
+
+Como alinhado no resumo: "Depende de 04, 07 e 16" está obsoleto (tasks arquivadas/absorvidas
+pela Fase 4). Validei os 9 itens direto contra o código real — 7 continuavam reais, 1 (achado do
+`money.ts`) já tinha sido resolvido pela task 10 desta mesma sessão, e 1 (W10) parou de fazer
+sentido porque o próprio mecanismo que ele descrevia foi removido do código (ranking
+materializado aposentado, task 4/15) — sem código a corrigir, só documentação a reconciliar.
+
+### O que mudou
+
+1. **`backend/.dockerignore`** — acrescentou `runtime-logs/`, `.runtime-logs/` (as duas existem
+   por deriva histórica), `logs/`, `*.log`, `.uv-cache/`, `.cache/`. **Medido antes/depois**:
+   confirmei com `docker run --rm imagem ls` que a imagem antiga embutia `.runtime-logs/` (7,9
+   MB), `runtime-logs/` (3,3 MB), `logs/` (1,3 MB) e dois `.log` soltos — **~12,5 MB de lixo
+   local**, tudo confirmadamente ausente na imagem nova. O tamanho reportado por `docker image
+   inspect` caiu de 70.541.638 para 69.318.833 bytes (~1,2 MB) — menor que a soma bruta dos
+   arquivos por causa de deduplicação/compressão de camada do Docker; o que importa (os
+   arquivos não estarem mais lá) está confirmado diretamente.
+2. **`frontend/src/App.tsx`** — `/ui`/`/estilo` viraram `import.meta.env.DEV ? lazy(...) : null`
+   em vez de `lazy(...)` incondicional, e a `<Route>` só é renderizada quando o componente não é
+   `null`. Confirmado com `npm run build` real: nem `Preview-*.js`/`LinguagemVisualPage-*.js`
+   nem as strings `UiPreview`/`LinguagemVisualPage` aparecem em `dist/assets/` — o bundle de
+   produção não sabe que essas telas existem, não é só uma rota inacessível.
+3. **`frontend/package.json`** — `@radix-ui/react-dropdown-menu`, `@radix-ui/react-label`,
+   `@radix-ui/react-separator` e `@radix-ui/react-tooltip` moveram para `devDependencies` (só
+   `Preview.tsx`/`LinguagemVisualPage.tsx` os usavam). `@radix-ui/react-checkbox` **ficou** em
+   `dependencies` — a task 10 desta sessão fez `components/filters/index.tsx` (filtro real do
+   scanner) passar a usá-lo. `input`/`table`/`badge` não tinham pacote Radix nenhum (wrappers
+   HTML puros), nada a mover.
+4. **`backend/src/items/service.py`** — `list_location_ids` removida (zero referências).
+   `subtract`/`multiplyByQuantity`/`compare` de `money.ts`: **não removidas** — a task 10 já as
+   colocou em uso real (`ExactAnalysis.tsx`, `engine.ts`, `calculadora.ts`, `categorias.ts`,
+   `filters.ts`, `sorting.ts`).
+5. **`backend/alembic/versions/f2d7e8f9a0b1_...py`** — `down_revision` de merge
+   (`("b3e4f5a6c7d8", "f1c6d7e8f9a0")`) virou pai único `"b3e4f5a6c7d8"` — confirmei a cadeia:
+   `b3e4f5a6c7d8 → a2d7e8f9b0c1 → f1c6d7e8f9a0`, então o segundo pai já era ancestral do
+   primeiro. `alembic upgrade head` de um banco vazio passou de ponta a ponta na suíte inteira
+   (a fixture de teste roda isso a cada sessão).
+6. **`CLAUDE.md`/`AGENTS.md`** — versão do React Router corrigida (7.18.2 instalado, não 8, com
+   o motivo). A linha `docs/` já **não** estava congelada em "2.5, 14/14" — já tinha sido
+   reconciliada em algum momento anterior a esta task; nada a mudar aí. Caminho do systray em
+   `00-plano-macro.md:177,255` também já estava correto (fixado na task 3.6/14).
+7. **`frontend/package.json`** — `recharts` de `"^3.7.0"` para `"3.7.0"` (já era a versão
+   resolvida; só o lockfile registra a mudança de faixa pra exata).
+8. **`README.md`/`CLAUDE.md`/`AGENTS.md`** — nota de `--pool=solo` ao lado de cada comando
+   `celery worker` (W9).
+9. **W10 documentado como obsoleto** em `docs/tasks/refatoracao/README.md` — `rebuild_ranking`/
+   `rebuild_recipe_ranking` não existem mais no código.
+10. **`backend/scripts/_dumps.py`** — `RELEVANT_CATEGORIES` ganhou `mount` e `furnitureitem`
+    (W11). **Contagem real, medida de duas formas**: em memória com `prepare_recipe_import()`
+    contra os dumps reais (8.548 → 8.855, **+307 receitas**) e end-to-end contra um Postgres
+    real via `import_recipes()` (**8.855 receitas no banco**, sem erro de constraint). Também
+    corrigi o teste `test_iter_category_entries_flattens_relevant_categories`, que usava `mount`
+    como exemplo de categoria irrelevante — trocado por `trashitem` — e acrescentei um teste de
+    regressão específico para as duas categorias novas.
+
+### Desvios da spec
+
+- Achados W2 (dumps no `.dockerignore`) e W10 (rebuild_ranking) não exigiram código — o W2
+  nunca foi alcançável pelo `docker build .` (contexto é `backend/`, os dumps ficam na raiz do
+  monorepo) e o W10 descreve um mecanismo que outra task já removeu por completo. Ambos
+  documentados como tal nas tabelas de achados, não silenciosamente ignorados.
+- Achado do `money.ts` (metade do item 3) não precisou de remoção — a task 10 já resolveu.
+
+### Pendente pra você testar
+
+- **Worker de ingest no Windows com a nota nova**: rodar
+  `uv run celery -A src.celery_app.celery_app worker -Q ingest -c 4 --pool=solo --loglevel=info`
+  local e confirmar que processa uma task sem `PermissionError` — não é algo que eu consiga
+  disparar sozinho (precisa do client Go mandando dado de verdade, ou de um payload manual).

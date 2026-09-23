@@ -67,3 +67,63 @@ Nada.
 
 Confirmar no GitHub Actions que o `client-ci` do commit seguinte fecha verde, e anotar no bloco
 de estado o link da execução.
+
+## Estado da implementação
+
+**Concluída** (2026-09-22), com um item de investigação pendente pra você (sem acesso ao GitHub
+Actions deste ambiente).
+
+- **`lib/market.go`** (CRLF) — reformatado com `gofmt lib/market.go | sed 's/$/\r/'` (aplica o
+  gofmt sobre o conteúdo e reconverte LF→CRLF na saída, já que `gofmt` sempre devolve LF puro,
+  mesmo lendo um arquivo CRLF). Corrigiu o alinhamento de `MarketSnapshotScope`
+  (`EnchantmentLevel`) e `MarketUpload` (coluna de tipos).
+- **`client/market_snapshot.go`** (já era LF, sem CRLF nenhum a preservar) — `gofmt -w` direto.
+  Corrigiu o espaço faltando em `CapturedAt:` no literal de `lib.MarketUpload`.
+- Confirmado com `bash scripts/validate-fmt.sh lib/market.go client/market_snapshot.go` (verde) e
+  `bash scripts/validate-fmt.sh` sem argumentos — árvore inteira limpa (item 4).
+- `go build`, `go test ./...` (client, clientupdate, systray — todos `ok`) verdes depois da
+  correção.
+- `go vet ./client/` **localmente** (ambiente Windows, GOOS nativo) reproduz exatamente o achado
+  que a spec já previa: `client/net_interface_filter_win.go:75: possible misuse of
+  unsafe.Pointer` — código herdado do upstream, sem `PATCH LOCAL`, não tocado por esta task.
+
+### Item 2/3 da spec — pendente pra você
+
+**Não tenho acesso ao histórico do GitHub Actions deste repositório** (é privado;
+`api.github.com/repos/noble-company/albion-profit-pro` devolve 404 sem autenticação, e não há
+`gh` CLI nem token neste ambiente). O que consegui verificar sozinho: reproduzi localmente a
+mesma seleção de arquivos que o `validate-fmt.sh` do CI faria para o commit `0f56178`
+(`git diff --diff-filter=ACMRT <pai> 0f56178 -- '*.go'`) e **ela inclui os dois arquivos** — ou
+seja, a lógica de diff do workflow não tem o bug; se o job rodou com `FORMAT_BASE_REF` apontando
+pro pai correto, ele *deveria* ter falhado naquele push. Isso aponta pra duas explicações
+possíveis, que só dá pra distinguir olhando a aba Actions:
+1. O job rodou e falhou, e ninguém olhou (a hipótese que a própria spec já levanta) — precisa de
+   mecanismo de notificação (item 3).
+2. O job não rodou de verdade nesse push por algum motivo de infra (ex: `github.event.before`
+   nulo/zerado nesse tipo de push) — precisa investigar o payload do evento.
+
+**Como verificar:** abrir `https://github.com/noble-company/albion-profit-pro/actions/workflows/client-ci.yml`,
+filtrar pelo commit `0f56178` e pelos pushes seguintes até hoje, e confirmar qual das duas
+aconteceu. Se for (1), decidir o mecanismo de notificação (ex: proteção de branch exigindo o
+check, ou notificação do GitHub já embutida por e-mail/Slack).
+
+### Item 5 da spec — decisão sobre `vet` no Windows
+
+**Decisão: não adicionar um job `windows-latest` agora.** O achado é real (`go vet` no Linux
+nunca compila os arquivos `_win.go`, que são o alvo real de produção), mas o único resultado
+que esse job teria hoje é o `unsafe.Pointer` herdado do upstream — um job novo que nasce
+vermelho e fica vermelho é exatamente o "gate que ninguém olha" que esta task existe pra
+fechar. Registrado como achado `W14` (tabela abaixo) para virar task própria quando alguém
+decidir também triar/corrigir o achado do upstream (ou aceitar suprimi-lo com um comentário
+`//nolint` justificado).
+
+### Guard em vermelho antes da correção
+
+`bash scripts/validate-fmt.sh lib/market.go client/market_snapshot.go` (rodado antes de tocar
+nos arquivos):
+
+```
+The following files are not formatted properly:
+ - lib/market.go
+ - client/market_snapshot.go
+```

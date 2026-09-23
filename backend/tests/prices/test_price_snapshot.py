@@ -8,8 +8,9 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 
+from src.database import engine
 from src.items.models import Item
 from src.prices.models import MarketOrder, PriceSnapshot
 from src.prices.snapshot import (
@@ -599,3 +600,91 @@ async def test_categoria_sem_kind_e_rejeitada(cliente_autenticado):
     """A mesma `category` significa coisas diferentes no refino (família) e no craft."""
     resposta = await cliente_autenticado.get("/prices/snapshot?server=west&category=cloth")
     assert resposta.status_code == 422
+
+
+# --- Recorte explícito por saída salva (A07) ---
+
+
+async def test_output_items_expandem_saida_ingredientes_e_upgrade_sem_vazar(
+    cliente_autenticado, db_session
+):
+    await _seed_categorias(db_session)
+
+    itens = await _itens(
+        cliente_autenticado,
+        "output_item=T4_MAIN_SWORD&output_item=T4_MAIN_SWORD",
+    )
+
+    assert itens == {"T4_MAIN_SWORD", "T4_METALBAR", "T4_RUNE"}
+
+
+async def test_ordem_e_repeticao_do_output_item_dao_o_mesmo_recorte(
+    cliente_autenticado, db_session
+):
+    await _seed_categorias(db_session)
+
+    primeiro = await _itens(
+        cliente_autenticado,
+        "output_item=T4_MAIN_SWORD&output_item=T4_2H_BOW",
+    )
+    segundo = await _itens(
+        cliente_autenticado,
+        "output_item=T4_2H_BOW&output_item=T4_MAIN_SWORD&output_item=T4_2H_BOW",
+    )
+
+    assert (
+        primeiro
+        == segundo
+        == {
+            "T4_MAIN_SWORD",
+            "T4_METALBAR",
+            "T4_RUNE",
+            "T4_2H_BOW",
+            "T4_PLANKS",
+        }
+    )
+
+
+async def test_output_item_nao_mistura_com_categoria_e_tem_teto(cliente_autenticado):
+    conflito = await cliente_autenticado.get(
+        "/prices/snapshot",
+        params={"server": "west", "kind": "crafting", "output_item": "T4_MAIN_SWORD"},
+    )
+    excesso = await cliente_autenticado.get(
+        "/prices/snapshot",
+        params=[("server", "west"), *(("output_item", f"T4_{i}") for i in range(201))],
+    )
+
+    assert conflito.status_code == 422
+    assert excesso.status_code == 422
+
+
+async def test_output_item_mantem_numero_de_statements_constante(cliente_autenticado, db_session):
+    await _seed_categorias(db_session)
+    counter = {"selects": 0}
+
+    def count_selects(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            counter["selects"] += 1
+
+    event.listen(engine.sync_engine, "before_cursor_execute", count_selects)
+    try:
+        await cliente_autenticado.get(
+            "/prices/snapshot", params={"server": "west", "output_item": "T4_MAIN_SWORD"}
+        )
+        com_um = counter["selects"]
+
+        counter["selects"] = 0
+        await cliente_autenticado.get(
+            "/prices/snapshot",
+            params=[
+                ("server", "west"),
+                ("output_item", "T4_MAIN_SWORD"),
+                ("output_item", "T4_2H_BOW"),
+            ],
+        )
+        com_dois = counter["selects"]
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", count_selects)
+
+    assert com_dois == com_um

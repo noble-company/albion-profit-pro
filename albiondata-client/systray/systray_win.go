@@ -4,11 +4,13 @@ package systray
 
 import (
 	"fmt"
+	"os/exec"
 	"time"
 
 	"github.com/ao-data/albiondata-client/client"
 
 	"github.com/ao-data/albiondata-client/icon"
+	"github.com/ao-data/albiondata-client/log"
 	"github.com/getlantern/systray"
 	"github.com/gonutz/w32"
 )
@@ -66,6 +68,14 @@ func onReady() {
 	// PATCH LOCAL (Albion Profit Pro): make the build and updater state inspectable.
 	systray.SetTitle("Albion Profit Pro Client")
 	systray.SetTooltip("Albion Profit Pro Client | " + buildInfoLabel())
+	// PATCH LOCAL (Albion Profit Pro, task 3.6/14): entry point to the product comes first.
+	// Disabled instead of hidden when no URL is configured -- fail-closed, never an arbitrary
+	// destination, but still visible so the user knows the feature exists.
+	mOpenCalculator := systray.AddMenuItem("Abrir Calculadora", "Open the Albion Profit Pro web calculator")
+	if client.CalculatorURL() == "" {
+		mOpenCalculator.Disable()
+	}
+	systray.AddSeparator()
 	mBuildInfo := systray.AddMenuItem(buildInfoLabel(), "Compiled release and updater state")
 	mBuildInfo.Disable()
 	mConnection := systray.AddMenuItem("Connection: "+client.ConnectionStatusLabel(), "Backend authentication and realm state")
@@ -81,6 +91,10 @@ func onReady() {
 			case status := <-client.ConnectionStatusChanges():
 				mConnection.SetTitle("Connection: " + status)
 				systray.SetTooltip("Albion Profit Pro Client | " + status)
+			case <-mOpenCalculator.ClickedCh:
+				if url := client.CalculatorURL(); url != "" {
+					openBrowser(url)
+				}
 			case <-mReloadConfig.ClickedCh:
 				go client.RevalidateConnectionConfiguration()
 			case <-mQuit.ClickedCh:
@@ -101,4 +115,14 @@ func onReady() {
 			}
 		}
 	}()
+}
+
+// openBrowser opens the default browser at url. PATCH LOCAL (Albion Profit Pro, task 3.6/14):
+// rundll32 avoids the quoting quirks of `cmd /c start` and needs no extra dependency -- it is
+// the shell's own URL handler. url comes from resolved config (flag/config.yaml/release
+// ldflags), never from user input, so this is not command-injection surface.
+func openBrowser(url string) {
+	if err := exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start(); err != nil {
+		log.Errorf("Failed to open calculator URL: %v", err)
+	}
 }

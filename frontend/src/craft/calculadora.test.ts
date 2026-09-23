@@ -20,7 +20,7 @@ function catalogo(kind: 'refining' | 'crafting', saidas: string[]): RecipeCatalo
       output_item,
       production_kind: kind,
       enchantment_level: 0,
-      silver_cost: 0,
+      silver_cost: '0',
       crafting_focus: 0,
       amount_crafted: 1,
       ingredients: [],

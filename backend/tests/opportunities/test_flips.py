@@ -62,7 +62,11 @@ async def test_flips_ranks_by_profit_and_applies_quantity_and_fees(client, db_se
 
     response = await client.get(
         "/opportunities/flips",
-        params={"server": "west", "location_id": ["1002", "3005"]},
+        params={
+            "server": "west",
+            "buy_location_id": ["1002"],
+            "sell_location_id": ["3005"],
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -207,7 +211,11 @@ async def test_flip_ignores_expired_orders_on_both_sides(client, db_session):
     body = (
         await client.get(
             "/opportunities/flips",
-            params={"server": "west", "location_id": ["1002", "3005"]},
+            params={
+                "server": "west",
+                "buy_location_id": ["1002"],
+                "sell_location_id": ["3005"],
+            },
             headers=headers,
         )
     ).json()
@@ -228,7 +236,11 @@ async def test_flip_ignores_expired_orders_on_both_sides(client, db_session):
     still_one = (
         await client.get(
             "/opportunities/flips",
-            params={"server": "west", "location_id": ["1002", "3005"]},
+            params={
+                "server": "west",
+                "buy_location_id": ["1002"],
+                "sell_location_id": ["3005"],
+            },
             headers=headers,
         )
     ).json()
@@ -306,6 +318,193 @@ async def test_flip_quantity_never_exceeds_buyer_depth_and_stays_within_one_side
     assert Decimal(opportunity["sell_price"]) == Decimal("300")
 
 
+async def test_flip_filters_buy_and_sell_cities_independently(client, db_session):
+    _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    item_id = _item_id()
+    db_session.add(Item(unique_name=item_id, albion_id=uuid.uuid4().int % 1_000_000_000, tier=4))
+    db_session.add_all(
+        [
+            _order(item_id, "1002", "offer", 100, 10),
+            _order(item_id, "3005", "offer", 110, 10),
+            _order(item_id, "4002", "offer", 120, 10),
+            _order(item_id, "1002", "request", 200, 10),
+            _order(item_id, "3005", "request", 210, 10),
+            _order(item_id, "4002", "request", 220, 10),
+        ]
+    )
+    await db_session.commit()
+
+    buy_only = await client.get(
+        "/opportunities/flips",
+        params={"server": "west", "buy_location_id": ["1002"]},
+        headers=headers,
+    )
+    assert buy_only.status_code == 200, buy_only.text
+    assert {row["buy_location"] for row in buy_only.json()["opportunities"]} == {"1002"}
+    assert {row["sell_location"] for row in buy_only.json()["opportunities"]} == {
+        "3005",
+        "4002",
+    }
+
+    sell_only = await client.get(
+        "/opportunities/flips",
+        params={"server": "west", "sell_location_id": ["3005"]},
+        headers=headers,
+    )
+    assert sell_only.status_code == 200, sell_only.text
+    assert {row["buy_location"] for row in sell_only.json()["opportunities"]} == {
+        "1002",
+        "4002",
+    }
+    assert {row["sell_location"] for row in sell_only.json()["opportunities"]} == {"3005"}
+
+
+async def test_flip_combines_city_lists_without_same_city_routes(client, db_session):
+    _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    item_id = _item_id()
+    db_session.add(Item(unique_name=item_id, albion_id=uuid.uuid4().int % 1_000_000_000, tier=4))
+    for city, offer, request in (
+        ("1002", 100, 200),
+        ("3005", 110, 210),
+        ("4002", 120, 220),
+    ):
+        db_session.add_all(
+            [
+                _order(item_id, city, "offer", offer, 10),
+                _order(item_id, city, "request", request, 10),
+            ]
+        )
+    await db_session.commit()
+
+    response = await client.get(
+        "/opportunities/flips",
+        params={
+            "server": "west",
+            "buy_location_id": ["1002", "3005"],
+            "sell_location_id": ["3005", "4002"],
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    routes = {
+        (row["buy_location"], row["sell_location"]) for row in response.json()["opportunities"]
+    }
+    assert routes == {("1002", "3005"), ("1002", "4002"), ("3005", "4002")}
+
+
+async def test_flip_accepts_multiple_item_dimensions_and_single_values(client, db_session):
+    _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    specs = [(4, 0, 1), (5, 1, 2), (6, 2, 3)]
+    item_ids: dict[int, str] = {}
+    for tier, enchantment, quality in specs:
+        item_id = _item_id()
+        item_ids[tier] = item_id
+        db_session.add(
+            Item(
+                unique_name=item_id,
+                albion_id=uuid.uuid4().int % 1_000_000_000,
+                tier=tier,
+                enchantment_level=enchantment,
+            )
+        )
+        db_session.add_all(
+            [
+                _order(
+                    item_id,
+                    "1002",
+                    "offer",
+                    100,
+                    10,
+                    quality_level=quality,
+                    enchantment_level=enchantment,
+                ),
+                _order(
+                    item_id,
+                    "3005",
+                    "request",
+                    200,
+                    10,
+                    quality_level=quality,
+                    enchantment_level=enchantment,
+                ),
+            ]
+        )
+    await db_session.commit()
+
+    multiple = await client.get(
+        "/opportunities/flips",
+        params={
+            "server": "west",
+            "tier": [4, 5],
+            "enchantment_level": [0, 1],
+            "quality_level": [1, 2],
+        },
+        headers=headers,
+    )
+    assert multiple.status_code == 200, multiple.text
+    assert {row["item"] for row in multiple.json()["opportunities"]} == {
+        item_ids[4],
+        item_ids[5],
+    }
+
+    single = await client.get(
+        "/opportunities/flips",
+        params={"server": "west", "tier": 4},
+        headers=headers,
+    )
+    assert single.status_code == 200, single.text
+    assert {row["item"] for row in single.json()["opportunities"]} == {item_ids[4]}
+
+
+async def test_flip_rejects_item_dimension_values_outside_their_ranges(client):
+    _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    for params in (
+        {"tier": 9},
+        {"tier": 0},
+        {"enchantment_level": 5},
+        {"enchantment_level": -1},
+        {"quality_level": 6},
+        {"quality_level": 0},
+    ):
+        response = await client.get(
+            "/opportunities/flips",
+            params={"server": "west", **params},
+            headers=headers,
+        )
+        assert response.status_code == 422, (params, response.text)
+
+
+async def test_flip_cache_normalizes_repeated_filter_order(client, db_session):
+    _, token = await registrar_e_logar(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    first = await client.get(
+        "/opportunities/flips",
+        params={
+            "server": "west",
+            "tier": [5, 4, 5],
+            "buy_location_id": ["3005", "1002", "3005"],
+        },
+        headers=headers,
+    )
+    second = await client.get(
+        "/opportunities/flips",
+        params={
+            "server": "west",
+            "buy_location_id": ["1002", "3005"],
+            "tier": [4, 5, 4],
+        },
+        headers=headers,
+    )
+    assert first.status_code == second.status_code == 200
+    keys = [key async for key in get_redis().scan_iter(match="opportunities:v2:flip:*")]
+    assert len(keys) == 1
+
+
 def _count_statements():
     statements: list[str] = []
 
@@ -329,7 +528,15 @@ async def test_flip_query_count_is_constant_regardless_of_dataset_size(client, d
         try:
             started = time.perf_counter()
             response = await client.get(
-                "/opportunities/flips", params={"server": "west", "limit": 50}, headers=headers
+                "/opportunities/flips",
+                params={
+                    "server": "west",
+                    "limit": 50,
+                    "buy_location_id": ["1002"],
+                    "sell_location_id": ["3005"],
+                    "tier": [4, 5],
+                },
+                headers=headers,
             )
             elapsed = time.perf_counter() - started
         finally:
@@ -347,7 +554,7 @@ async def test_flip_query_count_is_constant_regardless_of_dataset_size(client, d
     source_base = uuid.uuid4().int % 1_000_000
     for index in range(2500):
         item_id = f"T15_LOAD_{index:05}_{run}"
-        rows.append({"unique_name": item_id, "albion_id": albion_base * 10_000 + index})
+        rows.append({"unique_name": item_id, "albion_id": albion_base * 10_000 + index, "tier": 4})
         for side, (city, kind, price) in enumerate(
             (("1002", "offer", 100), ("3005", "request", 250))
         ):

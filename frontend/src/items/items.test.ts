@@ -25,7 +25,7 @@ test('busca envia filtros do catálogo e aceita resultado encantado', async () =
   )
   const result = await searchItems(
     'T4_CLOTH',
-    { tier: 4, enchantment_level: 2, apenas_craftaveis: false },
+    { tier: 4, enchantment_level: 2, craftable_only: false },
     new AbortController().signal,
   )
   expect(result[0]?.unique_name).toBe('T4_CLOTH@2')

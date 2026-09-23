@@ -83,11 +83,11 @@ type MarketNotificationUpload struct {
 // The backend uses this scope to reconcile only the market/side/quality represented by the
 // response, never unrelated orders from the same city.
 type MarketSnapshotScope struct {
-	MarketID          string `json:"MarketId"`
-	ItemID            string `json:"ItemId"`
-	QualityLevel      int    `json:"QualityLevel"`
-	EnchantmentLevel  int    `json:"EnchantmentLevel"`
-	AuctionType       string `json:"AuctionType"`
+	MarketID         string `json:"MarketId"`
+	ItemID           string `json:"ItemId"`
+	QualityLevel     int    `json:"QualityLevel"`
+	EnchantmentLevel int    `json:"EnchantmentLevel"`
+	AuctionType      string `json:"AuctionType"`
 }
 
 // MarketUpload contains a list of orders and, when produced by the local client, the metadata
@@ -95,9 +95,9 @@ type MarketSnapshotScope struct {
 // legacy Orders field remains unchanged so old ingest endpoints can continue accepting payloads
 // during the migration.
 type MarketUpload struct {
-	SnapshotID  string                 `json:"SnapshotId,omitempty"`
-	CapturedAt  string                 `json:"CapturedAt,omitempty"`
-	CompletedAt string                 `json:"CompletedAt,omitempty"`
-	Scope       []MarketSnapshotScope  `json:"Scope,omitempty"`
-	Orders      []*MarketOrder         `json:"Orders"`
+	SnapshotID  string                `json:"SnapshotId,omitempty"`
+	CapturedAt  string                `json:"CapturedAt,omitempty"`
+	CompletedAt string                `json:"CompletedAt,omitempty"`
+	Scope       []MarketSnapshotScope `json:"Scope,omitempty"`
+	Orders      []*MarketOrder        `json:"Orders"`
 }

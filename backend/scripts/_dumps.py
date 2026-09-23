@@ -13,7 +13,17 @@ campo numérico em comum. Ver docs/02-dados-de-receita.md.
 import json
 from pathlib import Path
 
-RELEVANT_CATEGORIES = ["simpleitem", "equipmentitem", "weapon", "consumableitem"]
+# `mount` e `furnitureitem` entraram na task 3.6/17 (W11, P09): 109 + 199 itens com
+# `craftingrequirements` no dump real ficavam invisíveis ao importer, divergindo de
+# docs/02-dados-de-receita.md, que já os documentava como fonte de receita.
+RELEVANT_CATEGORIES = [
+    "simpleitem",
+    "equipmentitem",
+    "weapon",
+    "consumableitem",
+    "mount",
+    "furnitureitem",
+]
 
 
 def as_list(value):

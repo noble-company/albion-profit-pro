@@ -72,6 +72,18 @@ export interface RecorteDoSnapshot {
   subcategory: string | null
 }
 
+/** Recorte dirigido usado por Meus Crafts: o backend expande cada saída para seus insumos. */
+export interface RecortePorItens {
+  outputItems: readonly string[]
+}
+
+export type PriceSnapshotRecorte = RecorteDoSnapshot | RecortePorItens
+
+export function itensDoRecorte(recorte: PriceSnapshotRecorte | null): string[] | null {
+  if (!recorte || !('outputItems' in recorte)) return null
+  return [...new Set(recorte.outputItems)].sort()
+}
+
 /**
  * Snapshot de preço do realm (task 4/03), ou só de uma categoria (task 4/22).
  *
@@ -84,9 +96,11 @@ export interface RecorteDoSnapshot {
 export function usePriceSnapshot(
   realm: Realm | null,
   locations: string[],
-  recorte: RecorteDoSnapshot | null = null,
+  recorte: PriceSnapshotRecorte | null = null,
   habilitado = true,
 ) {
+  const outputItems = itensDoRecorte(recorte)
+  const recorteDeCategoria = recorte && 'kind' in recorte ? recorte : null
   const query = useQuery({
     // As cidades entram na chave: pedir menos cidades é um payload diferente, não um recorte
     // do mesmo. A categoria também (task 22) — trocar de categoria é uma ação explícita, não uma
@@ -96,7 +110,14 @@ export function usePriceSnapshot(
       'snapshot',
       realm,
       [...locations].sort(),
-      recorte ? [recorte.kind, recorte.category, recorte.subcategory] : null,
+      outputItems ??
+        (recorteDeCategoria
+          ? [
+              recorteDeCategoria.kind,
+              recorteDeCategoria.category,
+              recorteDeCategoria.subcategory,
+            ]
+          : null),
     ] as const,
     queryFn: async ({ signal }) => {
       const response = await safeApiCall(() =>
@@ -105,9 +126,10 @@ export function usePriceSnapshot(
             query: {
               server: realm as Realm,
               location_id: locations.length ? locations : undefined,
-              kind: recorte?.kind,
-              category: recorte?.category,
-              subcategory: recorte?.subcategory ?? undefined,
+              output_item: outputItems ?? undefined,
+              kind: recorteDeCategoria?.kind,
+              category: recorteDeCategoria?.category,
+              subcategory: recorteDeCategoria?.subcategory ?? undefined,
             },
           },
           signal,
@@ -133,5 +155,6 @@ export function usePriceSnapshot(
     loading: query.isLoading,
     error: query.error,
     updatedAt: query.dataUpdatedAt,
+    refetch: query.refetch,
   }
 }

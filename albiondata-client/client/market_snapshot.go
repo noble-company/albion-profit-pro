@@ -53,7 +53,7 @@ func marketUploadWithSnapshot(orders []*lib.MarketOrder, capturedAt time.Time) l
 	completedAt := time.Now().UTC()
 	return lib.MarketUpload{
 		SnapshotID:  snapshotID.String(),
-		CapturedAt: capturedAt.UTC().Format(time.RFC3339Nano),
+		CapturedAt:  capturedAt.UTC().Format(time.RFC3339Nano),
 		CompletedAt: completedAt.Format(time.RFC3339Nano),
 		Scope:       snapshotScopes,
 		Orders:      orders,

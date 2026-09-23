@@ -14,7 +14,7 @@ from src.prices.policy import get_market_book_policy
 from src.prices.service import LATEST_OBSERVATION_TOLERANCE
 
 
-def _flip_item_filters(item_id, category, subcategory, subcategory2, subcategory3, tier):
+def _flip_item_filters(item_id, category, subcategory, subcategory2, subcategory3, tiers):
     """Item-scoped predicates shared by the flip query. Empty when no item filter is active."""
     predicates = []
     if item_id:
@@ -32,8 +32,8 @@ def _flip_item_filters(item_id, category, subcategory, subcategory2, subcategory
         predicates.append(Item.shop_subcategory2 == subcategory2)
     if subcategory3:
         predicates.append(Item.shop_subcategory3 == subcategory3)
-    if tier is not None:
-        predicates.append(Item.tier == tier)
+    if tiers:
+        predicates.append(Item.tier.in_(tiers))
     return predicates
 
 
@@ -46,14 +46,15 @@ async def flip_opportunities(
     subcategory: str | None = None,
     subcategory2: str | None = None,
     subcategory3: str | None = None,
-    locations: list[str],
-    tier: int | None,
-    enchantment: int | None,
+    buy_locations: list[str],
+    sell_locations: list[str],
+    tiers: list[int],
+    enchantments: list[int],
     limit: int,
     offset: int,
     min_profit: Decimal | None,
     min_roi: Decimal | None,
-    quality: int | None = None,
+    qualities: list[int],
     max_age_hours: int | None = None,
     require_complete: bool = False,
     premium: bool = True,
@@ -78,7 +79,7 @@ async def flip_opportunities(
     setup_fee_rate = constants.DEFAULT_SETUP_FEE_RATE
     tolerance = literal(LATEST_OBSERVATION_TOLERANCE, Interval())
     item_filters = _flip_item_filters(
-        item_id, category, subcategory, subcategory2, subcategory3, tier
+        item_id, category, subcategory, subcategory2, subcategory3, tiers
     )
 
     # 1. Every book row plus the newest observation timestamp for its (item, city, quality,
@@ -110,12 +111,12 @@ async def flip_opportunities(
     )
     if item_filters:
         base = base.join(Item, Item.unique_name == MarketOrder.item_id).where(*item_filters)
-    if locations:
-        base = base.where(MarketOrder.location_id.in_(locations))
-    if enchantment is not None:
-        base = base.where(MarketOrder.enchantment_level == enchantment)
-    if quality is not None:
-        base = base.where(MarketOrder.quality_level == quality)
+    if buy_locations and sell_locations:
+        base = base.where(MarketOrder.location_id.in_(set(buy_locations) | set(sell_locations)))
+    if enchantments:
+        base = base.where(MarketOrder.enchantment_level.in_(enchantments))
+    if qualities:
+        base = base.where(MarketOrder.quality_level.in_(qualities))
     base_cte = base.cte("flip_orders")
 
     # 2. Keep only the newest observation per side, and only orders still live in game.
@@ -128,37 +129,37 @@ async def flip_opportunities(
         fresh = fresh.where(base_cte.c.last_seen_at >= cutoff)
     fresh_cte = fresh.cte("fresh_flip_orders")
 
-    def _best_side(auction_type: str, price_order):
-        return (
-            select(
-                fresh_cte.c.item_id,
-                fresh_cte.c.location_id,
-                fresh_cte.c.quality_level,
-                fresh_cte.c.enchantment_level,
-                fresh_cte.c.unit_price.label("price"),
-                fresh_cte.c.amount.label("amount"),
-                fresh_cte.c.last_seen_at.label("seen"),
-            )
-            .where(fresh_cte.c.auction_type == auction_type)
-            .distinct(
-                fresh_cte.c.item_id,
-                fresh_cte.c.location_id,
-                fresh_cte.c.quality_level,
-                fresh_cte.c.enchantment_level,
-            )
-            .order_by(
-                fresh_cte.c.item_id,
-                fresh_cte.c.location_id,
-                fresh_cte.c.quality_level,
-                fresh_cte.c.enchantment_level,
-                price_order,
-                fresh_cte.c.amount.desc(),
-                fresh_cte.c.last_seen_at.desc(),
-            )
+    def _best_side(auction_type: str, price_order, locations: list[str]):
+        side = select(
+            fresh_cte.c.item_id,
+            fresh_cte.c.location_id,
+            fresh_cte.c.quality_level,
+            fresh_cte.c.enchantment_level,
+            fresh_cte.c.unit_price.label("price"),
+            fresh_cte.c.amount.label("amount"),
+            fresh_cte.c.last_seen_at.label("seen"),
+        ).where(fresh_cte.c.auction_type == auction_type)
+        if locations:
+            side = side.where(fresh_cte.c.location_id.in_(locations))
+        return side.distinct(
+            fresh_cte.c.item_id,
+            fresh_cte.c.location_id,
+            fresh_cte.c.quality_level,
+            fresh_cte.c.enchantment_level,
+        ).order_by(
+            fresh_cte.c.item_id,
+            fresh_cte.c.location_id,
+            fresh_cte.c.quality_level,
+            fresh_cte.c.enchantment_level,
+            price_order,
+            fresh_cte.c.amount.desc(),
+            fresh_cte.c.last_seen_at.desc(),
         )
 
-    offers = _best_side("offer", fresh_cte.c.unit_price.asc()).cte("best_offers")
-    requests = _best_side("request", fresh_cte.c.unit_price.desc()).cte("best_requests")
+    offers = _best_side("offer", fresh_cte.c.unit_price.asc(), buy_locations).cte("best_offers")
+    requests = _best_side("request", fresh_cte.c.unit_price.desc(), sell_locations).cte(
+        "best_requests"
+    )
 
     # 3. Cross city buy vs sell as a self-join, then the money math from craft's rates.
     qty = func.least(offers.c.amount, requests.c.amount)

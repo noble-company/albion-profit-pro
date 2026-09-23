@@ -223,7 +223,7 @@ async def test_missing_intermediate_upgrade_link_only_disables_chain(
     city = body["ranked_cities"][0]
     chain = next(route for route in city["routes"] if route["route"] == "base_upgrade")
     assert chain["available"] is False
-    assert chain["unavailable_reason"] == "receita_upgrade_nivel_1_indisponivel"
+    assert chain["unavailable_reason"] == "upgrade_recipe_level_1_unavailable"
     assert (
         next(route for route in city["routes"] if route["route"] == "craft_direct")["available"]
         is True
@@ -256,7 +256,7 @@ async def test_selected_order_modes_use_correct_sides_and_fees(
     assert direct["costs"]["ingredient_cost"] == "360"
     assert direct["costs"]["acquisition_setup_fee"] == "9"
     assert direct["net_revenue"] == "1309"
-    assert direct["warnings"] == ["ordem_nao_garantida"]
+    assert direct["warnings"] == ["order_not_guaranteed"]
 
 
 async def _compare_counting_selects(db_session, request, user_id):

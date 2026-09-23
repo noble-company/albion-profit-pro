@@ -181,6 +181,34 @@ estado real e recebe confirmação explícita antes de alterar código.
 - [x] 15 — Aposentar o ranking materializado
 - [x] 16 — Documentos reconciliados
 
+## Ajustes depois do fechamento
+
+A fase fechou em 38/38 com a task 16. O que aparece depois, no uso, entra aqui com código `A`:
+**não reabre a contagem da fase** (o gate conta só o checklist acima) e segue o mesmo fluxo da
+skill `/implementar-task`.
+
+| # | Ajuste | Entrega principal |
+|---|---|---|
+| [A01](A01-market-flip-no-visual-do-scanner.md) | Market Flip no visual do scanner | A última tela com o layout da 3.5 ganha filtros à direita, tabela na altura toda e Tamanho do conteúdo; o cálculo continua no servidor |
+| [A02](A02-filtros-do-flip-no-servidor.md) | Filtros do Flip que dependem do servidor | Comprar em e Vender em separados; tier, encantamento e qualidade com vários valores — depende da A01 |
+| [A03](A03-marca-no-site.md) | Marca no site | Favicon, escudo na navegação e logo no login, a partir de originais organizados e versões leves geradas por script |
+| [A04](A04-icone-do-client-com-a-marca.md) | Ícone do client com a marca | Bandeja, `.exe` e instalador com o escudo "AP" no lugar do ícone do upstream — depende da A03 |
+| [A05](A05-qualidade-no-craft.md) | Qualidade no Craft | Filtro global na tela e seletor local no painel expandido |
+| [A06](A06-meus-crafts-persistencia-e-favoritos.md) | Meus Crafts: persistência e favoritos | Salvar receitas por usuário e realm a partir do scanner |
+| [A07](A07-tela-meus-crafts.md) | Tela Meus Crafts | Bancada pessoal com cálculo atual, giro, frescor e remoção |
+| [A08](A08-cenario-individual-por-craft.md) | Cenário individual por craft | Quantidade, qualidade e estratégia próprias; duplicação para comparar |
+
+Ordem do bloco Meus Crafts: **A06 → A07 → A08**. A04 é independente deste bloco.
+
+- [x] A01 — Market Flip no visual do scanner
+- [x] A02 — Filtros do Flip que dependem do servidor
+- [x] A03 — Marca no site
+- [ ] A04 — Ícone do client com a marca
+- [x] A05 — Qualidade no Craft
+- [x] A06 — Meus Crafts: persistência e favoritos
+- [x] A07 — Tela Meus Crafts
+- [ ] A08 — Cenário individual por craft
+
 ## Herança da Fase 3.6
 
 A [Fase 3.6](../correcoes/README.md) é substituída por esta. Destino de cada task:

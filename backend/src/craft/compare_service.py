@@ -304,22 +304,22 @@ async def compare_craft(
     base_needs: list[AcquisitionNeed] = []
     upgrade_steps = []
     if target_level == 0:
-        base_reason = "item_sem_encantamento"
+        base_reason = "item_has_no_enchantment"
     elif base_recipe is None:
-        base_reason = "receita_base_indisponivel"
+        base_reason = "base_recipe_unavailable"
     else:
         base_production = calculate_production(request.quantity, base_recipe.amount_crafted)
         base_needs = _ingredient_needs(base_recipe, base_production.executions, request)
         for level in range(1, target_level + 1):
             step_recipe = family.get(level)
             if step_recipe is None:
-                base_reason = f"receita_upgrade_nivel_{level}_indisponivel"
+                base_reason = f"upgrade_recipe_level_{level}_unavailable"
                 break
             if (
                 step_recipe.upgrade_resource_unique_name is None
                 or step_recipe.upgrade_resource_count is None
             ):
-                base_reason = f"recurso_upgrade_nivel_{level}_indisponivel"
+                base_reason = f"upgrade_resource_level_{level}_unavailable"
                 break
             resource_id = step_recipe.upgrade_resource_unique_name
             override = request.ingredient_overrides.get(resource_id)

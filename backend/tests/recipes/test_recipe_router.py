@@ -131,7 +131,7 @@ async def test_base_recipe_has_ordered_enriched_ingredients_and_variants(
         "name_pt": "Escudo",
         "name_en": "Escudo EN",
     }
-    assert body["silver_cost"] == 7
+    assert body["silver_cost"] == "7"
     assert body["crafting_focus"] == 31
     assert body["amount_crafted"] == 1
     assert body["craft_time"] == "0.03125"
@@ -210,6 +210,6 @@ async def test_recipe_uses_two_semantic_404_codes(cliente_autenticado, db_sessio
     unavailable = await cliente_autenticado.get("/items/T4_HIDE/recipe")
 
     assert missing_item.status_code == 404
-    assert missing_item.json()["detail"] == "item_nao_encontrado"
+    assert missing_item.json()["detail"] == "item_not_found"
     assert unavailable.status_code == 404
-    assert unavailable.json()["detail"] == "receita_indisponivel"
+    assert unavailable.json()["detail"] == "recipe_unavailable"

@@ -17,8 +17,12 @@ export function Pagination({
 }) {
   if (total <= 0) return null
   const page = Math.floor(offset / limit) + 1
+  const pages = Math.ceil(total / limit)
   return (
-    <div className="flex items-center justify-between rounded-xl border border-border bg-surface/40 px-3 py-2 text-sm text-foreground-muted">
+    <nav
+      aria-label="Paginação do Market Flip"
+      className="flex shrink-0 items-center justify-center gap-3 text-sm text-foreground-muted"
+    >
       <Button
         variant="outline"
         size="sm"
@@ -27,9 +31,7 @@ export function Pagination({
       >
         Anterior
       </Button>
-      <span>
-        Página {page} · {total} oportunidades
-      </span>
+      <span> Página {page} de {pages} </span>
       <Button
         variant="outline"
         size="sm"
@@ -38,6 +40,6 @@ export function Pagination({
       >
         Próxima
       </Button>
-    </div>
+    </nav>
   )
 }

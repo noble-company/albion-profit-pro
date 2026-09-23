@@ -103,6 +103,27 @@ Além de `P01` e `P02`, a ordem do próprio plano macro (`00-plano-macro.md:279-
 19 e o deploy antes da Fase 4. E `P03` — ordem que sumiu do mercado e continua sendo cotada —
 vale mais para o produto do que trocar o navegador por um webview.
 
+### 5. `P03` — a reconciliação 20.4 fica adiada; o produto assume o limite (2026-09-22, task 3.6/15)
+
+Duas opções foram postas na mesa: implementar a reconciliação transacional de verdade (client Go
+emitindo escopo mesmo em resposta vazia, backend inativando ordens ausentes, quatro telas
+deixando de mostrar a ordem sumida) ou assumir por escrito que o produto opera com "ordem some
+só ao expirar" e comunicar isso onde o jogador decide.
+
+**Decisão do responsável do produto: assumir o limite (Caminho B).** Implementar de verdade
+exigiria mexer de novo no client Go recém-estabilizado (Fase 2.5) e no ingest do backend, por um
+ganho que a mitigação já em produção (expiração + janela de frescor + projeção da última
+observação, `20.3`) cobre parcialmente — o caso não coberto (ordem comprada ou cancelada antes
+de vencer) é real, mas o custo de reabrir o client de novo, logo depois da 3.6/14, não se paga
+agora. Fica reavaliável se o volume de reclamação sobre preço errado justificar.
+
+A UI comunica o limite no ponto em que o jogador decide agir sobre um preço — o extrato de
+"Analisar com o livro real" (`ExactAnalysis.tsx`), compartilhado por Market Flip, Refino, Craft
+e Calculadora via `DetalheDaLinha.tsx` — com uma ressalva permanente, não condicionada a nenhum
+aviso do backend (é uma limitação estrutural do sistema, não uma condição pontual de uma
+resposta). `20.4` permanece formalmente aberta como pendência técnica conhecida, não mais como
+"aberta sem decisão" — a próxima revisão que reabrir este tema parte desta decisão, não do zero.
+
 ## Fora do escopo desta fase
 
 Continuam adiadas por decisão já registrada em

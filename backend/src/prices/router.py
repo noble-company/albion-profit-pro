@@ -83,6 +83,23 @@ snapshot_router = APIRouter(
     prefix="/prices", tags=["prices"], dependencies=[Depends(current_active_user)]
 )
 
+MAX_OUTPUT_ITEMS = 200
+
+
+def _normalizar_output_items(output_items: list[str] | None) -> list[str] | None:
+    if output_items is None:
+        return None
+    if len(output_items) > MAX_OUTPUT_ITEMS:
+        raise HTTPException(status_code=422, detail="output_item accepts at most 200 values")
+
+    normalizados: set[str] = set()
+    for bruto in output_items:
+        item = bruto.strip()
+        if not item:
+            raise HTTPException(status_code=422, detail="output_item cannot be blank")
+        normalizados.add(item)
+    return sorted(normalizados)
+
 
 @snapshot_router.get(
     "/snapshot",
@@ -99,6 +116,8 @@ snapshot_router = APIRouter(
         "`consumables` reads the crafting recipes of the food & potions screen: the category is "
         "the consumable subcategory and the subcategory is the family; `insumos` groups the "
         "kitchen inputs (`fishsauce`, `farmingproducts`)."
+        " Alternatively, repeat `output_item` to request specific recipe outputs and all items "
+        "those recipes need; it cannot be combined with category filters."
     ),
 )
 async def read_price_snapshot(
@@ -107,9 +126,10 @@ async def read_price_snapshot(
     kind: Literal["refining", "crafting", "consumables"] | None = Query(None),
     category: str | None = Query(None),
     subcategory: str | None = Query(None),
+    output_item: list[str] | None = Query(None),
     session: AsyncSession = Depends(get_session),
 ):
-    _validar_recorte(kind, category, subcategory)
+    output_items = _validar_recorte(kind, category, subcategory, output_item)
 
     rows = await read_snapshot(
         session,
@@ -118,11 +138,17 @@ async def read_price_snapshot(
         kind=kind,
         category=category,
         subcategory=subcategory,
+        output_items=output_items,
     )
     return PriceSnapshotOut(server=server, generated_at=datetime.now(UTC), **to_columnar(rows))
 
 
-def _validar_recorte(kind: str | None, category: str | None, subcategory: str | None) -> None:
+def _validar_recorte(
+    kind: str | None,
+    category: str | None,
+    subcategory: str | None,
+    output_items: list[str] | None = None,
+) -> list[str] | None:
     """A mesma `category` significa coisas diferentes no refino (família) e no craft. Sem `kind`
     não há como resolver os itens — e devolver o realm inteiro esconderia o erro do cliente atrás
     de uma resposta que funciona, só que muitas vezes maior (tasks 4/22 e 4/23)."""
@@ -130,6 +156,15 @@ def _validar_recorte(kind: str | None, category: str | None, subcategory: str | 
         raise HTTPException(status_code=422, detail="subcategory requires category")
     if category is not None and kind is None:
         raise HTTPException(status_code=422, detail="category requires kind")
+    normalizados = _normalizar_output_items(output_items)
+    if normalizados is not None and any(
+        value is not None for value in (kind, category, subcategory)
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="output_item cannot be combined with category filters",
+        )
+    return normalizados
 
 
 @snapshot_router.get(
@@ -140,7 +175,8 @@ def _validar_recorte(kind: str | None, category: str | None, subcategory: str | 
         "quality. Built from the daily rollup, which merges our client's history with the public "
         "Albion Data Project history. Pass `kind` + `category` (and optionally `subcategory`) to "
         "narrow the rows to the outputs of that shop category. An item without history is "
-        "absent, never zero."
+        "absent, never zero. Alternatively, repeat `output_item` to request only those outputs; "
+        "it cannot be combined with category filters."
     ),
 )
 async def read_sales_volume(
@@ -148,10 +184,16 @@ async def read_sales_volume(
     kind: Literal["refining", "crafting", "consumables"] | None = Query(None),
     category: str | None = Query(None),
     subcategory: str | None = Query(None),
+    output_item: list[str] | None = Query(None),
     session: AsyncSession = Depends(get_session),
 ):
-    _validar_recorte(kind, category, subcategory)
+    output_items = _validar_recorte(kind, category, subcategory, output_item)
     vendas = await read_sales(
-        session, server.value, kind=kind, category=category, subcategory=subcategory
+        session,
+        server.value,
+        kind=kind,
+        category=category,
+        subcategory=subcategory,
+        output_items=output_items,
     )
     return SalesOut(server=server, **vendas)

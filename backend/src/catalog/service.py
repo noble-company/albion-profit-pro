@@ -7,6 +7,7 @@ para o produto. Aqui a fonte é a tabela `recipe`, e só ela.
 """
 
 import hashlib
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -126,7 +127,9 @@ async def get_recipe_catalog(session: AsyncSession, kind: str | None = None) -> 
                 output_item=recipe.output_item_unique_name,
                 production_kind=recipe.production_kind,
                 enchantment_level=recipe.enchantment_level,
-                silver_cost=recipe.silver_cost,
+                # F09 (task 3.6/10, P07): a coluna é `int` de propósito, mas o contrato não pode
+                # expor isso -- dinheiro é decimal string ponta a ponta.
+                silver_cost=Decimal(recipe.silver_cost),
                 crafting_focus=recipe.crafting_focus,
                 amount_crafted=recipe.amount_crafted,
                 ingredients=ingredients,

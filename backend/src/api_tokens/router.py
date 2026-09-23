@@ -43,7 +43,7 @@ async def client_me(
     user = await session.get(User, token.user_id)
     if user is None:
         # FK garante que não acontece; se acontecer, é dado corrompido e não um 500 opaco.
-        raise HTTPException(status_code=404, detail="Usuário do token não encontrado")
+        raise HTTPException(status_code=404, detail="Token owner not found")
 
     return ClientIdentity(user_id=user.id, email=user.email, token_sufixo=token.token_sufixo)
 
@@ -60,8 +60,8 @@ async def create_api_token(
         raise HTTPException(
             status_code=409,
             detail=(
-                f"Limite de {MAX_ACTIVE_TOKENS_PER_USER} tokens ativos atingido. "
-                "Revogue um token que você não usa mais antes de criar outro."
+                f"Limit of {MAX_ACTIVE_TOKENS_PER_USER} active tokens reached. "
+                "Revoke a token you no longer use before creating another."
             ),
         ) from None
 
@@ -82,4 +82,4 @@ async def delete_api_token(
 ):
     revoked = await revoke_token(session, token_id, owner_id=user.id)
     if not revoked:
-        raise HTTPException(status_code=404, detail="Token não encontrado")
+        raise HTTPException(status_code=404, detail="Token not found")

@@ -57,7 +57,7 @@ reintroduziria o `X01`. Receitas com ingredientes (`count`, `enchantment_level`,
 - O frontend guarda no IndexedDB e pinta com ele (task 07); pede com `cache: 'no-cache'`, para a
   revalidação nunca ficar presa na janela do `max-age` (task 21).
 
-### `GET /prices/snapshot?server=&location_id=&kind=&category=&subcategory=`
+### `GET /prices/snapshot?server=&location_id=&kind=&category=&subcategory=&output_item=`
 
 Topo de livro do realm, **formato colunar** (dicionários de string + arrays paralelos, epoch em
 segundos): 23 B/linha virariam ~560 KB a cada 30 s (task 03). Cada lado traz `observed_at` e
@@ -72,13 +72,18 @@ segundos): 23 B/linha virariam ~560 KB a cada 30 s (task 03). Cada lado traz `ob
   - `consumables` → Comida/Poções + família, e `insumos` (`fishsauce`, `farmingproducts`) (task 13).
 - Polling de 30 s; a identidade da resposta segue os **preços**, não o `generated_at` — o carimbo
   sozinho travava a tela a cada 30 s (task 12).
+- **Recorte por saídas salvas** (A07): `output_item` repetido, normalizado e limitado a 200,
+  expande cada saída para ingredientes e recurso de upgrade. Não combina com categoria e não
+  publica `ETag`: preço novo não pode ser escondido por um validador parcial.
 
-### `GET /prices/sales?server=&kind=&category=&subcategory=`
+### `GET /prices/sales?server=&kind=&category=&subcategory=&output_item=`
 
 Unidades vendidas por dia, média dos **últimos 7 dias UTC completos**, por item × mercado ×
 qualidade, lida do rollup diário que junta client e API pública (task 23). Item sem histórico
 **fica ausente**. O diário da série é recalculado no próprio upload do client (task 29, `W11`); o
 frontend busca de novo ao voltar o foco, sem polling.
+Com `output_item` repetido, devolve somente as saídas salvas; usa a mesma normalização e conflito
+com categoria do snapshot (A07).
 
 ### `POST /craft/simulate`
 
@@ -114,8 +119,21 @@ Filtros de exibição (`applyFilters`, `filtrarPorVolume`) rodam sobre as linhas
 | `/refino` | Refino | 110 receitas, famílias de refino |
 | `/craft` | Craft | O catálogo de craft menos o que é de cozinha |
 | `/consumiveis` | Comida & Poções | Comida, poções e insumos da cozinha, sobre o catálogo de craft (task 13) |
+| `/meus-crafts` | Meus Crafts | Uma linha por registro salvo, com quantidade/qualidade próprias, giro e corte local de frescor (A07) |
 | `/calculadora` | Calculadora | Uma receita em todas as cidades, com a mesma barra e o mesmo painel do scanner; "Abrir na Calculadora" leva o cenário de uma linha (task 14) |
 | `/painel` | Painel do Destino | Níveis de especialização que baixam o custo de foco (task 17) |
+
+### Favoritos e Meus Crafts
+
+Desde o ajuste A06, Refino, Craft e Comida & Poções podem persistir uma receita em
+`POST /me/saved-crafts`. O registro pertence ao usuário e ao realm e usa `output_item` como chave
+estável do catálogo; ele já guarda quantidade e qualidade do cenário que estava sendo analisado.
+O PostgreSQL continua sendo a fonte de verdade, enquanto o TanStack Query mantém apenas o cache
+da sessão. A A07 adiciona a bancada `/meus-crafts`: carrega o catálogo completo de craft e refino,
+busca mercado apenas para as saídas salvas,
+reaproveita o engine e o extrato do scanner, preserva duplicatas pelo UUID e remove cotação acima
+de `max_age` **antes** da conta. A observação vencida continua visível somente como diagnóstico.
+Cenários individuais editáveis entram na [A08](tasks/scanner/A08-cenario-individual-por-craft.md).
 
 Shell e densidade em [13-linguagem-visual.md](13-linguagem-visual.md) §1 e §6.
 

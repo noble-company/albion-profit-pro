@@ -91,6 +91,17 @@ function montar(cenarios: unknown[], estimativa = '1000') {
   )
 }
 
+// Task 3.6/15 (Caminho B): a reconciliação transacional (20.4) ficou adiada — o produto assume
+// o limite e avisa onde o jogador decide, em vez de ficar em silêncio. A ressalva é permanente,
+// não depende de nenhuma chamada de rede ter acontecido.
+test('a ressalva de frescor aparece antes mesmo de pedir a análise exata', () => {
+  montar([cenario('buy_order', 'sell_order', '700')])
+
+  expect(
+    screen.getByText(/Uma ordem pode já ter sido comprada ou cancelada/),
+  ).toBeInTheDocument()
+})
+
 test('compara o MESMO cenário da linha, não o mais lucrativo do exato', async () => {
   // Pegar o melhor cenário do exato compararia laranja com maçã: a estimativa de um caminho
   // contra o número de outro, e a "diferença" seria pura ficção.
@@ -110,7 +121,7 @@ test('compara o MESMO cenário da linha, não o mais lucrativo do exato', async 
 
 test('os avisos do servidor aparecem — é neles que mora a razão da diferença', async () => {
   const user = userEvent.setup()
-  montar([cenario('buy_order', 'sell_order', '700', ['profundidade_insuficiente'])])
+  montar([cenario('buy_order', 'sell_order', '700', ['insufficient_depth'])])
 
   await user.click(screen.getByRole('button', { name: 'Analisar com o livro real' }))
 

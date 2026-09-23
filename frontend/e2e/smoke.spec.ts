@@ -20,13 +20,13 @@ test('registrar, logar, escolher realm e ver o Market Flip com dado real', async
   await chooseRealm(page, 'West')
 
   // Market Flip renderiza.
-  await expect(page.getByText(/Encontre o próximo lucro/i)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Market Flip' })).toBeVisible()
 
   // A oportunidade determinística do seed: T4_FIBER_LEVEL3@3, Fort Sterling (4002) →
   // Caerleon (3005), compra 4.000 / venda 5.500, ROI 32%. O nome do item vem do catálogo
   // estático semeado.
-  const flipRow = page.getByRole('row', {
-    name: /Cânhamo Excepcional.*Fort Sterling.*Caerleon/,
+  const flipRow = page.getByRole('row').filter({
+    has: page.getByRole('link', { name: 'Fibra T4.3 · Normal', exact: true }),
   })
   await expect(flipRow).toBeVisible()
   await expect(flipRow).toContainText('32') // ROI %

@@ -34,7 +34,7 @@ class LocationPrice(BaseModel):
     sell: BookSide
     buy: BookSide
     sold_24h: SoldVolume | None = None
-    coverage: Literal["parcial"]
+    coverage: Literal["partial"]
     freshness_window_seconds: int
 
 
@@ -61,7 +61,7 @@ class ItemSummary(BaseModel):
 class BookOut(BaseModel):
     sell: BookSide
     buy: BookSide
-    coverage: Literal["parcial"]
+    coverage: Literal["partial"]
     freshness_window_seconds: int
 
 

@@ -63,6 +63,16 @@ tudo seguindo apenas o `README.md`. Este é o critério real de pronto da fase.
 **Concluída** (2026-09-06). `python scripts/verify_repository.py` verde; `pytest` + `ruff`
 (backend) e `lint` + `typecheck` + `test` (frontend) verdes numa passada limpa.
 
+> **Nota (task 3.6/08, 2026-09-22):** a linha 93 abaixo ("fonte não rastreada") descreve o
+> `verify_no_untracked_source` de então, que só olhava `git status --porcelain` sem `--ignored`
+> e só pegava `??`. A task 3.6/08 estendeu esse check (modificado/staged/deletado, fonte
+> escondida no `.gitignore`, mais extensões) e acrescentou `verify_head_is_pushed` — **as duas
+> são checagens locais por natureza**: `actions/checkout` sempre produz árvore limpa e HEAD
+> destacado, então em CI elas nunca têm nada pra reportar (não é falso "verde", é ausência da
+> condição que elas verificam). Ganhar valor de verdade em CI exigiria `fetch-depth: 0` e
+> comparar contra o remoto, o que o script não faz de propósito. Detalhes em
+> `docs/tasks/correcoes/08-baseline-git-verificado.md`.
+
 ### O que mudou
 
 | Item | Arquivo | Mudança |

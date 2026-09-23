@@ -1,6 +1,7 @@
 version: "3.9"
 
 x-image: &backend-image "${BACKEND_IMAGE:?defina BACKEND_IMAGE com imagem imutável}"
+x-frontend-image: &frontend-image "${FRONTEND_IMAGE:?defina FRONTEND_IMAGE com imagem imutável}"
 x-common-environment: &common-environment
   ENVIRONMENT: production
   DATABASE_URL_FILE: /run/secrets/profitpro_database_url
@@ -95,12 +96,25 @@ services:
         condition: on-failure
       labels:
         - traefik.enable=true
+        # Router 1: host dedicado da API (ex: api.dominio.com). É o que o client Go
+        # (ingest, `{base_url}/{topic}`) usa desde a Fase 2 — mantido como está, intocado.
         - traefik.http.routers.profitpro-api.rule=Host(`${API_HOST:?defina API_HOST}`)
         - traefik.http.routers.profitpro-api.entrypoints=websecure
         - traefik.http.routers.profitpro-api.tls=true
         - traefik.http.routers.profitpro-api.middlewares=profitpro-body-limit@docker
         - traefik.http.middlewares.profitpro-body-limit.buffering.maxRequestBodyBytes=10485760
         - traefik.http.services.profitpro-api.loadbalancer.server.port=8000
+        # Router 2: mesma origem do frontend (task 3.6/13, P01) — a SPA chama `/api/...` no
+        # próprio host dela; o Traefik tira o prefixo antes de encaminhar pro backend, que
+        # continua recebendo `/items/...`, `/craft/...` etc. sem mudança nenhuma de rota.
+        # Fecha CORS em produção (`S04`): front e API na mesma origem, sem preflight.
+        - traefik.http.routers.profitpro-api-mesma-origem.rule=Host(`${APP_HOST:?defina APP_HOST}`) && PathPrefix(`/api`)
+        - traefik.http.routers.profitpro-api-mesma-origem.entrypoints=websecure
+        - traefik.http.routers.profitpro-api-mesma-origem.tls=true
+        - traefik.http.routers.profitpro-api-mesma-origem.priority=10
+        - traefik.http.routers.profitpro-api-mesma-origem.service=profitpro-api
+        - traefik.http.routers.profitpro-api-mesma-origem.middlewares=profitpro-body-limit@docker,profitpro-strip-api@docker
+        - traefik.http.middlewares.profitpro-strip-api.stripprefix.prefixes=/api
 
   worker-ingest:
     image: *backend-image
@@ -172,6 +186,27 @@ services:
         order: stop-first
       restart_policy:
         condition: on-failure
+
+  frontend:
+    image: *frontend-image
+    networks: [traefik_public]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.profitpro-frontend.rule=Host(`${APP_HOST:?defina APP_HOST}`)
+        - traefik.http.routers.profitpro-frontend.entrypoints=websecure
+        - traefik.http.routers.profitpro-frontend.tls=true
+        - traefik.http.routers.profitpro-frontend.priority=1
+        - traefik.http.services.profitpro-frontend.loadbalancer.server.port=8080
 
 secrets:
   profitpro_database_url:

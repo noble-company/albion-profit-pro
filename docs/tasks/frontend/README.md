@@ -107,7 +107,7 @@ ETAPA 4 — fechamento
 - [x] 16 — Dashboard Market Flip
 - [x] 17 — Rankings Refino + Craft
 - [x] 18 — Resiliência e E2E — **entregue** pela [Fase 3.5, task 27](../refatoracao/27-e2e-playwright.md) (suíte Playwright contra a stack real)
-- [ ] 19 — Build e validação final — **executada depois da Fase 3.5**, como gate conjunto
+- [x] 19 — Build e validação final — implementação entregue pela [Fase 3.6, task 13](../correcoes/13-serving-e-deploy-do-frontend.md); ensaio integrado em jogo concluído em 2026-09-23 (ver "Estado da implementação" em [19-build-validacao.md](19-build-validacao.md))
 
 > ⚠️ **Fase 3 pausada em 2026-08-30.** A auditoria em
 > [12-revisao-fase-3.md](../../12-revisao-fase-3.md) encontrou defeitos de correção e de
@@ -155,7 +155,7 @@ alteram o contrato de preço consumido por Market Flip, Refino, Craft e Calculad
   `tests/prices/test_service.py`, `tests/craft/test_quotes.py`, `tests/craft/test_simulate_router.py`,
   `tests/opportunities/test_flips.py`; os critérios de aceite do 20.1/20.3 no limite HTTP em
   `tests/prices/test_current_price_projection_acceptance.py` (novo, Fase 3.5/28).
-- [ ] 20.11 — Validação real no jogo — **humana, no gate da task 19** (a spec já diz isso).
+- [x] 20.11 — Validação real no jogo — concluída junto do gate da task 19, em 2026-09-23.
 
 ## Convenções específicas desta fase
 

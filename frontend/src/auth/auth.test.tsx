@@ -25,6 +25,18 @@ test('protege a home e redireciona para login', async () => {
     await screen.findByRole('heading', { name: 'Entrar' }),
   ).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Criar conta' })).toBeInTheDocument()
+  expect(
+    screen.getByRole('img', { name: 'Albion Profit Pro' }),
+  ).toBeInTheDocument()
+})
+
+test('cadastro também mostra o logo completo', async () => {
+  const typed = userEvent.setup()
+  renderWithProviders(<App />)
+  await typed.click(await screen.findByRole('link', { name: 'Criar conta' }))
+  expect(
+    screen.getByRole('img', { name: 'Albion Profit Pro' }),
+  ).toBeInTheDocument()
 })
 
 test('faz login com form-urlencoded, grava sessão e acessa o destino', async () => {

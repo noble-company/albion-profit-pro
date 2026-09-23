@@ -10,7 +10,8 @@ UPDATE_GITHUB_OWNER="${UPDATE_GITHUB_OWNER:-}"
 UPDATE_GITHUB_REPO="${UPDATE_GITHUB_REPO:-}"
 BUILD_PROFILE="${BUILD_PROFILE:-release}"
 PUBLIC_INGEST_BASE_URL="${PUBLIC_INGEST_BASE_URL:-}"
-BUILD_LDFLAGS="-s -w -X main.version=${BUILD_VERSION} -X main.updateChannel=${UPDATE_CHANNEL} -X main.updateGithubOwner=${UPDATE_GITHUB_OWNER} -X main.updateGithubRepo=${UPDATE_GITHUB_REPO} -X github.com/ao-data/albiondata-client/client.buildProfile=${BUILD_PROFILE} -X github.com/ao-data/albiondata-client/client.releasePublicIngestBaseURL=${PUBLIC_INGEST_BASE_URL}"
+CALCULATOR_URL="${CALCULATOR_URL:-}"
+BUILD_LDFLAGS="-s -w -X main.version=${BUILD_VERSION} -X main.updateChannel=${UPDATE_CHANNEL} -X main.updateGithubOwner=${UPDATE_GITHUB_OWNER} -X main.updateGithubRepo=${UPDATE_GITHUB_REPO} -X github.com/ao-data/albiondata-client/client.buildProfile=${BUILD_PROFILE} -X github.com/ao-data/albiondata-client/client.releasePublicIngestBaseURL=${PUBLIC_INGEST_BASE_URL} -X github.com/ao-data/albiondata-client/client.releaseCalculatorURL=${CALCULATOR_URL}"
 
 sudo apt-get update && sudo apt-get install -y libpcap-dev patchelf
 

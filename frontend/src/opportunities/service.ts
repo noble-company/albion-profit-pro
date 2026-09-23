@@ -10,10 +10,11 @@ export type OpportunityQuery = {
   subcategory?: string
   subcategory2?: string
   subcategory3?: string
-  locations?: string[]
-  tier?: number
-  enchantment?: number
-  quality?: number
+  buyLocations?: string[]
+  sellLocations?: string[]
+  tiers?: number[]
+  enchantments?: number[]
+  qualities?: number[]
   maxAgeHours?: number
   requireComplete?: boolean
   limit: number
@@ -64,10 +65,17 @@ export async function getFlipOpportunities(
           subcategory: query.subcategory,
           subcategory2: query.subcategory2,
           subcategory3: query.subcategory3,
-          location_id: query.locations?.length ? query.locations : undefined,
-          tier: query.tier,
-          enchantment_level: query.enchantment,
-          quality_level: query.quality,
+          buy_location_id: query.buyLocations?.length
+            ? query.buyLocations
+            : undefined,
+          sell_location_id: query.sellLocations?.length
+            ? query.sellLocations
+            : undefined,
+          tier: query.tiers?.length ? query.tiers : undefined,
+          enchantment_level: query.enchantments?.length
+            ? query.enchantments
+            : undefined,
+          quality_level: query.qualities?.length ? query.qualities : undefined,
           max_age_hours: query.maxAgeHours,
           require_complete: query.requireComplete,
           limit: query.limit,
@@ -96,4 +104,3 @@ export async function getCategories(signal: AbortSignal) {
   )
   return response.data ?? []
 }
-

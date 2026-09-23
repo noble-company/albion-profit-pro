@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="frontend/src/assets/marca/logo.webp" alt="Albion Profit Pro" width="160" />
+</p>
+
 # Albion Profit Pro
 
 Plataforma própria para calcular lucro de crafting e refino no Albion Online a partir de preços
@@ -32,8 +36,8 @@ Navegador (React) — o engine calcula lucro, ROI e lista de compras de todas as
 | Diretório | Responsabilidade | Estado |
 |---|---|---|
 | `albiondata-client/` | Captura preços do tráfego local e envia ao backend | Fase 2 e estabilização concluídas |
-| `backend/` | Auth, ingest, catálogo, preços, histórico, poller da API pública, filas e persistência | Fases 1, 1.5, 2.5, o backend da 3.5 e o da Fase 4 concluídos (462 testes) |
-| `frontend/` | Scanner de Refino, Craft, Comida & Poções e Calculadora (engine no navegador), Market Flip, Preços, Painel do Destino | Fase 4 concluída — 565 testes unitários + suíte E2E Playwright; falta o gate em jogo |
+| `backend/` | Auth, ingest, catálogo, preços, histórico, poller da API pública, filas e persistência | Fases 1, 1.5, 2.5, o backend da 3.5 e o da Fase 4 concluídos (485 testes: 484 verdes e 1 skip) |
+| `frontend/` | Scanner de Refino, Craft, Comida & Poções e Calculadora (engine no navegador), Meus Crafts, Market Flip, Preços, Painel do Destino | Fase 4 concluída; A01–A03 e A05–A07 entregues — 594 testes unitários + suíte E2E Playwright; falta o gate em jogo |
 | `docs/` | Decisões, contratos, auditorias e specs executáveis | Fonte de verdade do projeto |
 
 PostgreSQL é a fonte de verdade. Redis é somente cache e pode ser esvaziado sem perda de dados.
@@ -98,6 +102,10 @@ uv run celery -A src.celery_app.celery_app worker -Q maintenance -c 1 --loglevel
 uv run celery -A src.celery_app.celery_app worker -Q quarantine -c 1 --loglevel=info
 uv run celery -A src.celery_app.celery_app beat --loglevel=info
 ```
+
+**Windows:** o pool padrão do Celery (`prefork`) não funciona neste SO (`WinError 5`, achado `W9`
+da Fase 3.5) — acrescente `--pool=solo` em cada comando `worker` acima (ex.:
+`uv run celery -A src.celery_app.celery_app worker -Q ingest -c 4 --pool=solo --loglevel=info`).
 
 ### 4. Compilar o client
 

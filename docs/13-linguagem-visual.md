@@ -180,3 +180,17 @@ Os componentes de demonstração que ainda não têm dono definitivo (`Confidenc
 `TabelaCarregando`) vivem em `src/design/`, não em `src/components/ui/` — evita a task 20
 "extrair" algo que já foi extraído com o nome errado. `Carregando`/`EstadoVazio`/`EstadoErro`
 são reaproveitados de `components/ui/states.tsx` porque já são reais.
+
+## 8. Marca
+
+Os originais transparentes da marca ficam em `assets/marca/`: `logo.png` é a marca completa e
+`escudo-ap.png` é a versão compacta. As versões leves usadas pelo site são geradas por
+`scripts/gerar_marca.py` e ficam versionadas; nenhuma delas é editada à mão.
+
+O **escudo** é a marca para tamanhos pequenos: favicon, atalhos e navegação. O **logo completo**
+só é usado a partir de aproximadamente 120 px, como nas telas de autenticação e no README, porque
+o texto deixa de ser legível abaixo disso. Para regenerar todos os formatos:
+
+```powershell
+uv run --with pillow==12.3.0 python scripts/gerar_marca.py
+```

@@ -2,7 +2,8 @@
 
 Inglês em toda a superfície HTTP (`B09`). Dinheiro e grandezas derivadas viajam como string
 decimal (`F09`) — aqui isso vale para `weight`, que entra na divisão `lucro / peso` do scanner,
-e para `item_value`, que multiplica a taxa da estação.
+para `item_value`, que multiplica a taxa da estação, e para `silver_cost` (task 3.6/10, `P07`),
+que soma direto no custo total de uma receita.
 
 Formato deliberado: **dicionário de itens + receitas que o referenciam**. Um mesmo ingrediente
 aparece em centenas de receitas; repetir nome/tier/peso em cada uma multiplicaria o payload sem
@@ -66,7 +67,7 @@ class CatalogRecipeOut(BaseModel):
     output_item: str
     production_kind: str  # "refining" | "crafting"
     enchantment_level: int
-    silver_cost: int
+    silver_cost: Decimal
     crafting_focus: int
     amount_crafted: int
     ingredients: list[CatalogIngredientOut]

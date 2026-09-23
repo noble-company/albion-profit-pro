@@ -136,7 +136,7 @@ async def test_scope_all_separates_venda_and_compra(client, db_session):
     match = _match(resp.json())
     assert Decimal(match["sell"]["best_price"]) == Decimal("39")
     assert Decimal(match["buy"]["best_price"]) == Decimal("1")
-    assert match["coverage"] == "parcial"
+    assert match["coverage"] == "partial"
     assert match["freshness_window_seconds"] == 6 * 60 * 60
     assert match["sell"]["observed_at"] is not None
     assert match["sell"]["age_seconds"] >= 0
@@ -443,7 +443,7 @@ async def test_cache_hit_is_preferred_over_postgres_fallback(client, db_session)
                 "age_seconds": None,
             },
             "sold_24h": None,
-            "coverage": "parcial",
+            "coverage": "partial",
             "freshness_window_seconds": 6 * 60 * 60,
             "sources": {"book": True, "history": False},
             "atualizado_em": datetime.now(timezone.utc).isoformat(),
@@ -489,7 +489,7 @@ async def test_orphaned_cache_entry_is_not_returned_without_database_combination
                 "age_seconds": None,
             },
             "sold_24h": None,
-            "coverage": "parcial",
+            "coverage": "partial",
             "freshness_window_seconds": 6 * 60 * 60,
             "sources": {"book": True, "history": False},
             "atualizado_em": datetime.now(timezone.utc).isoformat(),

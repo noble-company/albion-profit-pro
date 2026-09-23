@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form'
 import { Link, useLocation, useNavigate } from 'react-router'
 import type { ReactNode } from 'react'
 
+import brandLogo from '@/assets/marca/logo.webp'
+
 import { useAuth } from './useAuth'
 import {
   loginSchema,
@@ -24,9 +26,11 @@ function AuthCard({
   return (
     <main className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
       <section className="w-full max-w-md rounded-2xl border border-primary/20 bg-surface p-8 shadow-2xl shadow-black/30">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primary">
-          Albion Profit Pro
-        </p>
+        <img
+          src={brandLogo}
+          alt="Albion Profit Pro"
+          className="mx-auto mb-5 size-44 object-contain"
+        />
         <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
         <p className="mt-2 text-sm text-foreground-muted">{subtitle}</p>
         <div className="mt-7">{children}</div>
@@ -36,9 +40,7 @@ function AuthCard({
 }
 
 function FieldError({ message }: { message?: string }) {
-  return message ? (
-    <p className="mt-1 text-sm text-danger">{message}</p>
-  ) : null
+  return message ? <p className="mt-1 text-sm text-danger">{message}</p> : null
 }
 
 export function LoginPage() {

@@ -7,19 +7,19 @@
 export type ConfidenceLevel = 'observacao' | 'atencao' | 'sem-dado'
 
 const WARNING_TO_LEVEL: Record<string, ConfidenceLevel> = {
-  ordem_nao_garantida: 'observacao',
-  dado_velho: 'atencao',
-  profundidade_insuficiente: 'atencao',
-  sem_cobertura: 'sem-dado',
-  sem_preco: 'sem-dado',
+  order_not_guaranteed: 'observacao',
+  stale_data: 'atencao',
+  insufficient_depth: 'atencao',
+  no_coverage: 'sem-dado',
+  no_price: 'sem-dado',
 }
 
 export const WARNING_LABELS: Record<string, string> = {
-  ordem_nao_garantida: 'Ordem não garantida',
-  dado_velho: 'Preço desatualizado',
-  profundidade_insuficiente: 'Profundidade insuficiente',
-  sem_cobertura: 'Mercado sem cobertura',
-  sem_preco: 'Preço indisponível',
+  order_not_guaranteed: 'Ordem não garantida',
+  stale_data: 'Preço desatualizado',
+  insufficient_depth: 'Profundidade insuficiente',
+  no_coverage: 'Mercado sem cobertura',
+  no_price: 'Preço indisponível',
 }
 
 export const DEMO_WARNINGS = Object.keys(WARNING_TO_LEVEL)

@@ -10,13 +10,13 @@ import { chooseRealm, registerAndLogin } from './helpers'
 test('recarregar autenticado continua logado', async ({ page }) => {
   await registerAndLogin(page)
   await chooseRealm(page, 'West')
-  await expect(page.getByText(/Encontre o próximo lucro/i)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Market Flip' })).toBeVisible()
 
   await page.reload()
 
   // Continua na Market Flip, não foi jogado pro login.
   await expect(page).toHaveURL(/\/(?:$|\?)/)
-  await expect(page.getByText(/Encontre o próximo lucro/i)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Market Flip' })).toBeVisible()
   await expect(page).not.toHaveURL(/\/login/)
 
   // E uma navegação direta pra rota protegida também sobrevive ao reload.

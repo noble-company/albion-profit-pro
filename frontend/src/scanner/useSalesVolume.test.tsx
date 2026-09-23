@@ -87,3 +87,19 @@ describe('useSalesVolume (task 29)', () => {
     expect(result.current.vendas?.columns.units_per_day[0]).toBe('10')
   })
 })
+
+test('sales envia as saídas salvas normalizadas', async () => {
+  const pedidos: URLSearchParams[] = []
+  server.use(
+    http.get('http://localhost:8000/prices/sales', ({ request }) => {
+      pedidos.push(new URL(request.url).searchParams)
+      return HttpResponse.json(vendas('10'))
+    }),
+  )
+  const { result } = renderHook(
+    () => useSalesVolume('west', { outputItems: ['T5_BAG', 'T4_BAG', 'T5_BAG'] }),
+    { wrapper: wrapperWithQueryClient(createTestQueryClient()) },
+  )
+  await waitFor(() => expect(result.current.vendas).not.toBeNull())
+  expect(pedidos.at(-1)?.getAll('output_item')).toEqual(['T4_BAG', 'T5_BAG'])
+})

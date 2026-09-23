@@ -57,6 +57,11 @@ describe('leitura da URL', () => {
     expect(result.current.filters.enchantments).toEqual([1, 3])
   })
 
+  test('a qualidade da saída viaja na URL e alimenta o cenário', () => {
+    expect(render().result.current.scenario.outputQuality).toBe(1)
+    expect(render('/craft?quality=4').result.current.scenario.outputQuality).toBe(4)
+  })
+
   test('a base do preço de ingrediente é a MÉDIA por padrão (task 11.3)', () => {
     // "no fim do dia, a maioria dos players que refinam usam preço médio" — então é o padrão,
     // não uma opção escondida.

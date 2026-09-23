@@ -3,7 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { apiClient, queryPolicies, safeApiCall } from '@/api'
 import type { components } from '@/api/schema'
 
-import type { RecorteDoSnapshot } from './usePriceSnapshot'
+import {
+  itensDoRecorte,
+  type PriceSnapshotRecorte,
+} from './usePriceSnapshot'
 import type { SalesOut } from './vendas'
 
 type Realm = components['schemas']['AlbionServer']
@@ -19,15 +22,24 @@ type Realm = components['schemas']['AlbionServer']
  */
 export function useSalesVolume(
   realm: Realm | null,
-  recorte: RecorteDoSnapshot | null,
+  recorte: PriceSnapshotRecorte | null,
   habilitado = true,
 ) {
+  const outputItems = itensDoRecorte(recorte)
+  const recorteDeCategoria = recorte && 'kind' in recorte ? recorte : null
   const query = useQuery({
     queryKey: [
       'prices',
       'sales',
       realm,
-      recorte ? [recorte.kind, recorte.category, recorte.subcategory] : null,
+      outputItems ??
+        (recorteDeCategoria
+          ? [
+              recorteDeCategoria.kind,
+              recorteDeCategoria.category,
+              recorteDeCategoria.subcategory,
+            ]
+          : null),
     ] as const,
     queryFn: async ({ signal }) => {
       const response = await safeApiCall(() =>
@@ -35,9 +47,10 @@ export function useSalesVolume(
           params: {
             query: {
               server: realm as Realm,
-              kind: recorte?.kind,
-              category: recorte?.category,
-              subcategory: recorte?.subcategory ?? undefined,
+              output_item: outputItems ?? undefined,
+              kind: recorteDeCategoria?.kind,
+              category: recorteDeCategoria?.category,
+              subcategory: recorteDeCategoria?.subcategory ?? undefined,
             },
           },
           signal,
@@ -49,5 +62,10 @@ export function useSalesVolume(
     ...queryPolicies.demand,
   })
 
-  return { vendas: query.data ?? null }
+  return {
+    vendas: query.data ?? null,
+    loading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  }
 }

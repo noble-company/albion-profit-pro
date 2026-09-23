@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { Clock } from 'lucide-react'
 
 import { WarningBadges } from '@/components/opportunities/WarningBadges'
 import { Button } from '@/components/ui/button'
@@ -13,10 +14,18 @@ import { simulateCraft, type CraftRequest, type CraftResult } from '@/craft/serv
  * um lucro que o mercado não paga na quantidade pedida.
  *
  * `POST /craft/simulate` anda o livro de verdade, com slippage, e devolve os avisos
- * (`profundidade_insuficiente`, `dado_velho`…). Aqui as duas contas ficam **lado a lado**: a
+ * (`insufficient_depth`, `stale_data`…). Aqui as duas contas ficam **lado a lado**: a
  * diferença entre elas é a informação, não um detalhe de implementação a esconder.
  *
  * É a única parte do painel que vai à rede, e só quando alguém pede.
+ *
+ * A ressalva de frescor abaixo do botão existe porque nem o exato resolve tudo: o client não
+ * afirma quando uma combinação fica sem ordem nenhuma (task 3.6/15, decisão registrada em
+ * `docs/14-revisao-fase-3-5.md` — implementar a reconciliação transacional foi adiado). Uma
+ * ordem comprada ou cancelada por outro jogador entre a última coleta e agora ainda aparece
+ * cotável até expirar, no exato tanto quanto na estimativa. Por ser um limite estrutural do
+ * sistema, e não uma condição de uma resposta específica, a ressalva é permanente — não depende
+ * de nenhum `warning` do backend.
  */
 export function ExactAnalysis({
   request,
@@ -47,6 +56,12 @@ export function ExactAnalysis({
       >
         {analise.isPending ? 'Analisando…' : 'Analisar com o livro real'}
       </Button>
+
+      <p className="flex items-start gap-1 text-2xs leading-snug text-foreground-subtle">
+        <Clock className="mt-px size-3 shrink-0" aria-hidden="true" />
+        Este preço é da última coleta, não do livro agora. Uma ordem pode já ter sido comprada ou
+        cancelada antes de sumir da tela.
+      </p>
 
       {analise.isError && (
         <p className="text-xs text-danger">

@@ -14,6 +14,6 @@ async def read_recipe(unique_name: str, session: AsyncSession = Depends(get_sess
     try:
         return await get_recipe_detail(session, unique_name)
     except ItemNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="item_nao_encontrado") from exc
+        raise HTTPException(status_code=404, detail="item_not_found") from exc
     except RecipeUnavailableError as exc:
-        raise HTTPException(status_code=404, detail="receita_indisponivel") from exc
+        raise HTTPException(status_code=404, detail="recipe_unavailable") from exc

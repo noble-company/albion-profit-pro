@@ -33,3 +33,47 @@ jobs:
         run: npm run test:coverage
       - name: Production build
         run: npm run build
+
+  image:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build production image
+        run: docker build -t profitpro-frontend:ci .
+      - name: Inspect image contract
+        run: |
+          test "$(docker image inspect profitpro-frontend:ci --format '{{.Config.User}}')" = "101"
+      - name: Run container
+        run: docker run -d --name profitpro-frontend-ci -p 18080:8080 profitpro-frontend:ci
+      - name: Wait for healthcheck
+        run: |
+          for i in $(seq 1 20); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' profitpro-frontend-ci)
+            [ "$status" = "healthy" ] && exit 0
+            sleep 3
+          done
+          docker logs profitpro-frontend-ci
+          exit 1
+      - name: Unknown route falls back to index.html
+        run: |
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/uma-rota-que-nao-existe)" = "200"
+      - name: Missing asset returns 404, not the SPA shell
+        run: |
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/assets/nao-existe.js)" = "404"
+      - name: index.html is revalidated, not cached long
+        run: |
+          curl -sI http://localhost:18080/ | grep -i '^cache-control: no-cache'
+      - name: Hashed assets are cached long and immutable
+        run: |
+          asset=$(docker exec profitpro-frontend-ci sh -c "basename \$(ls /usr/share/nginx/html/assets/*.js | head -1)")
+          curl -sI "http://localhost:18080/assets/$asset" | grep -i '^cache-control: public, max-age=31536000, immutable'
+      - name: Bundle uses a relative, same-origin API base (no absolute dev host baked in)
+        run: |
+          docker exec profitpro-frontend-ci sh -c "grep -q '/api' /usr/share/nginx/html/assets/index-*.js"
+          docker exec profitpro-frontend-ci sh -c "! grep -q 'localhost:8000' /usr/share/nginx/html/assets/*.js"
+      - name: Cleanup
+        if: always()
+        run: docker rm -f profitpro-frontend-ci || true

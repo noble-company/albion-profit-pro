@@ -9,3 +9,12 @@ __pycache__
 .git
 tests/
 docker-compose.yml
+
+# Higiene de imagem (task 3.6/17, P09): execução local não pode entrar no build de produção.
+# `runtime-logs/`/`.runtime-logs/`/`logs/` coexistem por deriva histórica -- ignora as três.
+runtime-logs/
+.runtime-logs/
+logs/
+*.log
+.uv-cache/
+.cache/

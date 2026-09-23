@@ -67,8 +67,8 @@ observadas. Diagnóstico em [05-revisao-fases-0-a-2.md](05-revisao-fases-0-a-2.m
 [tasks/estabilizacao/](tasks/estabilizacao/README.md). O ensaio integrado Windows/jogo/Swarm foi
 transferido para a Task 19 da Fase 3.
 
-**Fase 3 — 18/19.** O produto foi reorganizado para rankings de Market Flip, Refino e Craft.
-Só falta a task 19 (gate integrado em jogo), executada depois da Fase 3.5.
+**Fase 3 — ✅ 19/19.** O produto foi reorganizado para rankings de Market Flip, Refino e Craft.
+A task 19 (gate integrado em jogo) foi executada em 2026-09-23, depois da Fase 3.5 e da Fase 4.
 
 **Fase 3.5 (refatoração) — ✅ concluída, 28/29 tasks.** Só a task `10` (antifraude, `S01`)
 segue aberta, adiada por decisão de produto. Derivada da auditoria
@@ -109,7 +109,7 @@ O usuário quer construir uma **plataforma própria**, não só usar o client va
 2. **Infraestrutura própria**: o client passa a mandar os dados pro backend deles, não pro ingest público do Albion Data Project.
 3. **Login + vínculo de personagem**: usuário cria conta (email/senha), e os dados que o client dele captura ficam associados à conta.
 4. **Dados públicos vs. privados**: usuário escolhe entre ver os preços agregados de todos os usuários da plataforma ("públicos", entre aspas — na real é só "de todo mundo que usa nosso client") ou só os preços que ele mesmo coletou.
-5. Interface tanto **na página web** quanto **dentro do próprio client** (systray já existe em `client/systray/`).
+5. Interface tanto **na página web** quanto **dentro do próprio client** (systray já existe em `albiondata-client/systray/`).
 
 Decisões já confirmadas com o usuário:
 - **Backend**: Python/FastAPI.
@@ -231,13 +231,13 @@ saída estão em [tasks/estabilizacao/README.md](tasks/estabilizacao/README.md).
 Esta fase não implementa frontend. Ela estabiliza o contrato que as 19 tasks da Fase 3 vão
 consumir, evitando consolidar APIs enganosas ou chaves sem realm na SPA.
 
-## Fase 3 — Calculadora web (API de craft + React/Vite) — 18/19
+## Fase 3 — Calculadora web (API de craft + React/Vite) — ✅ 19/19
 
 O escopo detalhado e a ordem de implementação estão em
 [tasks/frontend/](tasks/frontend/README.md): **19 microtasks**, revisadas contra o código real em
 2026-08-23. A fase começou completando o backend (catálogo, API de receitas, contrato monetário,
 simulação e comparação) e então criou a SPA. A task 18 (resiliência + E2E) foi entregue pela
-Fase 3.5/27; só falta a **task 19** — o gate integrado em jogo.
+Fase 3.5/27; a **task 19** — o gate integrado em jogo — foi concluída em 2026-09-23.
 
 Decisões centrais:
 
@@ -311,7 +311,7 @@ Trocar o "abrir navegador" da Fase 2 por um webview nativo embutido (`github.com
 4. ~~Recipes: decidir onde `ITEM DUMP.json` mora no repo, escrever o import pra `Recipe`/`RecipeIngredient`~~ ✅ **Completo** (Fase 1b, task 19) — falta só torná-lo reexecutável (task 35).
 5. ~~Fase 2.5 — estabilização~~ ✅ **Completa, 14/14 tasks**, ver
    [tasks/estabilizacao/](tasks/estabilizacao/README.md).
-6. ~~Fase 3 — API de craft + frontend completo~~ ✅ **18/19**, ver
+6. ~~Fase 3 — API de craft + frontend completo~~ ✅ **19/19**, ver
    [tasks/frontend/](tasks/frontend/README.md).
 7. ~~Fase 3.5 — refatoração~~ ✅ **28/29**, ver [tasks/refatoracao/](tasks/refatoracao/README.md).
 8. ~~Fase 3.6 — correções da revisão da 3.5~~ **substituída pela Fase 4** (2026-09-07); as tasks

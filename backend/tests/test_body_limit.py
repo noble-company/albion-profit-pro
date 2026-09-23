@@ -8,7 +8,7 @@ async def test_malformed_content_length_returns_400_never_500(client):
         content=b"{}",
     )
     assert response.status_code == 400
-    assert response.json() == {"detail": "Content-Length inválido"}
+    assert response.json() == {"detail": "Invalid Content-Length"}
 
 
 async def test_oversized_content_length_returns_413_before_parsing(client):

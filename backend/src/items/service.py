@@ -35,11 +35,6 @@ async def upsert_locations(session: AsyncSession, location_ids: set[str]) -> Non
     await session.execute(stmt)
 
 
-async def list_location_ids(session: AsyncSession) -> list[str]:
-    result = await session.execute(select(Location.location_id))
-    return list(result.scalars().all())
-
-
 def _item_projection():
     has_recipe = exists(select(Recipe.id).where(Recipe.output_item_unique_name == Item.unique_name))
     return (

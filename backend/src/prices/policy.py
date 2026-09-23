@@ -10,7 +10,7 @@ class MarketBookPolicy:
     """Política única do livro observado, compartilhada por ingest e leitura."""
 
     freshness: timedelta
-    coverage: Literal["parcial"] = "parcial"
+    coverage: Literal["partial"] = "partial"
 
     @property
     def freshness_hours(self) -> int:

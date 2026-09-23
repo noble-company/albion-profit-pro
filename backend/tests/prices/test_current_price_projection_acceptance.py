@@ -88,7 +88,7 @@ async def test_flip_quotes_the_newest_observation_and_drops_the_older_orders(cli
 
 
 async def test_flip_flags_stale_data_and_require_complete_drops_it(client, db_session):
-    """20.1: sem coleta atual, a resposta informa a desatualização (`dado_velho`) — nunca usa
+    """20.1: sem coleta atual, a resposta informa a desatualização (`stale_data`) — nunca usa
     o preço velho em silêncio — e `require_complete` a exclui de vez."""
     _, token = await registrar_e_logar(client)
     headers = {"Authorization": f"Bearer {token}"}
@@ -111,7 +111,7 @@ async def test_flip_flags_stale_data_and_require_complete_drops_it(client, db_se
         )
     ).json()
     assert flagged["total"] == 1
-    assert flagged["opportunities"][0]["warnings"] == ["dado_velho"]
+    assert flagged["opportunities"][0]["warnings"] == ["stale_data"]
     assert flagged["opportunities"][0]["oldest_observed_at"] is not None
 
     complete = (
@@ -231,7 +231,7 @@ async def test_simulate_reports_stale_ingredient_instead_of_a_silent_price(
 
     quote = body["ingredients"][0]["immediate_purchase"]
     assert quote["total"] is None
-    assert quote["warnings"] == ["dado_velho"]
+    assert quote["warnings"] == ["stale_data"]
     scenario = next(
         s
         for s in body["scenarios"]

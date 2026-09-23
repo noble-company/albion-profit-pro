@@ -226,3 +226,28 @@ describe('snapshot só da categoria (task 22)', () => {
     expect(result.current.snapshot).toBeNull()
   })
 })
+
+describe('snapshot por saídas salvas (A07)', () => {
+  test('normaliza ordem e duplicatas na chave e na query', async () => {
+    const pedidos: URLSearchParams[] = []
+    server.use(
+      http.get('http://localhost:8000/prices/snapshot', ({ request }) => {
+        pedidos.push(new URL(request.url).searchParams)
+        return HttpResponse.json(snapshot())
+      }),
+    )
+    const client = createTestQueryClient()
+    const { result, rerender } = renderHook(
+      ({ items }: { items: string[] }) =>
+        usePriceSnapshot('west', ['1002'], { outputItems: items }),
+      { wrapper: wrapperWithQueryClient(client), initialProps: { items: ['B', 'A', 'A'] } },
+    )
+    await waitFor(() => expect(result.current.snapshot).not.toBeNull())
+    expect(pedidos.at(-1)?.getAll('output_item')).toEqual(['A', 'B'])
+
+    const count = pedidos.length
+    rerender({ items: ['A', 'B'] })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(pedidos).toHaveLength(count)
+  })
+})

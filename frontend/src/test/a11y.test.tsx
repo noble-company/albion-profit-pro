@@ -6,9 +6,11 @@ import { Route, Routes } from 'react-router'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 
 import { CalculadoraPage } from '@/craft/pages'
+import { AppShell } from '@/components/AppShell'
 import { BuscaItem } from '@/items/pages'
 import { MarketFlipPage } from '@/opportunities/pages'
 import { RefiningScannerPage } from '@/scanner/ScannerPage'
+import { SavedCraftsPage } from '@/saved-crafts/SavedCraftsPage'
 import { ItemPricesPage } from '@/prices/pages'
 import { TokensPage } from '@/tokens/pages'
 
@@ -69,6 +71,7 @@ beforeEach(() => {
       () => new HttpResponse(null, { status: 422 }),
     ),
     http.get('http://localhost:8000/auth/tokens', () => HttpResponse.json([])),
+    http.get('http://localhost:8000/me/saved-crafts', () => HttpResponse.json([])),
   )
 })
 
@@ -90,8 +93,24 @@ async function expectNoSeriousViolations(
 
 test('Market Flip — sem violação séria (axe)', async () => {
   await expectNoSeriousViolations(
-    <MarketFlipPage />,
-    /Encontre o próximo lucro/,
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/" element={<MarketFlipPage />} />
+      </Route>
+    </Routes>,
+    /Compre barato em uma cidade/,
+  )
+})
+
+test('Meus Crafts vazio — sem violação séria (axe)', async () => {
+  await expectNoSeriousViolations(
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/meus-crafts" element={<SavedCraftsPage />} />
+      </Route>
+    </Routes>,
+    /Sua bancada ainda está vazia/,
+    ['/meus-crafts'],
   )
 })
 

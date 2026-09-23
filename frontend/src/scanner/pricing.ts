@@ -246,7 +246,7 @@ function agregado(
     if (partes.length === 0) return null
     const soma = add(...partes.map(([, parte]) => parte.price))
     return {
-      price: divide(soma, partes.length).toString(),
+      price: divide(soma, String(partes.length)).toString(),
       observedAt: Math.min(...partes.map(([, parte]) => parte.observedAt)),
       source: `média de ${partes.length}`,
       locationId: null,

@@ -27,7 +27,7 @@ class RecipeOut(BaseModel):
     output: RecipeItemOut
     enchantment_level: int
     production_kind: Literal["refining", "crafting"]
-    silver_cost: int
+    silver_cost: Decimal
     crafting_focus: int
     amount_crafted: int
     craft_time: Decimal

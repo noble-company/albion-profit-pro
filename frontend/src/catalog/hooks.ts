@@ -67,6 +67,7 @@ export function useRecipeCatalog(kind: CatalogKind) {
     /** só é verdade quando não há nada para mostrar — com cache, nunca */
     loading: !cacheReady || (query.isLoading && query.data === undefined),
     error: query.error,
+    refetch: query.refetch,
     /** revalidando por trás, com conteúdo já na tela */
     revalidating: query.isFetching && query.data !== undefined,
   }

@@ -7,7 +7,11 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "f2d7e8f9a0b1"
-down_revision: tuple[str, str] = ("b3e4f5a6c7d8", "f1c6d7e8f9a0")
+# PATCH (task 3.6/17, P09): nunca existiram dois heads pra juntar -- `f1c6d7e8f9a0` já é
+# ancestral de `b3e4f5a6c7d8` (duas migrações antes: b3e4f5a6c7d8 -> a2d7e8f9b0c1 ->
+# f1c6d7e8f9a0). O `down_revision` de merge escrito à mão deixava `downgrade` percorrer um
+# ramo fantasma; o pai único correto já cobre a mesma ancestralidade.
+down_revision: str = "b3e4f5a6c7d8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

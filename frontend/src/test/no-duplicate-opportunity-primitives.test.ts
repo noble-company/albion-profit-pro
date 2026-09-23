@@ -21,13 +21,9 @@ function stripComments(code: string): string {
 
 // Onde cada primitivo tem permissão de ser DECLARADO.
 const CANON: Record<string, string> = {
-  KpiCard: '/src/components/opportunities/KpiCard.tsx',
-  FilterSelect: '/src/components/opportunities/FilterPanel.tsx',
-  FilterToggle: '/src/components/opportunities/FilterPanel.tsx',
-  FilterNumber: '/src/components/opportunities/FilterPanel.tsx',
   useOpportunityParams: '/src/opportunities/useOpportunityParams.ts',
-  // Primitivos verticais da sidebar (task 4/09). A família horizontal de `FilterPanel` não
-  // cabe numa coluna de 288 px, e espremer geraria a quarta cópia de `fieldLabel`.
+  // Primitivos verticais da sidebar (task 4/09). A task A01 removeu a família horizontal
+  // depois de migrar a última consumidora, o Market Flip.
   FilterSearch: '/src/components/filters/index.tsx',
   FilterChips: '/src/components/filters/index.tsx',
   FilterCheckbox: '/src/components/filters/index.tsx',
@@ -55,10 +51,7 @@ test('cada primitivo compartilhado é declarado uma única vez, no lugar canôni
 // componente sem o nome — o guard acima não veria.
 test('as classes de campo de filtro não são recopiadas à mão', () => {
   const offenders: string[] = []
-  const permitido = new Set([
-    '/src/components/filters/index.tsx',
-    '/src/components/opportunities/FilterPanel.tsx',
-  ])
+  const permitido = new Set(['/src/components/filters/index.tsx'])
   for (const [path, raw] of Object.entries(sources)) {
     if (path.endsWith('.test.ts') || path.endsWith('.test.tsx')) continue
     if (permitido.has(path)) continue

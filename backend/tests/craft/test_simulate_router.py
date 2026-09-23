@@ -197,7 +197,7 @@ async def test_four_scenarios_use_slippage_and_correct_fees(
         "net_revenue": "1196.0000",
     }
     assert both_orders["profit"] == "440.0000"
-    assert both_orders["warnings"] == ["ordem_nao_garantida"]
+    assert both_orders["warnings"] == ["order_not_guaranteed"]
 
 
 async def test_amount_crafted_return_focus_and_explicit_return_exception(
@@ -364,7 +364,7 @@ async def test_partial_depth_keeps_fill_but_nulls_dependent_totals(
     assert scenario["costs"]["ingredient_cost"] is None
     assert scenario["costs"]["total_cost"] is None
     assert scenario["profit"] is None
-    assert scenario["warnings"] == ["profundidade_insuficiente"]
+    assert scenario["warnings"] == ["insufficient_depth"]
 
 
 async def test_covered_side_without_price_warns_and_propagates_null(
@@ -377,7 +377,7 @@ async def test_covered_side_without_price_warns_and_propagates_null(
     body = (await cliente_autenticado.post("/craft/simulate", json=_payload())).json()
 
     quote = body["ingredients"][0]["immediate_purchase"]
-    assert quote["warnings"] == ["sem_preco"]
+    assert quote["warnings"] == ["no_price"]
     assert _scenario(body, "immediate", "immediate")["profit"] is None
 
 
@@ -399,7 +399,7 @@ async def test_stale_side_is_not_used_as_executable_price(
 
     quote = body["ingredients"][0]["immediate_purchase"]
     assert quote["total"] is None
-    assert quote["warnings"] == ["dado_velho"]
+    assert quote["warnings"] == ["stale_data"]
 
 
 async def test_scope_mine_requires_collectors_own_book_coverage(
@@ -416,10 +416,10 @@ async def test_scope_mine_requires_collectors_own_book_coverage(
 
     body = (await cliente_autenticado.post("/craft/simulate", json=_payload(scope="mine"))).json()
 
-    assert body["ingredients"][0]["immediate_purchase"]["warnings"] == ["sem_cobertura"]
+    assert body["ingredients"][0]["immediate_purchase"]["warnings"] == ["no_coverage"]
     scenario = _scenario(body, "immediate", "immediate")
     assert scenario["profit"] is None
-    assert scenario["warnings"] == ["sem_cobertura"]
+    assert scenario["warnings"] == ["no_coverage"]
 
 
 async def test_scope_mine_uses_global_book_after_own_coverage(
@@ -457,7 +457,7 @@ async def test_server_is_forwarded_to_every_book_query(cliente_autenticado, db_s
     body = (await cliente_autenticado.post("/craft/simulate", json=_payload(server="east"))).json()
 
     assert body["server"] == "east"
-    assert body["ingredients"][0]["immediate_purchase"]["warnings"] == ["sem_cobertura"]
+    assert body["ingredients"][0]["immediate_purchase"]["warnings"] == ["no_coverage"]
     assert _scenario(body, "immediate", "immediate")["profit"] is None
 
 
@@ -480,7 +480,7 @@ async def test_manual_prices_replace_missing_book_and_quality_override_is_explic
     assert ingredient["immediate_purchase"]["source"] == "manual"
     assert ingredient["immediate_purchase"]["total"] == "82.00"
     assert all(scenario["profit"] is not None for scenario in body["scenarios"])
-    assert _scenario(body, "buy_order", "sell_order")["warnings"] == ["ordem_nao_garantida"]
+    assert _scenario(body, "buy_order", "sell_order")["warnings"] == ["order_not_guaranteed"]
 
 
 async def test_semantic_404_and_validation_errors(cliente_autenticado, db_session) -> None:
@@ -495,10 +495,10 @@ async def test_semantic_404_and_validation_errors(cliente_autenticado, db_sessio
     )
     invalid = await cliente_autenticado.post("/craft/simulate", json=_payload(quantity=0))
 
-    assert (missing.status_code, missing.json()["detail"]) == (404, "item_nao_encontrado")
+    assert (missing.status_code, missing.json()["detail"]) == (404, "item_not_found")
     assert (unavailable.status_code, unavailable.json()["detail"]) == (
         404,
-        "receita_indisponivel",
+        "recipe_unavailable",
     )
     assert invalid.status_code == 422
 
@@ -514,7 +514,7 @@ async def test_unknown_manual_or_ingredient_override_is_rejected(
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "override_invalido"
+    assert response.json()["detail"] == "invalid_override"
 
 
 async def test_query_count_does_not_grow_with_ingredient_count(db_session, usuario) -> None:

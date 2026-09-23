@@ -79,7 +79,10 @@ function catalogFor(vector: Vector): ScannerCatalog {
         output_item: vector.recipe.output_item,
         production_kind: vector.recipe.production_kind,
         enchantment_level: vector.recipe.enchantment_level,
-        silver_cost: vector.recipe.silver_cost,
+        // O fixture guarda o valor bruto da receita (int, como a coluna real); o catálogo de
+        // verdade devolve decimal string (task 3.6/10, P07) — converte aqui pra bater com
+        // `ScannerCatalog['recipes']`.
+        silver_cost: String(vector.recipe.silver_cost),
         crafting_focus: vector.recipe.crafting_focus,
         amount_crafted: vector.recipe.amount_crafted,
         ingredients: vector.recipe.ingredients,

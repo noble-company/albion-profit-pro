@@ -159,4 +159,4 @@ async def test_price_freshness_window_is_single_source_in_flip(client, db_sessio
     tight_window = (
         await client.get("/opportunities/flips", params={"server": "west"}, headers=headers)
     ).json()
-    assert tight_window["opportunities"][0]["warnings"] == ["dado_velho"]
+    assert tight_window["opportunities"][0]["warnings"] == ["stale_data"]

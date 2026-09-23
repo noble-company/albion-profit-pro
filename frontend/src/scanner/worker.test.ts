@@ -48,7 +48,7 @@ const CATALOGO: ScannerCatalog = {
       output_item: 'T4_CLOTH',
       production_kind: 'crafting',
       enchantment_level: 0,
-      silver_cost: 0,
+      silver_cost: '0',
       crafting_focus: 100,
       amount_crafted: 1,
       ingredients: [

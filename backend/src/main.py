@@ -26,6 +26,7 @@ from src.prices.router import router as prices_router
 from src.prices.router import snapshot_router as prices_snapshot_router
 from src.readiness import check_rabbitmq
 from src.recipes.router import router as recipes_router
+from src.saved_crafts.router import router as saved_crafts_router
 from src.static_data.models import StaticDatasetVersion
 
 configure_logging()
@@ -48,7 +49,7 @@ class ValidarContentLengthMiddleware:
             if content_length is not None and not content_length.isdigit():
                 response = JSONResponse(
                     status_code=400,
-                    content={"detail": "Content-Length inválido"},
+                    content={"detail": "Invalid Content-Length"},
                 )
                 await response(scope, receive, send)
                 return
@@ -85,6 +86,7 @@ app.include_router(recipes_router)
 app.include_router(items_router)
 app.include_router(catalog_router)
 app.include_router(destiny_router)
+app.include_router(saved_crafts_router)
 app.include_router(prices_snapshot_router)
 app.include_router(prices_router)
 app.include_router(craft_router)
@@ -134,27 +136,27 @@ async def ready():
                 .limit(1)
             )
         checks["postgres"] = "ok"
-        checks["dataset"] = "ok" if dataset_active is not None else "ausente"
+        checks["dataset"] = "ok" if dataset_active is not None else "missing"
     except Exception:
         # detalhe completo (host/usuário/DSN podem vazar em str(exc)) só no log — o
         # O endpoint não é autenticado; detalhes internos ficam somente no log.
         log.error("ready.postgres_falhou", exc_info=True)
-        checks["postgres"] = "erro"
-        checks["dataset"] = "erro"
+        checks["postgres"] = "error"
+        checks["dataset"] = "error"
 
     try:
         await get_redis().ping()
         checks["redis"] = "ok"
     except Exception:
         log.error("ready.redis_falhou", exc_info=True)
-        checks["redis"] = "erro"
+        checks["redis"] = "error"
 
     try:
         await check_rabbitmq()
         checks["rabbitmq"] = "ok"
     except Exception:
         log.error("ready.rabbitmq_falhou", exc_info=True)
-        checks["rabbitmq"] = "erro"
+        checks["rabbitmq"] = "error"
 
     all_ok = all(v == "ok" for v in checks.values())
     status_code = 200 if all_ok else 503

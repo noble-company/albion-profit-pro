@@ -101,6 +101,7 @@ export function RowDetails({
   padraoDe,
   onOrigem,
   analise,
+  readOnly = false,
   agora = new Date(),
 }: {
   detail: ScannerDetail
@@ -117,6 +118,8 @@ export function RowDetails({
   onOrigem: (lado: Lado, item: string, origem: Origem) => void
   /** a ponte para o número exato; ausente = o painel só mostra a estimativa */
   analise?: ReactNode
+  /** Oculta os controles de origem quando o cenário é somente leitura. */
+  readOnly?: boolean
   agora?: Date
 }) {
   const { row, breakdown, scenarios, ingredients } = detail
@@ -239,7 +242,7 @@ export function RowDetails({
                       {ingrediente.subtotal ? formatSilver(ingrediente.subtotal) : TRACO}
                     </span>
                   </div>
-                  <OrigemDoPreco
+                  {!readOnly && <OrigemDoPreco
                     // A chave pela escolha: quando a URL muda a origem, o seletor recomeça do
                     // estado novo em vez de carregar o rascunho da escolha anterior.
                     key={`${ingrediente.item}:${JSON.stringify(origem)}:${JSON.stringify(padraoDe('compra'))}`}
@@ -249,7 +252,7 @@ export function RowDetails({
                     padrao={padraoDe('compra')}
                     cidades={cidades}
                     onOrigem={(escolha) => onOrigem('compra', ingrediente.item, escolha)}
-                  />
+                  />}
                 </li>
               )
             })}
@@ -272,7 +275,7 @@ export function RowDetails({
 
           {/* Junto da venda, onde o olho está — e fora do bloco que só aparece com cotação:
               escolher a origem de um item SEM mercado é quando o jogador mais precisa dela. */}
-          <OrigemDoPreco
+          {!readOnly && <OrigemDoPreco
             key={`${row.outputItem}:${JSON.stringify(origemDaVenda)}:${JSON.stringify(padraoDe('venda'))}`}
             lado="venda"
             rotulo={`de venda de ${nomeItem(row.outputItem)}`}
@@ -280,7 +283,7 @@ export function RowDetails({
             padrao={padraoDe('venda')}
             cidades={cidades}
             onOrigem={(escolha) => onOrigem('venda', row.outputItem, escolha)}
-          />
+          />}
 
           {/* Rola aqui dentro: a tabela não quebra linha, e sem isto empurrava a tela inteira para
               o lado quando o painel era estreito (Calculadora, pedido no uso). */}

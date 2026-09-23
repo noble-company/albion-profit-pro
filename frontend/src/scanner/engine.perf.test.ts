@@ -29,7 +29,7 @@ function catalogoSintetico(): { catalog: ScannerCatalog; snapshot: PriceSnapshot
       output_item: saida,
       production_kind: 'crafting',
       enchantment_level: 0,
-      silver_cost: 12,
+      silver_cost: '12',
       crafting_focus: 100,
       amount_crafted: 1,
       ingredients: [

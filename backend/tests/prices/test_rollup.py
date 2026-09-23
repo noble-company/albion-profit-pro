@@ -318,7 +318,7 @@ async def test_demand_endpoint_with_empty_book_returns_zeroed_fields_not_null(cl
     }
     assert body["book"]["sell"] == empty_side
     assert body["book"]["buy"] == empty_side
-    assert body["book"]["coverage"] == "parcial"
+    assert body["book"]["coverage"] == "partial"
     assert body["book"]["freshness_window_seconds"] == 6 * 60 * 60
     assert body["sold"]["last_24h"] == {"units": 0, "average_price": None}
     assert body["sold"]["last_7d"] == {"units": 0, "average_price": None}

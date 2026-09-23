@@ -5,7 +5,9 @@ import {
   ceilToInteger,
   divide,
   money,
+  moneyForDisplay,
   percentageCharge,
+  type FormulaInput,
   type Money,
   type MoneyInput,
 } from './money'
@@ -62,7 +64,7 @@ function validateRate(rate: Money): void {
 }
 
 /** Arredonda uma Decimal não-negativa para cima até a unidade inteira comprável. */
-export function ceilDecimal(value: MoneyInput): number {
+export function ceilDecimal(value: FormulaInput): number {
   return ceilToInteger(value).toNumber()
 }
 
@@ -71,7 +73,7 @@ export function roundDownForDisplay(
   value: MoneyInput,
   decimalPlaces = 1,
 ): Money {
-  return money(value).toDecimalPlaces(decimalPlaces, Decimal.ROUND_FLOOR)
+  return moneyForDisplay(value).toDecimalPlaces(decimalPlaces, Decimal.ROUND_FLOOR)
 }
 
 export function calculateProduction(
@@ -96,7 +98,7 @@ export function calculateProduction(
 export function calculateIngredientRequirement(
   countPerExecution: number,
   executions: number,
-  returnRate: MoneyInput,
+  returnRate: FormulaInput,
   returnEligible = true,
 ): IngredientRequirement {
   if (countPerExecution < 0) {
@@ -150,15 +152,15 @@ export function calculateFocusConsumed(
  * artifício, que não têm ingrediente. Cobrar uma taxa inventada ali seria pior que não cobrar.
  */
 export function calculateStationFee(
-  itemValue: MoneyInput | null,
-  feePer100Nutrition: MoneyInput,
+  itemValue: FormulaInput | null,
+  feePer100Nutrition: FormulaInput,
   executions: number,
 ): Money {
   const fee = money(feePer100Nutrition)
   if (fee.isNegative()) {
     throw new RangeError('fee_per_100_nutrition deve ser não-negativo')
   }
-  if (itemValue === null || executions <= 0) return money(0)
+  if (itemValue === null || executions <= 0) return ZERO
 
   const valor = money(itemValue)
   if (valor.isNegative()) {
@@ -172,16 +174,16 @@ export function calculateStationFee(
 }
 
 export function calculatePercentageCharge(
-  base: MoneyInput,
-  rate: MoneyInput,
+  base: FormulaInput,
+  rate: FormulaInput,
 ): Money {
   return percentageCharge(base, rate)
 }
 
 export function calculateAcquisitionCost(
-  quotedCost: MoneyInput,
+  quotedCost: FormulaInput,
   mode: AcquisitionMode,
-  setupFeeRate: MoneyInput,
+  setupFeeRate: FormulaInput,
 ): AcquisitionCost {
   const quoted = money(quotedCost)
   if (quoted.isNegative()) {
@@ -194,10 +196,10 @@ export function calculateAcquisitionCost(
 }
 
 export function calculateSaleRevenue(
-  grossRevenue: MoneyInput,
+  grossRevenue: FormulaInput,
   mode: SaleMode,
-  salesTaxRate: MoneyInput,
-  setupFeeRate: MoneyInput,
+  salesTaxRate: FormulaInput,
+  setupFeeRate: FormulaInput,
 ): SaleRevenue {
   const gross = money(grossRevenue)
   if (gross.isNegative()) {
@@ -217,8 +219,8 @@ export function calculateSaleRevenue(
 }
 
 export function calculateFinancialResult(
-  totalCost: MoneyInput,
-  netRevenue: MoneyInput,
+  totalCost: FormulaInput,
+  netRevenue: FormulaInput,
   producedQuantity: number,
 ): FinancialResult {
   const cost = money(totalCost)
@@ -232,7 +234,9 @@ export function calculateFinancialResult(
   const profit = net.minus(cost)
   return {
     profit,
-    profitPerUnit: divide(profit, producedQuantity),
+    // produced_quantity é contagem (inteiro exato), não dinheiro -- string só pra satisfazer
+    // FormulaInput, sem perda nenhuma de precisão.
+    profitPerUnit: divide(profit, String(producedQuantity)),
     roi: cost.isZero() ? null : divide(profit, cost),
   }
 }

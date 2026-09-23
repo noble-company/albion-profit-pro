@@ -1,7 +1,8 @@
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import current_active_user
@@ -21,6 +22,14 @@ router = APIRouter(
     tags=["opportunities"],
     dependencies=[Depends(current_active_user), _opportunities_rate_limit],
 )
+
+TierValue = Annotated[int, Field(ge=1, le=8)]
+EnchantmentValue = Annotated[int, Field(ge=0, le=4)]
+QualityValue = Annotated[int, Field(ge=1, le=5)]
+
+
+def _normalized[T](values: list[T] | None) -> list[T]:
+    return sorted(set(values or []))
 
 
 async def _cached_page(kind: str, params: dict) -> OpportunityPage | None:
@@ -46,10 +55,11 @@ async def flips(
     subcategory: str | None = Query(None, max_length=64),
     subcategory2: str | None = Query(None, max_length=64),
     subcategory3: str | None = Query(None, max_length=64),
-    location_id: list[str] | None = Query(None),
-    tier: int | None = Query(None, ge=1, le=8),
-    enchantment_level: int | None = Query(None, ge=0, le=4),
-    quality_level: int | None = Query(None, ge=1, le=5),
+    buy_location_id: list[str] | None = Query(None),
+    sell_location_id: list[str] | None = Query(None),
+    tier: list[TierValue] | None = Query(None),
+    enchantment_level: list[EnchantmentValue] | None = Query(None),
+    quality_level: list[QualityValue] | None = Query(None),
     max_age_hours: int | None = Query(None, ge=1, le=168),
     require_complete: bool = Query(False),
     limit: int = Query(50, ge=1, le=200),
@@ -63,6 +73,11 @@ async def flips(
     direction: Literal["asc", "desc"] = Query("desc"),
     session: AsyncSession = Depends(get_session),
 ):
+    buy_locations = _normalized(buy_location_id)
+    sell_locations = _normalized(sell_location_id)
+    tiers = _normalized(tier)
+    enchantments = _normalized(enchantment_level)
+    qualities = _normalized(quality_level)
     cache_params = {
         "server": server.value,
         "item_id": item_id,
@@ -70,10 +85,11 @@ async def flips(
         "subcategory": subcategory,
         "subcategory2": subcategory2,
         "subcategory3": subcategory3,
-        "locations": location_id or [],
-        "tier": tier,
-        "enchantment": enchantment_level,
-        "quality": quality_level,
+        "buy_locations": buy_locations,
+        "sell_locations": sell_locations,
+        "tiers": tiers,
+        "enchantments": enchantments,
+        "qualities": qualities,
         "max_age_hours": max_age_hours,
         "require_complete": require_complete,
         "limit": limit,
@@ -97,9 +113,10 @@ async def flips(
         subcategory=subcategory,
         subcategory2=subcategory2,
         subcategory3=subcategory3,
-        locations=location_id or [],
-        tier=tier,
-        enchantment=enchantment_level,
+        buy_locations=buy_locations,
+        sell_locations=sell_locations,
+        tiers=tiers,
+        enchantments=enchantments,
         limit=limit,
         offset=offset,
         min_profit=min_profit,
@@ -107,7 +124,7 @@ async def flips(
         premium=premium,
         buy_order=buy_order,
         sell_order=sell_order,
-        quality=quality_level,
+        qualities=qualities,
         max_age_hours=max_age_hours,
         require_complete=require_complete,
         sort=sort,

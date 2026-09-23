@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 import {
   add,
   compare,
+  divide,
   formatPercent,
   formatQuantity,
   formatSilver,
@@ -105,5 +106,38 @@ describe('formatação', () => {
     expect(formatSilver('Infinity')).toBe('—')
     expect(formatQuantity('Infinity')).toBe('—')
     expect(formatPercent('-Infinity')).toBe('—')
+  })
+})
+
+describe('money — fórmula recusa number em tempo de compilação (task 3.6/10, P07)', () => {
+  // `@ts-expect-error` numa linha que NÃO erra é, ela mesma, um erro de compilação (nativo do
+  // TypeScript, sem flag nenhuma) -- então `npm run typecheck` reprova sozinho se algum dia
+  // `money`/`add`/`subtract`/`divide`/`compare`/`isZero`/`isPositive`/`percentageCharge`/
+  // `multiplyByQuantity` voltarem a aceitar `number` no lado do dinheiro. O teste em si só
+  // prova que o arquivo compila e roda; quem garante a regra é o `npm run typecheck`.
+  test('caminhos de fórmula não compilam com number — prova em tempo de tipo', () => {
+    // @ts-expect-error number não é FormulaInput
+    money(5)
+    // @ts-expect-error number não é FormulaInput
+    add('1', 2)
+    // @ts-expect-error number não é FormulaInput
+    subtract(5, '1')
+    // @ts-expect-error number não é FormulaInput
+    divide(5, '2')
+    // @ts-expect-error number não é FormulaInput
+    compare(5, '5')
+    // @ts-expect-error number não é FormulaInput
+    isZero(0)
+    // @ts-expect-error number não é FormulaInput
+    isPositive(1)
+    // @ts-expect-error number não é FormulaInput
+    percentageCharge(100, '0.04')
+    // multiplyByQuantity(valor, quantidade): quantidade É number de propósito (contagem), só o
+    // valor (1º argumento) tem que recusar number.
+    // @ts-expect-error number não é FormulaInput
+    multiplyByQuantity(5, 3)
+
+    // roundDownForDisplay é apresentação, não fórmula -- continua aceitando number de propósito.
+    expect(roundDownForDisplay(2.5).toString()).toBe('2.5')
   })
 })

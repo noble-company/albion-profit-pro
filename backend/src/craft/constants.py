@@ -32,8 +32,8 @@ class SaleMode(StrEnum):
 class CraftWarning(StrEnum):
     """Stable warning identifiers returned by craft simulations."""
 
-    STALE_DATA = "dado_velho"
-    INSUFFICIENT_DEPTH = "profundidade_insuficiente"
-    NO_PRICE = "sem_preco"
-    NO_COVERAGE = "sem_cobertura"
-    ORDER_NOT_GUARANTEED = "ordem_nao_garantida"
+    STALE_DATA = "stale_data"
+    INSUFFICIENT_DEPTH = "insufficient_depth"
+    NO_PRICE = "no_price"
+    NO_COVERAGE = "no_coverage"
+    ORDER_NOT_GUARANTEED = "order_not_guaranteed"

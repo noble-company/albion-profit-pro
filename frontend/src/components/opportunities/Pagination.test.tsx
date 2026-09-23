@@ -17,7 +17,7 @@ test('na primeira página o "Anterior" fica desabilitado', () => {
   )
   expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Próxima' })).toBeEnabled()
-  expect(screen.getByText('Página 1 · 100 oportunidades')).toBeInTheDocument()
+  expect(screen.getByText('Página 1 de 4')).toBeInTheDocument()
 })
 
 test('na última página o "Próxima" fica desabilitado', () => {
@@ -25,7 +25,7 @@ test('na última página o "Próxima" fica desabilitado', () => {
     <Pagination offset={75} limit={25} total={100} onOffsetChange={vi.fn()} />,
   )
   expect(screen.getByRole('button', { name: 'Próxima' })).toBeDisabled()
-  expect(screen.getByText('Página 4 · 100 oportunidades')).toBeInTheDocument()
+  expect(screen.getByText('Página 4 de 4')).toBeInTheDocument()
 })
 
 test('avançar/voltar pedem o novo offset — nunca menos que zero', async () => {
