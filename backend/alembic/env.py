@@ -39,7 +39,18 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+
+def escape_percent_for_configparser(url: str) -> str:
+    """`Config.set_main_option` grava no `configparser` interno do Alembic, que trata `%` como
+    início de interpolação (`%(nome)s`) por padrão -- uma URL com senha percent-encoded (`%40`
+    pra um `@` literal, por exemplo) quebra com "invalid interpolation syntax". `%%` escapa o
+    literal; `configparser` desfaz na leitura, então `get_main_option` devolve a URL original."""
+    return url.replace("%", "%%")
+
+
+config.set_main_option(
+    "sqlalchemy.url", escape_percent_for_configparser(get_settings().database_url)
+)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
