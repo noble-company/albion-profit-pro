@@ -13,16 +13,19 @@ import "testing"
 
 func TestResolveApiToken(t *testing.T) {
 	casos := []struct {
-		nome       string
-		fromFlag   string
-		fromFile   string
-		wantToken  string
-		wantOrigem string
+		nome           string
+		fromFlag       string
+		fromFile       string
+		profile        string
+		releaseDefault string
+		wantToken      string
+		wantOrigem     string
 	}{
 		{
 			nome:       "flag vence o arquivo",
 			fromFlag:   "apk_daflag",
 			fromFile:   "apk_doarquivo",
+			profile:    "development",
 			wantToken:  "apk_daflag",
 			wantOrigem: "flag -token",
 		},
@@ -30,6 +33,7 @@ func TestResolveApiToken(t *testing.T) {
 			nome:       "arquivo usado quando a flag esta vazia",
 			fromFlag:   "",
 			fromFile:   "apk_doarquivo",
+			profile:    "development",
 			wantToken:  "apk_doarquivo",
 			wantOrigem: "config.yaml",
 		},
@@ -37,21 +41,55 @@ func TestResolveApiToken(t *testing.T) {
 			nome:       "flag usada quando nao ha arquivo",
 			fromFlag:   "apk_daflag",
 			fromFile:   "",
+			profile:    "development",
 			wantToken:  "apk_daflag",
 			wantOrigem: "flag -token",
 		},
 		{
-			nome:       "ambos vazios nao inventa token nem origem",
+			nome:       "ambos vazios em desenvolvimento nao inventa token nem origem",
 			fromFlag:   "",
 			fromFile:   "",
+			profile:    "development",
 			wantToken:  "",
 			wantOrigem: "",
+		},
+		{
+			// PATCH LOCAL (Albion Profit Pro): sem isto, amigos testando o app precisariam
+			// gerar e colar um token so pra abrir o client -- friccao que o pedido explicito
+			// do produto (2026-09-23) quis remover enquanto token != assinatura.
+			nome:           "release sem flag nem arquivo usa o token compartilhado injetado por ldflags",
+			fromFlag:       "",
+			fromFile:       "",
+			profile:        "release",
+			releaseDefault: "apk_compartilhado",
+			wantToken:      "apk_compartilhado",
+			wantOrigem:     "build de release",
+		},
+		{
+			nome:           "release sem nenhum token injetado continua vazio",
+			fromFlag:       "",
+			fromFile:       "",
+			profile:        "release",
+			releaseDefault: "",
+			wantToken:      "",
+			wantOrigem:     "",
+		},
+		{
+			// Um token pessoal (config.yaml ou -token) sempre vence o compartilhado -- e o que
+			// permite ligar token a usuario/assinatura no futuro sem mudar esta funcao.
+			nome:           "token pessoal no arquivo vence o default de release",
+			fromFlag:       "",
+			fromFile:       "apk_pessoal",
+			profile:        "release",
+			releaseDefault: "apk_compartilhado",
+			wantToken:      "apk_pessoal",
+			wantOrigem:     "config.yaml",
 		},
 	}
 
 	for _, caso := range casos {
 		t.Run(caso.nome, func(t *testing.T) {
-			token, origem := resolveApiToken(caso.fromFlag, caso.fromFile)
+			token, origem := resolveApiToken(caso.fromFlag, caso.fromFile, caso.profile, caso.releaseDefault)
 			if token != caso.wantToken {
 				t.Errorf("token = %q, esperado %q", token, caso.wantToken)
 			}

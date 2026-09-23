@@ -37,6 +37,11 @@ var (
 	buildProfile               = "development"
 	releasePublicIngestBaseURL string
 	releaseCalculatorURL       string
+	// PATCH LOCAL (Albion Profit Pro): token de API "de fabrica" injetado por ldflags nos
+	// binarios de release -- o usuario final (ex: amigos testando) nao precisa gerar nem colar
+	// token nenhum, o client ja sobe funcional. Um token pessoal em config.yaml/-token continua
+	// tendo prioridade (resolveApiToken), entao nada muda pra quem ja configura o proprio.
+	releaseApiToken string
 )
 
 // ansiStripWriter wraps an io.Writer and strips ANSI escape codes before writing
@@ -121,7 +126,12 @@ func (config *config) SetupFlags() {
 	// do flag.Parse(). setupWebsocketFlags() le o viper la em cima, antes das flags sequer
 	// existirem -- resolver antes faria o default vazio da flag sobrescrever o valor do
 	// config.yaml no Parse.
-	config.ApiToken, config.apiTokenOrigem = resolveApiToken(config.ApiToken, viper.GetString("ApiToken"))
+	config.ApiToken, config.apiTokenOrigem = resolveApiToken(
+		config.ApiToken,
+		viper.GetString("ApiToken"),
+		buildProfile,
+		releaseApiToken,
+	)
 	config.PublicIngestBaseUrls, config.publicIngestOrigem = resolvePublicIngestBaseURLs(
 		config.PublicIngestBaseUrls,
 		viper.GetString("PublicIngestBaseUrls"),
@@ -196,7 +206,12 @@ func reloadConnectionConfigFromFile() error {
 	if err := viper.ReadInConfig(); err != nil {
 		return err
 	}
-	token, tokenOrigin := resolveApiToken(ConfigGlobal.apiTokenFlag, viper.GetString("ApiToken"))
+	token, tokenOrigin := resolveApiToken(
+		ConfigGlobal.apiTokenFlag,
+		viper.GetString("ApiToken"),
+		buildProfile,
+		releaseApiToken,
+	)
 	targets, targetOrigin := resolvePublicIngestBaseURLs(
 		ConfigGlobal.publicIngestFlag,
 		viper.GetString("PublicIngestBaseUrls"),
@@ -224,14 +239,21 @@ func reloadConnectionConfigFromFile() error {
 	return nil
 }
 
-// resolveApiToken decide de onde vem o token: flag vence config.yaml, config.yaml vence
-// vazio. Extraida do SetupFlags pra ser testavel sem mexer no flag.CommandLine global.
-func resolveApiToken(fromFlag string, fromFile string) (token string, origem string) {
+// resolveApiToken decide de onde vem o token: flag vence config.yaml, config.yaml vence o
+// default de release injetado por ldflags, e so entao fica vazio. Extraida do SetupFlags pra
+// ser testavel sem mexer no flag.CommandLine global. Mesma precedencia de
+// resolvePublicIngestBaseURLs/resolveCalculatorURL -- um token pessoal sempre vence o
+// compartilhado "de fabrica", entao ligar token a usuario/assinatura no futuro nao exige mudar
+// esta funcao, so parar de injetar o default no build.
+func resolveApiToken(fromFlag, fromFile, profile, releaseDefault string) (token string, origem string) {
 	if fromFlag != "" {
 		return fromFlag, "flag -token"
 	}
 	if fromFile != "" {
 		return fromFile, "config.yaml"
+	}
+	if strings.EqualFold(profile, "release") && strings.TrimSpace(releaseDefault) != "" {
+		return strings.TrimSpace(releaseDefault), "build de release"
 	}
 	return "", ""
 }

@@ -26,6 +26,7 @@ jobs:
           UPDATE_CHANNEL: disabled
           BUILD_PROFILE: release
           PUBLIC_INGEST_BASE_URL: ${{ vars.PROFITPRO_INGEST_URL }}
+          SHARED_API_TOKEN: ${{ secrets.PROFITPRO_SHARED_API_TOKEN }}
         run: scripts/build-linux.sh
       - name: Upload Linux assets
         env:
@@ -51,6 +52,7 @@ jobs:
           UPDATE_CHANNEL: disabled
           BUILD_PROFILE: release
           PUBLIC_INGEST_BASE_URL: ${{ vars.PROFITPRO_INGEST_URL }}
+          SHARED_API_TOKEN: ${{ secrets.PROFITPRO_SHARED_API_TOKEN }}
         run: scripts/build-windows.sh
       - name: Upload Windows assets
         env:
@@ -78,10 +80,11 @@ jobs:
         env:
           VERSION: ${{ github.event.release.tag_name }}
           PUBLIC_INGEST_BASE_URL: ${{ vars.PROFITPRO_INGEST_URL }}
+          SHARED_API_TOKEN: ${{ secrets.PROFITPRO_SHARED_API_TOKEN }}
         run: |
           VERSION="${VERSION#v}"
           CGO_ENABLED=1 GOARCH=amd64 CC="clang -arch x86_64" CGO_LDFLAGS="-arch x86_64" \
-            go build -ldflags "-s -w -X main.version=${VERSION} -X main.updateChannel=disabled -X github.com/ao-data/albiondata-client/client.buildProfile=release -X github.com/ao-data/albiondata-client/client.releasePublicIngestBaseURL=${PUBLIC_INGEST_BASE_URL}" albiondata-client.go
+            go build -ldflags "-s -w -X main.version=${VERSION} -X main.updateChannel=disabled -X github.com/ao-data/albiondata-client/client.buildProfile=release -X github.com/ao-data/albiondata-client/client.releasePublicIngestBaseURL=${PUBLIC_INGEST_BASE_URL} -X github.com/ao-data/albiondata-client/client.releaseApiToken=${SHARED_API_TOKEN}" albiondata-client.go
           gzip -k9 albiondata-client
           mv albiondata-client.gz update-darwin-amd64.gz
           mkdir -p scripts/albiondata-client

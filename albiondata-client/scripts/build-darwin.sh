@@ -11,7 +11,11 @@ UPDATE_GITHUB_REPO="${UPDATE_GITHUB_REPO:-}"
 BUILD_PROFILE="${BUILD_PROFILE:-release}"
 PUBLIC_INGEST_BASE_URL="${PUBLIC_INGEST_BASE_URL:-}"
 CALCULATOR_URL="${CALCULATOR_URL:-}"
-BUILD_LDFLAGS="-s -w -X main.version=${BUILD_VERSION} -X main.updateChannel=${UPDATE_CHANNEL} -X main.updateGithubOwner=${UPDATE_GITHUB_OWNER} -X main.updateGithubRepo=${UPDATE_GITHUB_REPO} -X github.com/ao-data/albiondata-client/client.buildProfile=${BUILD_PROFILE} -X github.com/ao-data/albiondata-client/client.releasePublicIngestBaseURL=${PUBLIC_INGEST_BASE_URL} -X github.com/ao-data/albiondata-client/client.releaseCalculatorURL=${CALCULATOR_URL}"
+# PATCH LOCAL (Albion Profit Pro): token de API compartilhado "de fabrica" -- decisao de
+# produto (2026-09-23) pra amigos testando o app abrirem o client sem gerar/colar token nenhum.
+# Um token pessoal em config.yaml/-token sempre tem prioridade (resolveApiToken).
+SHARED_API_TOKEN="${SHARED_API_TOKEN:-}"
+BUILD_LDFLAGS="-s -w -X main.version=${BUILD_VERSION} -X main.updateChannel=${UPDATE_CHANNEL} -X main.updateGithubOwner=${UPDATE_GITHUB_OWNER} -X main.updateGithubRepo=${UPDATE_GITHUB_REPO} -X github.com/ao-data/albiondata-client/client.buildProfile=${BUILD_PROFILE} -X github.com/ao-data/albiondata-client/client.releasePublicIngestBaseURL=${PUBLIC_INGEST_BASE_URL} -X github.com/ao-data/albiondata-client/client.releaseCalculatorURL=${CALCULATOR_URL} -X github.com/ao-data/albiondata-client/client.releaseApiToken=${SHARED_API_TOKEN}"
 
 apt-get update && apt-get install -y libpcap-dev zip
 
