@@ -1,0 +1,114 @@
+# Ensaio local do bundle de produção (task 3/19 — o "ensaio integrado em jogo" que a Fase 3.6
+# task 13 deixou pendente). NÃO é o stack.production.example.yml: aquele é Swarm real, com
+# secrets externos e Traefik com TLS, pro host de produção. Aqui é só pra rodar as MESMAS
+# imagens Docker localmente, contra o Postgres/Redis/RabbitMQ do dev (docker-compose.yml), com
+# um nginx de borda fino reproduzindo o "mesma origem" (/api → api, resto → frontend) que o
+# Traefik faz em produção — sem precisar de TLS/DNS real pra validar o produto com o jogo aberto.
+#
+# Uso (a partir de backend/):
+#   docker compose -f docker-compose.yml -f docker-compose.production-local.yml up -d
+#
+# Imagens: `docker build -t profitpro-backend:local backend/` e
+# `docker build -t profitpro-frontend:local frontend/` antes de subir.
+
+x-backend-env: &backend-env
+  env_file: .env
+  environment:
+    ENVIRONMENT: production
+    DATABASE_URL: postgresql+asyncpg://profitpro:profitpro@postgres:5432/profitpro
+    REDIS_URL: redis://redis:6379/0
+    RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672//
+
+services:
+  migrate:
+    image: profitpro-backend:local
+    <<: *backend-env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: profitpro-backend:local
+    <<: *backend-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  worker-ingest:
+    image: profitpro-backend:local
+    <<: *backend-env
+    command: ["celery", "-A", "src.celery_app.celery_app", "worker", "--queues", "ingest", "--concurrency", "4", "--prefetch-multiplier", "1", "--hostname", "ingest@%h", "--loglevel", "INFO"]
+    # Sobrescreve o HEALTHCHECK da imagem base (testa a API em :8000, que não existe aqui dentro)
+    # — mesmo padrão do stack.production.example.yml, um por papel.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.celery_app.celery_app inspect ping --destination ingest@$$(hostname) --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker-maintenance:
+    image: profitpro-backend:local
+    <<: *backend-env
+    command: ["celery", "-A", "src.celery_app.celery_app", "worker", "--queues", "maintenance", "--concurrency", "1", "--prefetch-multiplier", "1", "--hostname", "maintenance@%h", "--loglevel", "INFO"]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.celery_app.celery_app inspect ping --destination maintenance@$$(hostname) --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker-quarantine:
+    image: profitpro-backend:local
+    <<: *backend-env
+    command: ["celery", "-A", "src.celery_app.celery_app", "worker", "--queues", "quarantine", "--concurrency", "1", "--prefetch-multiplier", "1", "--hostname", "quarantine@%h", "--loglevel", "INFO"]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.celery_app.celery_app inspect ping --destination quarantine@$$(hostname) --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  beat:
+    image: profitpro-backend:local
+    <<: *backend-env
+    command: ["celery", "-A", "src.celery_app.celery_app", "beat", "--schedule", "/tmp/celerybeat-schedule", "--pidfile", "/tmp/celerybeat.pid", "--loglevel", "INFO"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /tmp/celerybeat.pid && kill -0 $$(cat /tmp/celerybeat.pid)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    image: profitpro-frontend:local
+
+  edge-proxy:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./local-edge-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+      - frontend
