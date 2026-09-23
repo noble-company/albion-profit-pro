@@ -112,9 +112,16 @@ Section $(TEXT_SecBase) SecBase
   ; Main executable
   File "${TOP_SRCDIR}\${PACKAGE_EXE}"
 
-  ; WinPCAP driver
-  File "${TOP_SRCDIR}\thirdparty\WinPcap_4_1_3.exe"
-  PUSH "WinPcap_4_1_3.exe"
+  ; PATCH LOCAL (Albion Profit Pro): NAO embutimos driver de captura. O WinPcap 4.1.3 esta
+  ; descontinuado e a licenca gratuita do Npcap nao permite redistribui-lo dentro do nosso
+  ; instalador. Em vez disso, detecta o Npcap e, se faltar, abre a pagina oficial de download.
+  SetRegView 64
+  ReadRegStr $0 HKLM "SOFTWARE\Npcap" ""
+  SetRegView 32
+  StrCmp $0 "" 0 npcap_ok
+  MessageBox MB_YESNO|MB_ICONINFORMATION "O Npcap (driver de captura de pacotes) nao foi encontrado. O client precisa dele para ler os precos do jogo.$\r$\n$\r$\nAbrir a pagina de download agora? Na instalacao do Npcap, deixe marcada a opcao WinPcap API-compatible Mode." IDNO npcap_ok
+  ExecShell "open" "https://npcap.com/#download"
+  npcap_ok:
 
   File "${TOP_SRCDIR}\LICENSE"
   Push "LICENSE"
@@ -152,12 +159,6 @@ Section $(TEXT_SecBase) SecBase
 ; Create Task to run the Client as Admin on Logon
   Exec 'c:\Windows\System32\schtasks.exe /Create /F /SC ONLOGON /RL HIGHEST /TN "Albion Data Client" /TR "\"$INSTDIR\albiondata-client.exe\" -minimize"'
 
-SectionEnd
-
-Section $(TEXT_SecWinPcap) SecWinPcap
-  SetOutPath "$INSTDIR"
-  File "${TOP_SRCDIR}\thirdparty\WinPcap_4_1_3.exe"
-  ExecWait '"$INSTDIR\WinPcap_4_1_3.exe"'
 SectionEnd
 
 
@@ -207,8 +208,6 @@ FunctionEnd
 LangString TEXT_SecBase ${LANG_ENGLISH} "Core files"
 LangString DESC_SecBase ${LANG_ENGLISH} "The core files required to run ${PACKAGE_NAME}."
 
-LangString TEXT_SecWinPcap ${LANG_ENGLISH} "WinPCAP"
-LangString DESC_SecWinPcap ${LANG_ENGLISH} "WinPCAP Driver"
 
 
 ;--------------------------------
@@ -219,8 +218,6 @@ Section "Uninstall"
   ; Main executable
   Delete "$INSTDIR\${PACKAGE_EXE}"
 
-  ; WinPCAP driver
-  Delete "$INSTDIR\WinPcap_4_1_3.exe"
   Delete "$INSTDIR\LICENSE.txt"
   Delete "$INSTDIR\uninstall.exe"
   RmDir "$INSTDIR"
