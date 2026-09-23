@@ -84,7 +84,9 @@ class DatasetManifest(BaseModel):
     schema_version: int = Field(ge=2, le=2)
     dataset_name: str = Field(min_length=1, max_length=64)
     version: str = Field(min_length=1, max_length=128)
-    transform_revision: str = Field(min_length=1, max_length=128)
+    # 128 estourou na prática (task 3.6/17, W11): a cadeia de sufixos -v1 só cresce a cada
+    # transformação nova, nunca encolhe. 256 dá folga real sem virar um limite inútil.
+    transform_revision: str = Field(min_length=1, max_length=256)
     source: SourceManifest
     files: FilesManifest
     locations: LocationsManifest
